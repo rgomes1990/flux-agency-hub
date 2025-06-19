@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function Auth() {
   const { user, signIn, loading } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,10 +34,10 @@ export default function Auth() {
     setIsLoading(true);
     setError('');
 
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(username, password);
     
     if (error) {
-      setError('Email ou senha incorretos. Tente novamente.');
+      setError('Usuário ou senha incorretos. Tente novamente.');
     }
     
     setIsLoading(false);
@@ -61,14 +61,15 @@ export default function Auth() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Usuário</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 disabled={isLoading}
+                placeholder="Digite seu usuário"
               />
             </div>
             
@@ -81,6 +82,7 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                placeholder="Digite sua senha"
               />
             </div>
             

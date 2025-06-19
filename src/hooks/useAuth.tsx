@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (username: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -39,7 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
+    // Para o usuário específico, mapear username para email
+    let email = username;
+    if (username === 'rogerio-projetos') {
+      email = 'rogerio-projetos@sistema.com';
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,

@@ -18,6 +18,14 @@ export function Header() {
     await signOut();
   };
 
+  // Mapear email para username para exibição
+  const getDisplayName = () => {
+    if (user?.email === 'rogerio-projetos@sistema.com') {
+      return 'rogerio-projetos';
+    }
+    return user?.email || '';
+  };
+
   return (
     <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between">
       <div className="flex items-center space-x-4">
@@ -47,7 +55,7 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center space-x-2">
               <User className="h-4 w-4" />
-              <span className="text-sm">{user?.email}</span>
+              <span className="text-sm">{getDisplayName()}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
