@@ -3,7 +3,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
-const Index = () => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -14,8 +18,9 @@ const Index = () => {
     );
   }
 
-  // Redirect to dashboard if authenticated, otherwise to auth page
-  return <Navigate to={user ? "/dashboard" : "/auth"} replace />;
-};
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-export default Index;
+  return <>{children}</>;
+}
