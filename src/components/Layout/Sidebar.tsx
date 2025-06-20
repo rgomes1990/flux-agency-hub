@@ -10,7 +10,8 @@ import {
   CheckSquare,
   Settings,
   BarChart3,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +31,10 @@ export function Sidebar() {
   return (
     <div className="flex h-screen w-64 flex-col bg-slate-900 text-white">
       <div className="flex h-16 items-center justify-center border-b border-slate-700">
-        <h1 className="text-xl font-bold text-blue-400">AgencyPro</h1>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-6 w-6 text-pink-400" />
+          <h1 className="text-xl font-bold text-pink-400">BeautyPro</h1>
+        </div>
       </div>
       
       <nav className="flex-1 space-y-1 px-4 py-4">
@@ -43,7 +47,7 @@ export function Sidebar() {
               cn(
                 'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-pink-600 text-white'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               )
             }
@@ -56,12 +60,12 @@ export function Sidebar() {
       
       <div className="border-t border-slate-700 p-4">
         <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-            <span className="text-sm font-medium">AD</span>
+          <div className="h-8 w-8 rounded-full bg-pink-500 flex items-center justify-center">
+            <span className="text-sm font-medium">BP</span>
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium">Admin User</p>
-            <p className="text-xs text-slate-400">admin@agency.com</p>
+            <p className="text-sm font-medium">Beauty Pro</p>
+            <p className="text-xs text-slate-400">Estética & Marketing</p>
           </div>
         </div>
       </div>
