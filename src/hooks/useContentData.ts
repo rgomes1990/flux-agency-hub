@@ -13,7 +13,6 @@ interface ContentItem {
   captacao: string;
   edicao_video: string;
   informacoes: string;
-  pessoa?: string;
   observacoes?: string;
 }
 
@@ -23,6 +22,12 @@ interface Group {
   color: string;
   isExpanded: boolean;
   items: ContentItem[];
+}
+
+interface ServiceStatus {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export const useContentData = () => {
@@ -37,43 +42,58 @@ export const useContentData = () => {
           id: '1',
           elemento: 'CT - VIDAS',
           servicos: '12 Artes + Conteúdo',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
+          titulos: 'aprovados',
+          textos: 'aprovados',
+          artes: 'aprovados',
+          postagem: 'feito',
           roteiro_videos: '',
           captacao: '',
           edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
+          informacoes: 'Falta somente o vídeo (tema 08)'
         },
         {
           id: '2',
           elemento: 'Darja',
           servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
+          titulos: 'aprovados',
+          textos: 'aprovados',
+          artes: 'aprovados',
+          postagem: 'feito',
           roteiro_videos: '',
           captacao: '',
           edicao_video: '',
-          informacoes: 'Falta somente o vídeo (tema 08)',
-          pessoa: '👤'
+          informacoes: 'Falta somente o vídeo (tema 08)'
         }
-        // ... resto dos itens iniciais
       ]
     }
+  ]);
+
+  const [statuses, setStatuses] = useState<ServiceStatus[]>([
+    { id: 'aprovados', name: 'Aprovados', color: 'bg-green-500' },
+    { id: 'feito', name: 'Feito', color: 'bg-blue-500' },
+    { id: 'parado', name: 'Parado', color: 'bg-red-500' },
+    { id: 'em-andamento', name: 'Em Andamento', color: 'bg-yellow-500' },
+    { id: 'revisao', name: 'Em Revisão', color: 'bg-purple-500' }
   ]);
 
   // Carregar dados do localStorage ao inicializar
   useEffect(() => {
     const savedData = localStorage.getItem('contentData');
+    const savedStatuses = localStorage.getItem('contentStatuses');
+    
     if (savedData) {
       try {
         setGroups(JSON.parse(savedData));
       } catch (error) {
         console.error('Erro ao carregar dados do conteúdo:', error);
+      }
+    }
+    
+    if (savedStatuses) {
+      try {
+        setStatuses(JSON.parse(savedStatuses));
+      } catch (error) {
+        console.error('Erro ao carregar status:', error);
       }
     }
   }, []);
@@ -82,6 +102,11 @@ export const useContentData = () => {
   useEffect(() => {
     localStorage.setItem('contentData', JSON.stringify(groups));
   }, [groups]);
+
+  // Salvar status no localStorage sempre que statuses mudar
+  useEffect(() => {
+    localStorage.setItem('contentStatuses', JSON.stringify(statuses));
+  }, [statuses]);
 
   const updateGroups = (newGroups: Group[]) => {
     setGroups(newGroups);
@@ -96,7 +121,7 @@ export const useContentData = () => {
       items: []
     };
     
-    setGroups([...groups, newGroup]);
+    setGroups(prev => [...prev, newGroup]);
     return newGroup.id;
   };
 
@@ -115,14 +140,77 @@ export const useContentData = () => {
       }))
     };
     
-    setGroups([...groups, newGroup]);
+    setGroups(prev => [...prev, newGroup]);
     return newGroup.id;
+  };
+
+  const addStatus = (status: ServiceStatus) => {
+    setStatuses(prev => [...prev, status]);
+  };
+
+  const updateItemStatus = (itemId: string, field: string, statusId: string) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === itemId 
+          ? { ...item, [field]: statusId }
+          : item
+      )
+    })));
+  };
+
+  const addClient = (groupId: string, clientData: Partial<ContentItem>) => {
+    const newClient: ContentItem = {
+      id: `client-${Date.now()}`,
+      elemento: clientData.elemento || 'Novo Cliente',
+      servicos: clientData.servicos || '',
+      titulos: '',
+      textos: '',
+      artes: '',
+      postagem: '',
+      roteiro_videos: '',
+      captacao: '',
+      edicao_video: '',
+      informacoes: ''
+    };
+
+    setGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, items: [...group.items, newClient] }
+        : group
+    ));
+
+    return newClient.id;
+  };
+
+  const deleteClient = (itemId: string) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== itemId)
+    })));
+  };
+
+  const updateClient = (itemId: string, updates: Partial<ContentItem>) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === itemId 
+          ? { ...item, ...updates }
+          : item
+      )
+    })));
   };
 
   return {
     groups,
+    statuses,
     updateGroups,
     createMonth,
-    duplicateMonth
+    duplicateMonth,
+    addStatus,
+    updateItemStatus,
+    addClient,
+    deleteClient,
+    updateClient
   };
 };

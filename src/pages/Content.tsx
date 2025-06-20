@@ -3,44 +3,51 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, 
   ChevronDown, 
   ChevronRight,
-  Copy
+  Copy,
+  Settings,
+  Edit,
+  Trash2,
+  Paperclip
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useContentData } from '@/hooks/useContentData';
-
-const statusColors: { [key: string]: string } = {
-  'Aprovados': 'bg-green-500',
-  'Feito': 'bg-blue-500',
-  'Parado': 'bg-red-500',
-  'Vídeos': 'bg-purple-500',
-  'Captações': 'bg-orange-500',
-  'Programação Parcial': 'bg-cyan-400',
-  'CLIENTE PEDIU PAR...': 'bg-red-600'
-};
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const colorClass = statusColors[status] || 'bg-gray-400';
-  return (
-    <Badge className={`${colorClass} text-white border-0 px-3 py-1 text-xs font-medium`}>
-      {status}
-    </Badge>
-  );
-};
+import { StatusButton } from '@/components/ServiceManagement/StatusButton';
+import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 
 export default function Content() {
-  const { groups, updateGroups, createMonth, duplicateMonth } = useContentData();
+  const { 
+    groups, 
+    statuses,
+    updateGroups, 
+    createMonth, 
+    duplicateMonth,
+    addStatus,
+    updateItemStatus,
+    addClient,
+    deleteClient,
+    updateClient
+  } = useContentData();
+  
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
   const [duplicateMonthName, setDuplicateMonthName] = useState('');
   const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showClientDialog, setShowClientDialog] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientServices, setNewClientServices] = useState('');
+  const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+  const [clientFile, setClientFile] = useState<File | null>(null);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -78,10 +85,31 @@ export default function Content() {
   const handleDuplicateMonth = () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-    setDuplicateMonthName('');
-    setSelectedGroupToDuplicate('');
-    setShowDuplicateDialog(false);
+    // Usar setTimeout para evitar travamento
+    setTimeout(() => {
+      duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      setDuplicateMonthName('');
+      setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+    }, 100);
+  };
+
+  const handleCreateClient = () => {
+    if (!newClientName.trim() || !selectedGroupForClient) return;
+    
+    addClient(selectedGroupForClient, {
+      elemento: newClientName,
+      servicos: newClientServices
+    });
+    
+    setNewClientName('');
+    setNewClientServices('');
+    setSelectedGroupForClient('');
+    setShowClientDialog(false);
+  };
+
+  const getStatusObject = (statusId: string) => {
+    return statuses.find(s => s.id === statusId);
   };
 
   return (
@@ -149,28 +177,23 @@ export default function Content() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Duplicar Mês</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Nome do novo mês"
-                  value={duplicateMonthName}
-                  onChange={(e) => setDuplicateMonthName(e.target.value)}
-                />
-                <div className="flex space-x-2">
-                  <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700">
-                    Duplicar
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowClientDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowStatusModal(true)}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Status
+          </Button>
         </div>
       </div>
 
@@ -186,17 +209,17 @@ export default function Content() {
                   onCheckedChange={handleSelectAll}
                 />
               </div>
-              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Elemento</div>
+              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
               <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              <div className="w-24 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Títulos</div>
-              <div className="w-24 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Textos</div>
-              <div className="w-24 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Artes</div>
+              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Títulos</div>
+              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Textos</div>
+              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Artes</div>
               <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Postagem</div>
               <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Roteiro de Vídeos</div>
-              <div className="w-24 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Captação</div>
+              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Captação</div>
               <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Edição de Vídeo</div>
               <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Informações</div>
-              <div className="w-24 p-2 text-xs font-medium text-gray-600">Pessoa</div>
+              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
             </div>
           </div>
 
@@ -236,38 +259,139 @@ export default function Content() {
                         onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
                       />
                     </div>
-                    <div className="w-48 p-2 text-sm text-gray-900 border-r border-gray-200 font-medium">
-                      {item.elemento}
+                    <div className="w-48 p-2 border-r border-gray-200">
+                      <button
+                        onClick={() => setShowClientDetails(item.id)}
+                        className="text-sm text-blue-600 hover:underline font-medium text-left w-full"
+                      >
+                        {item.elemento}
+                      </button>
                     </div>
                     <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
                     </div>
-                    <div className="w-24 p-2 border-r border-gray-200">
-                      {item.titulos && <StatusBadge status={item.titulos} />}
+                    <div className="w-28 p-2 border-r border-gray-200">
+                      {item.titulos ? (
+                        <StatusButton
+                          currentStatus={item.titulos}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'titulos', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'titulos', statusId)}
+                        />
+                      )}
                     </div>
-                    <div className="w-24 p-2 border-r border-gray-200">
-                      {item.textos && <StatusBadge status={item.textos} />}
+                    <div className="w-28 p-2 border-r border-gray-200">
+                      {item.textos ? (
+                        <StatusButton
+                          currentStatus={item.textos}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'textos', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'textos', statusId)}
+                        />
+                      )}
                     </div>
-                    <div className="w-24 p-2 border-r border-gray-200">
-                      {item.artes && <StatusBadge status={item.artes} />}
+                    <div className="w-28 p-2 border-r border-gray-200">
+                      {item.artes ? (
+                        <StatusButton
+                          currentStatus={item.artes}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'artes', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'artes', statusId)}
+                        />
+                      )}
                     </div>
                     <div className="w-32 p-2 border-r border-gray-200">
-                      {item.postagem && <StatusBadge status={item.postagem} />}
+                      {item.postagem ? (
+                        <StatusButton
+                          currentStatus={item.postagem}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'postagem', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'postagem', statusId)}
+                        />
+                      )}
                     </div>
                     <div className="w-32 p-2 border-r border-gray-200">
-                      {item.roteiro_videos && <StatusBadge status={item.roteiro_videos} />}
+                      {item.roteiro_videos ? (
+                        <StatusButton
+                          currentStatus={item.roteiro_videos}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'roteiro_videos', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'roteiro_videos', statusId)}
+                        />
+                      )}
                     </div>
-                    <div className="w-24 p-2 border-r border-gray-200">
-                      {item.captacao && <StatusBadge status={item.captacao} />}
+                    <div className="w-28 p-2 border-r border-gray-200">
+                      {item.captacao ? (
+                        <StatusButton
+                          currentStatus={item.captacao}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'captacao', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'captacao', statusId)}
+                        />
+                      )}
                     </div>
                     <div className="w-32 p-2 border-r border-gray-200">
-                      {item.edicao_video && <StatusBadge status={item.edicao_video} />}
+                      {item.edicao_video ? (
+                        <StatusButton
+                          currentStatus={item.edicao_video}
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'edicao_video', statusId)}
+                        />
+                      ) : (
+                        <StatusButton
+                          currentStatus=""
+                          statuses={statuses}
+                          onStatusChange={(statusId) => updateItemStatus(item.id, 'edicao_video', statusId)}
+                        />
+                      )}
                     </div>
                     <div className="w-48 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.informacoes}
+                      <Input
+                        value={item.informacoes}
+                        onChange={(e) => updateClient(item.id, { informacoes: e.target.value })}
+                        className="border-0 bg-transparent p-0 h-auto"
+                        placeholder="Informações..."
+                      />
                     </div>
-                    <div className="w-24 p-2 text-center">
-                      {item.pessoa}
+                    <div className="w-20 p-2 flex space-x-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteClient(item.id)}
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -276,6 +400,129 @@ export default function Content() {
           ))}
         </div>
       </div>
+
+      {/* Dialogs */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do novo mês"
+              value={duplicateMonthName}
+              onChange={(e) => setDuplicateMonthName(e.target.value)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700">
+                Duplicar
+              </Button>
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do cliente"
+              value={newClientName}
+              onChange={(e) => setNewClientName(e.target.value)}
+            />
+            <Input
+              placeholder="Serviços (ex: 12 Artes + Conteúdo)"
+              value={newClientServices}
+              onChange={(e) => setNewClientServices(e.target.value)}
+            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mês</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={selectedGroupForClient}
+                onChange={(e) => setSelectedGroupForClient(e.target.value)}
+              >
+                <option value="">Selecione um mês</option>
+                {groups.map(group => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700">
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Cliente</DialogTitle>
+          </DialogHeader>
+          {showClientDetails && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Observações</label>
+                <Textarea
+                  value={clientNotes}
+                  onChange={(e) => setClientNotes(e.target.value)}
+                  placeholder="Adicione suas observações..."
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Anexar Arquivo</label>
+                <div className="mt-1 flex items-center space-x-2">
+                  <input
+                    type="file"
+                    onChange={(e) => setClientFile(e.target.files?.[0] || null)}
+                    className="text-sm"
+                    accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                  />
+                  <Paperclip className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={() => {
+                    if (showClientDetails) {
+                      updateClient(showClientDetails, { observacoes: clientNotes });
+                    }
+                    setShowClientDetails(null);
+                    setClientNotes('');
+                    setClientFile(null);
+                  }}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Salvar
+                </Button>
+                <Button variant="outline" onClick={() => setShowClientDetails(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <CustomStatusModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        onAddStatus={addStatus}
+        onAddColumn={() => {}}
+      />
     </div>
   );
 }

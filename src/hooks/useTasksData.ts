@@ -13,6 +13,7 @@ interface Task {
   dueDate: string;
   estimatedHours: number;
   actualHours: number;
+  attachments?: File[];
 }
 
 interface Column {
@@ -41,19 +42,6 @@ export const useTasksData = () => {
           dueDate: '2024-01-20',
           estimatedHours: 8,
           actualHours: 0
-        },
-        {
-          id: '2',
-          title: 'Revisar conteúdo do blog',
-          description: 'Revisar e aprovar 3 artigos do blog corporativo',
-          type: 'content',
-          priority: 'medium',
-          assignedTo: 'Maria Redatora',
-          client: 'Startup XYZ',
-          project: 'Marketing de Conteúdo',
-          dueDate: '2024-01-22',
-          estimatedHours: 4,
-          actualHours: 0
         }
       ]
     },
@@ -81,41 +69,13 @@ export const useTasksData = () => {
       id: 'review',
       title: 'Em Revisão',
       color: 'bg-yellow-100',
-      tasks: [
-        {
-          id: '4',
-          title: 'Implementar sistema de pagamento',
-          description: 'Integrar gateway de pagamento no e-commerce',
-          type: 'development',
-          priority: 'urgent',
-          assignedTo: 'Pedro Dev',
-          client: 'E-commerce ABC',
-          project: 'Loja Virtual',
-          dueDate: '2024-01-18',
-          estimatedHours: 16,
-          actualHours: 14
-        }
-      ]
+      tasks: []
     },
     {
       id: 'done',
       title: 'Concluído',
       color: 'bg-green-100',
-      tasks: [
-        {
-          id: '5',
-          title: 'Campanha de redes sociais',
-          description: 'Criar posts para Instagram e Facebook',
-          type: 'marketing',
-          priority: 'medium',
-          assignedTo: 'Ana Social',
-          client: 'Loja Fashion',
-          project: 'Marketing Digital',
-          dueDate: '2024-01-15',
-          estimatedHours: 6,
-          actualHours: 6
-        }
-      ]
+      tasks: []
     }
   ]);
 
@@ -161,7 +121,8 @@ export const useTasksData = () => {
       project: taskData.project || 'Projeto',
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
       estimatedHours: taskData.estimatedHours || 4,
-      actualHours: taskData.actualHours || 0
+      actualHours: taskData.actualHours || 0,
+      attachments: taskData.attachments || []
     };
 
     setColumns(columns.map(col => {
@@ -180,10 +141,42 @@ export const useTasksData = () => {
     return newTask.id;
   };
 
+  const deleteTask = (taskId: string) => {
+    setColumns(columns.map(col => ({
+      ...col,
+      tasks: col.tasks.filter(task => task.id !== taskId)
+    })));
+  };
+
+  const addColumn = (columnName: string) => {
+    const newColumn: Column = {
+      id: columnName.toLowerCase().replace(/\s+/g, '-'),
+      title: columnName,
+      color: 'bg-gray-100',
+      tasks: []
+    };
+    
+    setColumns(prev => [...prev, newColumn]);
+  };
+
+  const deleteColumn = (columnId: string) => {
+    setColumns(prev => prev.filter(col => col.id !== columnId));
+  };
+
+  const editColumn = (columnId: string, newTitle: string) => {
+    setColumns(prev => prev.map(col => 
+      col.id === columnId ? { ...col, title: newTitle } : col
+    ));
+  };
+
   return {
     columns,
     updateColumns,
     updateTaskTitle,
-    createTask
+    createTask,
+    deleteTask,
+    addColumn,
+    deleteColumn,
+    editColumn
   };
 };
