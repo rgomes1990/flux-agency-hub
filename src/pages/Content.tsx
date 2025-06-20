@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,8 @@ import {
   Settings,
   Edit,
   Trash2,
-  Paperclip
+  Paperclip,
+  Eye
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -19,6 +21,7 @@ import { useContentData } from '@/hooks/useContentData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { FilePreview } from '@/components/FilePreview';
 
 export default function Content() {
   const { 
@@ -50,6 +53,8 @@ export default function Content() {
   const [clientNotes, setClientNotes] = useState('');
   const [clientFile, setClientFile] = useState<File | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'client', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -87,10 +92,15 @@ export default function Content() {
   const handleDuplicateMonth = () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-    setDuplicateMonthName('');
-    setSelectedGroupToDuplicate('');
+    // Close dialog first to prevent freezing
     setShowDuplicateDialog(false);
+    
+    // Use setTimeout to prevent blocking the UI
+    setTimeout(() => {
+      duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      setDuplicateMonthName('');
+      setSelectedGroupToDuplicate('');
+    }, 100);
   };
 
   const handleCreateClient = () => {
@@ -120,8 +130,9 @@ export default function Content() {
     }
   };
 
-  const getStatusObject = (statusId: string) => {
-    return statuses.find(s => s.id === statusId);
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
   };
 
   return (
@@ -135,7 +146,6 @@ export default function Content() {
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="bg-white border-b border-gray-200 px-4 py-2">
         <div className="flex items-center space-x-2">
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -221,7 +231,6 @@ export default function Content() {
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <div className="min-w-full">
-          {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
               <div className="w-8 flex items-center justify-center p-2">
@@ -244,10 +253,8 @@ export default function Content() {
             </div>
           </div>
 
-          {/* Table Body */}
           {groups.map((group) => (
             <div key={group.id}>
-              {/* Group Header */}
               <div 
                 className="bg-orange-50 border-b border-gray-200 cursor-pointer hover:bg-orange-100 transition-colors"
                 onClick={() => toggleGroup(group.id)}
@@ -267,7 +274,6 @@ export default function Content() {
                 </div>
               </div>
 
-              {/* Group Items */}
               {group.isExpanded && group.items.map((item, index) => (
                 <div 
                   key={item.id} 
@@ -458,6 +464,21 @@ export default function Content() {
                   />
                   <Paperclip className="h-4 w-4 text-gray-400" />
                 </div>
+                {clientFile && (
+                  <div className="mt-2 p-2 border rounded flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Paperclip className="h-4 w-4" />
+                      <span className="text-sm truncate">{clientFile.name}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openFilePreview(clientFile)}
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="flex space-x-2">
                 <Button 
@@ -503,6 +524,12 @@ export default function Content() {
         onOpenChange={setShowStatusModal}
         onAddStatus={addStatus}
         onAddColumn={() => {}}
+      />
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
       />
 
       <ConfirmationDialog

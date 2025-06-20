@@ -9,6 +9,7 @@ import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye } from 'lucide-re
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { FilePreview } from '@/components/FilePreview';
 
 const colorOptions = [
   { name: 'Cinza', value: 'bg-gray-100' },
@@ -49,6 +50,8 @@ export default function Tasks() {
   const [editingColumnName, setEditingColumnName] = useState('');
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'column', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -159,6 +162,11 @@ export default function Tasks() {
       if (task) return task;
     }
     return null;
+  };
+
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
   };
 
   return (
@@ -429,7 +437,7 @@ export default function Tasks() {
         ))}
       </div>
 
-      {/* Task Details Dialog */}
+      {/* Task Details Dialog - Simplified */}
       <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -455,41 +463,22 @@ export default function Tasks() {
                       <p className="text-gray-600 mt-1">{task.description}</p>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="font-medium">Responsável:</label>
-                        <p className="text-gray-600">{task.assignedTo}</p>
-                      </div>
-                      <div>
-                        <label className="font-medium">Cliente:</label>
-                        <p className="text-gray-600">{task.client}</p>
-                      </div>
-                      <div>
-                        <label className="font-medium">Projeto:</label>
-                        <p className="text-gray-600">{task.project}</p>
-                      </div>
-                      <div>
-                        <label className="font-medium">Data de Entrega:</label>
-                        <p className="text-gray-600">{new Date(task.dueDate).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                      <div>
-                        <label className="font-medium">Horas Estimadas:</label>
-                        <p className="text-gray-600">{task.estimatedHours}h</p>
-                      </div>
-                      <div>
-                        <label className="font-medium">Horas Reais:</label>
-                        <p className="text-gray-600">{task.actualHours}h</p>
-                      </div>
-                    </div>
-                    
                     {task.attachments && task.attachments.length > 0 && (
                       <div>
                         <label className="font-medium">Anexos:</label>
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           {task.attachments.map((file, index) => (
-                            <div key={index} className="flex items-center space-x-2 text-sm text-blue-600">
-                              <Paperclip className="h-4 w-4" />
-                              <span>{file.name}</span>
+                            <div key={index} className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                              <button
+                                onClick={() => openFilePreview(file)}
+                                className="flex items-center space-x-2 text-sm text-blue-600 w-full text-left"
+                              >
+                                <Paperclip className="h-4 w-4" />
+                                <span className="truncate">{file.name}</span>
+                              </button>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
                             </div>
                           ))}
                         </div>
@@ -502,6 +491,12 @@ export default function Tasks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
+      />
 
       <ConfirmationDialog
         open={!!confirmDelete}

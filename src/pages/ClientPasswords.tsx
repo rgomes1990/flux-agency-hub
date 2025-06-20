@@ -101,7 +101,7 @@ export default function ClientPasswords() {
                 onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
               />
               <Input
-                placeholder="Plataforma (ex: Facebook, Google Ads)"
+                placeholder="Plataforma/Serviço (ex: Facebook Ads, Google Analytics, Website, etc.)"
                 value={formData.platform}
                 onChange={(e) => setFormData(prev => ({ ...prev, platform: e.target.value }))}
               />
@@ -210,7 +210,7 @@ export default function ClientPasswords() {
               onChange={(e) => setEditFormData(prev => ({ ...prev, clientName: e.target.value }))}
             />
             <Input
-              placeholder="Plataforma"
+              placeholder="Plataforma/Serviço"
               value={editFormData.platform}
               onChange={(e) => setEditFormData(prev => ({ ...prev, platform: e.target.value }))}
             />

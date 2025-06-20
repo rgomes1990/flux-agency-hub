@@ -1,11 +1,13 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+
+interface User {
+  id: string;
+  username: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   signIn: (username: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -15,51 +17,58 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+    // Verificar se há usuário logado no localStorage
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+        localStorage.removeItem('currentUser');
       }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
   const signIn = async (username: string, password: string) => {
-    // Para o usuário específico, mapear username para email
-    let email = username;
-    if (username === 'rogerio-projetos') {
-      email = 'rogerio-projetos@sistema.com';
-    }
+    try {
+      // Buscar usuários do localStorage
+      const usersData = localStorage.getItem('usersData');
+      if (!usersData) {
+        return { error: { message: 'Nenhum usuário cadastrado no sistema' } };
+      }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+      const users = JSON.parse(usersData);
+      const foundUser = users.find((u: any) => u.username === username && u.password === password);
+      
+      if (!foundUser) {
+        return { error: { message: 'Credenciais inválidas' } };
+      }
+
+      const userSession = {
+        id: foundUser.id,
+        username: foundUser.username
+      };
+
+      setUser(userSession);
+      localStorage.setItem('currentUser', JSON.stringify(userSession));
+      
+      return { error: null };
+    } catch (error) {
+      return { error: { message: 'Erro ao fazer login' } };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    setUser(null);
+    localStorage.removeItem('currentUser');
   };
 
   const value = {
     user,
-    session,
     loading,
     signIn,
     signOut,
