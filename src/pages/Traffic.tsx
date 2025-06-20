@@ -9,30 +9,33 @@ import {
   ChevronRight,
   Copy,
   Settings,
-  Edit,
   Trash2,
   Paperclip
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useContentData } from '@/hooks/useContentData';
+import { useTrafficData } from '@/hooks/useTrafficData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
-export default function Content() {
+export default function Traffic() {
   const { 
     groups, 
+    columns,
     statuses,
     updateGroups, 
     createMonth, 
     duplicateMonth,
     addStatus,
+    addColumn,
+    updateColumn,
+    deleteColumn,
     updateItemStatus,
     addClient,
     deleteClient,
     updateClient
-  } = useContentData();
+  } = useTrafficData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
@@ -49,7 +52,9 @@ export default function Content() {
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
   const [clientNotes, setClientNotes] = useState('');
   const [clientFile, setClientFile] = useState<File | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client', id: string } | null>(null);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column', id: string } | null>(null);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -107,21 +112,23 @@ export default function Content() {
     setShowClientDialog(false);
   };
 
+  const handleCreateColumn = () => {
+    if (!newColumnName.trim()) return;
+    
+    addColumn(newColumnName, newColumnType);
+    setNewColumnName('');
+    setNewColumnType('status');
+    setShowColumnDialog(false);
+  };
+
   const handleDeleteClient = (clientId: string) => {
     deleteClient(clientId);
     setConfirmDelete(null);
   };
 
-  const openClientDetails = (clientId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    if (client) {
-      setClientNotes(client.observacoes || '');
-      setShowClientDetails(clientId);
-    }
-  };
-
-  const getStatusObject = (statusId: string) => {
-    return statuses.find(s => s.id === statusId);
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+    setConfirmDelete(null);
   };
 
   return (
@@ -130,7 +137,7 @@ export default function Content() {
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-gray-900">Criação Conteúdo</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Tráfego Pago</h1>
           </div>
         </div>
       </div>
@@ -232,14 +239,11 @@ export default function Content() {
               </div>
               <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
               <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Títulos</div>
-              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Textos</div>
-              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Artes</div>
-              <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Postagem</div>
-              <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Roteiro de Vídeos</div>
-              <div className="w-28 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Captação</div>
-              <div className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Edição de Vídeo</div>
-              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Informações</div>
+              {columns.map((column) => (
+                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                  {column.name}
+                </div>
+              ))}
               <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
             </div>
           </div>
@@ -282,7 +286,7 @@ export default function Content() {
                     </div>
                     <div className="w-48 p-2 border-r border-gray-200">
                       <button
-                        onClick={() => openClientDetails(item.id)}
+                        onClick={() => setShowClientDetails(item.id)}
                         className="text-sm text-blue-600 hover:underline font-medium text-left w-full"
                       >
                         {item.elemento}
@@ -291,63 +295,24 @@ export default function Content() {
                     <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
                     </div>
-                    <div className="w-28 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.titulos}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'titulos', statusId)}
-                      />
-                    </div>
-                    <div className="w-28 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.textos}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'textos', statusId)}
-                      />
-                    </div>
-                    <div className="w-28 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.artes}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'artes', statusId)}
-                      />
-                    </div>
-                    <div className="w-32 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.postagem}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'postagem', statusId)}
-                      />
-                    </div>
-                    <div className="w-32 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.roteiro_videos}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'roteiro_videos', statusId)}
-                      />
-                    </div>
-                    <div className="w-28 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.captacao}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'captacao', statusId)}
-                      />
-                    </div>
-                    <div className="w-32 p-2 border-r border-gray-200">
-                      <StatusButton
-                        currentStatus={item.edicao_video}
-                        statuses={statuses}
-                        onStatusChange={(statusId) => updateItemStatus(item.id, 'edicao_video', statusId)}
-                      />
-                    </div>
-                    <div className="w-48 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      <Input
-                        value={item.informacoes}
-                        onChange={(e) => updateClient(item.id, { informacoes: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto"
-                        placeholder="Informações..."
-                      />
-                    </div>
+                    {columns.map((column) => (
+                      <div key={column.id} className="w-32 p-2 border-r border-gray-200">
+                        {column.type === 'status' ? (
+                          <StatusButton
+                            currentStatus={(item as any)[column.id] || ''}
+                            statuses={statuses}
+                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
+                          />
+                        ) : (
+                          <Input
+                            value={(item as any)[column.id] || ''}
+                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto"
+                            placeholder="..."
+                          />
+                        )}
+                      </div>
+                    ))}
                     <div className="w-20 p-2 flex space-x-1">
                       <Button
                         size="sm"
@@ -402,7 +367,7 @@ export default function Content() {
               onChange={(e) => setNewClientName(e.target.value)}
             />
             <Input
-              placeholder="Serviços (ex: 12 Artes + Conteúdo)"
+              placeholder="Serviços (ex: Campanha Google Ads)"
               value={newClientServices}
               onChange={(e) => setNewClientServices(e.target.value)}
             />
@@ -426,6 +391,52 @@ export default function Content() {
               <Button variant="outline" onClick={() => setShowClientDialog(false)}>
                 Cancelar
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Colunas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome da coluna"
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo da Coluna</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={newColumnType}
+                onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
+              >
+                <option value="status">Status (com cores)</option>
+                <option value="text">Texto livre</option>
+              </select>
+            </div>
+            <Button onClick={handleCreateColumn} className="w-full bg-orange-600 hover:bg-orange-700">
+              Criar Coluna
+            </Button>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">Colunas Existentes:</h4>
+              {columns.map(column => (
+                <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">{column.name} ({column.type})</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
         </DialogContent>
@@ -482,22 +493,6 @@ export default function Content() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Gerenciar Colunas</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              As colunas do sistema de conteúdo são fixas. Use o menu "Gerenciar Status" para personalizar os status.
-            </p>
-            <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
-              Fechar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
@@ -508,9 +503,19 @@ export default function Content() {
       <ConfirmationDialog
         open={!!confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
-        onConfirm={() => confirmDelete && handleDeleteClient(confirmDelete.id)}
+        onConfirm={() => {
+          if (confirmDelete?.type === 'client') {
+            handleDeleteClient(confirmDelete.id);
+          } else if (confirmDelete?.type === 'column') {
+            handleDeleteColumn(confirmDelete.id);
+          }
+        }}
         title="Confirmar Exclusão"
-        message="Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+        message={
+          confirmDelete?.type === 'client' 
+            ? "Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+            : "Tem certeza que deseja excluir esta coluna? Esta ação não pode ser desfeita."
+        }
         confirmText="Excluir"
       />
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,9 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Save, X, Trash2, Settings, Paperclip } from 'lucide-react';
+import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+
+const colorOptions = [
+  { name: 'Cinza', value: 'bg-gray-100' },
+  { name: 'Azul', value: 'bg-blue-100' },
+  { name: 'Verde', value: 'bg-green-100' },
+  { name: 'Amarelo', value: 'bg-yellow-100' },
+  { name: 'Vermelho', value: 'bg-red-100' },
+  { name: 'Roxo', value: 'bg-purple-100' },
+  { name: 'Rosa', value: 'bg-pink-100' },
+  { name: 'Laranja', value: 'bg-orange-100' }
+];
 
 export default function Tasks() {
   const { 
@@ -26,15 +37,18 @@ export default function Tasks() {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [showNewTaskDialog, setShowNewTaskDialog] = useState(false);
+  const [showTaskDetailsDialog, setShowTaskDetailsDialog] = useState<string | null>(null);
   const [selectedColumn, setSelectedColumn] = useState('');
   const [selectedPosition, setSelectedPosition] = useState<number>(0);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnColor, setNewColumnColor] = useState('bg-gray-100');
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'column', id: string } | null>(null);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -97,7 +111,16 @@ export default function Tasks() {
     if (!newColumnName.trim()) return;
     
     addColumn(newColumnName);
+    // Update color after adding
+    const newColumns = [...columns];
+    const lastColumn = newColumns[newColumns.length - 1];
+    if (lastColumn) {
+      lastColumn.color = newColumnColor;
+      updateColumns(newColumns);
+    }
+    
     setNewColumnName('');
+    setNewColumnColor('bg-gray-100');
     setShowColumnDialog(false);
   };
 
@@ -118,6 +141,24 @@ export default function Tasks() {
     if (e.target.files) {
       setTaskFiles(Array.from(e.target.files));
     }
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask(taskId);
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+    setConfirmDelete(null);
+  };
+
+  const getTaskDetails = (taskId: string) => {
+    for (const column of columns) {
+      const task = column.tasks.find(t => t.id === taskId);
+      if (task) return task;
+    }
+    return null;
   };
 
   return (
@@ -237,9 +278,42 @@ export default function Tasks() {
                   value={newColumnName}
                   onChange={(e) => setNewColumnName(e.target.value)}
                 />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cor da Coluna</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {colorOptions.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        className={`w-full h-8 rounded ${color.value} border-2 ${
+                          newColumnColor === color.value ? 'border-gray-800' : 'border-gray-300'
+                        }`}
+                        onClick={() => setNewColumnColor(color.value)}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                </div>
                 <Button onClick={createNewColumn} className="w-full">
                   Criar Nova Coluna
                 </Button>
+                
+                <div className="space-y-2">
+                  <h4 className="font-medium">Colunas Existentes:</h4>
+                  {columns.map(column => (
+                    <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                      <span className="text-sm">{column.title}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -283,7 +357,7 @@ export default function Tasks() {
                       <Button 
                         size="sm"
                         variant="ghost"
-                        onClick={() => deleteColumn(column.id)}
+                        onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
                         className="text-red-600 hover:text-red-800"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -306,6 +380,13 @@ export default function Tasks() {
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={() => setShowTaskDetailsDialog(task.id)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
                           onClick={() => startEditing(task.id, task.title)}
                         >
                           <Edit className="h-3 w-3" />
@@ -313,13 +394,15 @@ export default function Tasks() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => deleteTask(task.id)}
+                          onClick={() => setConfirmDelete({ type: 'task', id: task.id })}
                           className="text-red-600 hover:text-red-800"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
                     {editingTaskId === task.id ? (
                       <div className="flex items-center space-x-2 mt-2">
                         <Input
@@ -336,11 +419,8 @@ export default function Tasks() {
                         </Button>
                       </div>
                     ) : (
-                      <CardTitle className="text-sm font-medium mt-2">{task.title}</CardTitle>
+                      <p className="text-sm font-medium">{task.title}</p>
                     )}
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-xs text-gray-600">{task.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -348,6 +428,99 @@ export default function Tasks() {
           </div>
         ))}
       </div>
+
+      {/* Task Details Dialog */}
+      <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Tarefa</DialogTitle>
+          </DialogHeader>
+          {showTaskDetailsDialog && (
+            <div className="space-y-4">
+              {(() => {
+                const task = getTaskDetails(showTaskDetailsDialog);
+                if (!task) return <p>Tarefa não encontrada</p>;
+                
+                return (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-lg">{task.title}</h3>
+                      <Badge className={`${getPriorityColor(task.priority)} mt-2`}>
+                        {getPriorityText(task.priority)}
+                      </Badge>
+                    </div>
+                    
+                    <div>
+                      <label className="font-medium">Descrição:</label>
+                      <p className="text-gray-600 mt-1">{task.description}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-medium">Responsável:</label>
+                        <p className="text-gray-600">{task.assignedTo}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium">Cliente:</label>
+                        <p className="text-gray-600">{task.client}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium">Projeto:</label>
+                        <p className="text-gray-600">{task.project}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium">Data de Entrega:</label>
+                        <p className="text-gray-600">{new Date(task.dueDate).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium">Horas Estimadas:</label>
+                        <p className="text-gray-600">{task.estimatedHours}h</p>
+                      </div>
+                      <div>
+                        <label className="font-medium">Horas Reais:</label>
+                        <p className="text-gray-600">{task.actualHours}h</p>
+                      </div>
+                    </div>
+                    
+                    {task.attachments && task.attachments.length > 0 && (
+                      <div>
+                        <label className="font-medium">Anexos:</label>
+                        <div className="mt-2 space-y-1">
+                          {task.attachments.map((file, index) => (
+                            <div key={index} className="flex items-center space-x-2 text-sm text-blue-600">
+                              <Paperclip className="h-4 w-4" />
+                              <span>{file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.type === 'task') {
+            handleDeleteTask(confirmDelete.id);
+          } else if (confirmDelete?.type === 'column') {
+            handleDeleteColumn(confirmDelete.id);
+          }
+        }}
+        title="Confirmar Exclusão"
+        message={
+          confirmDelete?.type === 'task' 
+            ? "Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita."
+            : "Tem certeza que deseja excluir esta coluna? Todas as tarefas serão perdidas. Esta ação não pode ser desfeita."
+        }
+        confirmText="Excluir"
+      />
     </div>
   );
 }

@@ -1,62 +1,82 @@
 
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  PenTool, 
-  CheckSquare,
-  Briefcase
+  FileText, 
+  CheckSquare, 
+  TrendingUp,
+  Users,
+  Lock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Conteúdo', href: '/content', icon: PenTool },
-  { name: 'Tarefas', href: '/tasks', icon: CheckSquare },
+const menuItems = [
+  {
+    name: 'Dashboard',
+    icon: LayoutDashboard,
+    path: '/'
+  },
+  {
+    name: 'Conteúdo',
+    icon: FileText,
+    path: '/content'
+  },
+  {
+    name: 'Tarefas',
+    icon: CheckSquare,
+    path: '/tasks'
+  },
+  {
+    name: 'Tráfego Pago',
+    icon: TrendingUp,
+    path: '/traffic'
+  },
+  {
+    name: 'Usuários',
+    icon: Users,
+    path: '/users'
+  },
+  {
+    name: 'Senhas Clientes',
+    icon: Lock,
+    path: '/client-passwords'
+  }
 ];
 
-export function Sidebar() {
+export default function Sidebar() {
+  const location = useLocation();
+
   return (
-    <div className="flex h-screen w-64 flex-col bg-gray-900 text-white">
-      <div className="flex h-16 items-center justify-center border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <Briefcase className="h-6 w-6 text-orange-400" />
-          <h1 className="text-xl font-bold text-orange-400">MarketingPro</h1>
-        </div>
+    <aside className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
+      <div className="p-6 border-b border-gray-200">
+        <h1 className="text-xl font-bold text-gray-900">RSG Tarefas</h1>
+        <p className="text-sm text-gray-600 mt-1">Agência de Marketing</p>
       </div>
       
-      <nav className="flex-1 space-y-1 px-4 py-4">
-        {navigation.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            end={item.href === '/'}
-            className={({ isActive }) =>
-              cn(
-                'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-orange-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              )
-            }
-          >
-            <item.icon className="mr-3 h-5 w-5" />
-            {item.name}
-          </NavLink>
-        ))}
+      <nav className="flex-1 p-4">
+        <ul className="space-y-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <li key={item.name}>
+                <NavLink
+                  to={item.path}
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
-      
-      <div className="border-t border-gray-700 p-4">
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center">
-            <span className="text-sm font-medium">MP</span>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium">Marketing Pro</p>
-            <p className="text-xs text-gray-400">Agência de Marketing</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </aside>
   );
 }
