@@ -17,12 +17,9 @@ export function Header() {
     await signOut();
   };
 
-  // Mapear email para username para exibição
+  // Usar username em vez de email
   const getDisplayName = () => {
-    if (user?.email === 'rogerio-projetos@sistema.com') {
-      return 'rogerio-projetos';
-    }
-    return user?.email || '';
+    return user?.username || '';
   };
 
   return (
