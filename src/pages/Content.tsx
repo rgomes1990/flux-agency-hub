@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,17 +5,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus, 
-  Search, 
-  Filter, 
-  SortDesc, 
-  User, 
   ChevronDown, 
   ChevronRight,
-  MoreHorizontal,
-  Eye,
-  Settings
+  Copy,
+  MoreHorizontal
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface ContentItem {
   id: string;
@@ -284,6 +279,11 @@ export default function Content() {
   ]);
 
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [newMonthName, setNewMonthName] = useState('');
+  const [duplicateMonthName, setDuplicateMonthName] = useState('');
+  const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
   const toggleGroup = (groupId: string) => {
     setGroups(groups.map(group => 
@@ -310,6 +310,45 @@ export default function Content() {
     }
   };
 
+  const createNewMonth = () => {
+    if (!newMonthName.trim()) return;
+    
+    const newGroup: Group = {
+      id: newMonthName.toLowerCase().replace(/\s+/g, '-'),
+      name: newMonthName.toUpperCase(),
+      color: 'bg-orange-500',
+      isExpanded: true,
+      items: []
+    };
+    
+    setGroups([...groups, newGroup]);
+    setNewMonthName('');
+    setShowCreateDialog(false);
+  };
+
+  const duplicateMonth = () => {
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
+    
+    const groupToDuplicate = groups.find(g => g.id === selectedGroupToDuplicate);
+    if (!groupToDuplicate) return;
+    
+    const newGroup: Group = {
+      id: duplicateMonthName.toLowerCase().replace(/\s+/g, '-'),
+      name: duplicateMonthName.toUpperCase(),
+      color: groupToDuplicate.color,
+      isExpanded: true,
+      items: groupToDuplicate.items.map(item => ({
+        ...item,
+        id: `${item.id}-${Date.now()}-${Math.random()}`
+      }))
+    };
+    
+    setGroups([...groups, newGroup]);
+    setDuplicateMonthName('');
+    setSelectedGroupToDuplicate('');
+    setShowDuplicateDialog(false);
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -321,19 +360,6 @@ export default function Content() {
               <ChevronDown className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <Eye className="h-4 w-4 mr-1" />
-              Integrar
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Settings className="h-4 w-4 mr-1" />
-              Automatizar
-            </Button>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -341,39 +367,79 @@ export default function Content() {
       <div className="bg-white border-b border-gray-200 px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Criar elemento
-            </Button>
-            <div className="flex items-center space-x-1 text-sm text-gray-600">
-              <Search className="h-4 w-4" />
-              <span>Pesqui...</span>
-            </div>
-            <div className="flex items-center space-x-1 text-sm text-gray-600">
-              <User className="h-4 w-4" />
-              <span>Pessoa</span>
-            </div>
-            <div className="flex items-center space-x-1 text-sm text-gray-600">
-              <Filter className="h-4 w-4" />
-              <span>Filtro</span>
-            </div>
-            <div className="flex items-center space-x-1 text-sm text-gray-600">
-              <SortDesc className="h-4 w-4" />
-              <span>Ordenar</span>
-            </div>
-            <Button variant="ghost" size="sm">
-              <Eye className="h-4 w-4 mr-1" />
-              Ocultar
-            </Button>
-            <Button variant="ghost" size="sm">
-              Agrupar por
-            </Button>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">Convidar / 2</span>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Criar mês
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Mês</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Nome do mês"
+                    value={newMonthName}
+                    onChange={(e) => setNewMonthName(e.target.value)}
+                  />
+                  <div className="flex space-x-2">
+                    <Button onClick={createNewMonth} className="bg-orange-600 hover:bg-orange-700">
+                      Criar
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Copy className="h-4 w-4 mr-1" />
+                  Duplicar mês
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {groups.map((group) => (
+                  <DropdownMenuItem
+                    key={group.id}
+                    onClick={() => {
+                      setSelectedGroupToDuplicate(group.id);
+                      setShowDuplicateDialog(true);
+                    }}
+                  >
+                    Duplicar {group.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Duplicar Mês</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Nome do novo mês"
+                    value={duplicateMonthName}
+                    onChange={(e) => setDuplicateMonthName(e.target.value)}
+                  />
+                  <div className="flex space-x-2">
+                    <Button onClick={duplicateMonth} className="bg-orange-600 hover:bg-orange-700">
+                      Duplicar
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -409,7 +475,7 @@ export default function Content() {
             <div key={group.id}>
               {/* Group Header */}
               <div 
-                className="bg-blue-50 border-b border-gray-200 cursor-pointer hover:bg-blue-100 transition-colors"
+                className="bg-orange-50 border-b border-gray-200 cursor-pointer hover:bg-orange-100 transition-colors"
                 onClick={() => toggleGroup(group.id)}
               >
                 <div className="flex items-center min-w-max">

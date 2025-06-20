@@ -3,37 +3,25 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Users, 
-  FolderOpen, 
-  Target, 
   PenTool, 
   CheckSquare,
-  Settings,
-  BarChart3,
-  Calendar,
-  Sparkles
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Clientes', href: '/clients', icon: Users },
-  { name: 'Projetos', href: '/projects', icon: FolderOpen },
-  { name: 'Campanhas', href: '/campaigns', icon: Target },
   { name: 'Conteúdo', href: '/content', icon: PenTool },
   { name: 'Tarefas', href: '/tasks', icon: CheckSquare },
-  { name: 'Calendário', href: '/calendar', icon: Calendar },
-  { name: 'Relatórios', href: '/reports', icon: BarChart3 },
-  { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
   return (
-    <div className="flex h-screen w-64 flex-col bg-slate-900 text-white">
-      <div className="flex h-16 items-center justify-center border-b border-slate-700">
+    <div className="flex h-screen w-64 flex-col bg-gray-900 text-white">
+      <div className="flex h-16 items-center justify-center border-b border-gray-700">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-pink-400" />
-          <h1 className="text-xl font-bold text-pink-400">BeautyPro</h1>
+          <Briefcase className="h-6 w-6 text-orange-400" />
+          <h1 className="text-xl font-bold text-orange-400">MarketingPro</h1>
         </div>
       </div>
       
@@ -47,8 +35,8 @@ export function Sidebar() {
               cn(
                 'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-pink-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-orange-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               )
             }
           >
@@ -58,14 +46,14 @@ export function Sidebar() {
         ))}
       </nav>
       
-      <div className="border-t border-slate-700 p-4">
+      <div className="border-t border-gray-700 p-4">
         <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-pink-500 flex items-center justify-center">
-            <span className="text-sm font-medium">BP</span>
+          <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center">
+            <span className="text-sm font-medium">MP</span>
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium">Beauty Pro</p>
-            <p className="text-xs text-slate-400">Estética & Marketing</p>
+            <p className="text-sm font-medium">Marketing Pro</p>
+            <p className="text-xs text-gray-400">Agência de Marketing</p>
           </div>
         </div>
       </div>
