@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,35 +8,11 @@ import {
   Plus, 
   ChevronDown, 
   ChevronRight,
-  Copy,
-  MoreHorizontal
+  Copy
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
-interface ContentItem {
-  id: string;
-  elemento: string;
-  servicos: string;
-  titulos: string;
-  textos: string;
-  artes: string;
-  postagem: string;
-  roteiro_videos: string;
-  captacao: string;
-  edicao_video: string;
-  informacoes: string;
-  pessoa?: string;
-  observacoes?: string;
-}
-
-interface Group {
-  id: string;
-  name: string;
-  color: string;
-  isExpanded: boolean;
-  items: ContentItem[];
-}
+import { useContentData } from '@/hooks/useContentData';
 
 const statusColors: { [key: string]: string } = {
   'Aprovados': 'bg-green-500',
@@ -57,227 +34,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function Content() {
-  const [groups, setGroups] = useState<Group[]>([
-    {
-      id: 'outubro',
-      name: 'OUTUBRO',
-      color: 'bg-blue-500',
-      isExpanded: true,
-      items: [
-        {
-          id: '1',
-          elemento: 'CT - VIDAS',
-          servicos: '12 Artes + Conteúdo',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '2',
-          elemento: 'Darja',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: 'Falta somente o vídeo (tema 08)',
-          pessoa: '👤'
-        },
-        {
-          id: '3',
-          elemento: 'Dr. Renato Furtado',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '4',
-          elemento: 'E-CAT',
-          servicos: '2 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '5',
-          elemento: 'Eventare',
-          servicos: '8 Artes + Conteúdo',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Programação Parcial',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '6',
-          elemento: 'Evoluc',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '7',
-          elemento: 'Grupo Forte',
-          servicos: '4 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '8',
-          elemento: 'Medicate',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: 'Faltando somente medi colors',
-          pessoa: '👤'
-        },
-        {
-          id: '9',
-          elemento: 'Mizar Item Imobiliá...',
-          servicos: '12 Conteúdos',
-          titulos: 'Parado',
-          textos: 'Parado',
-          artes: 'Parado',
-          postagem: 'Parado',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '10',
-          elemento: 'N Delivery',
-          servicos: '8 Conteúdos',
-          titulos: 'CLIENTE PEDIU PAR...',
-          textos: 'CLIENTE PEDIU PARA...',
-          artes: 'CLIENTE PEDIU PAR...',
-          postagem: 'CLIENTE PEDIU PAR...',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '11',
-          elemento: 'NotePost',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '12',
-          elemento: 'Padaria Century',
-          servicos: '4 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '13',
-          elemento: 'Padaria Gran Royalle',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '14',
-          elemento: 'Padaria Lisboa',
-          servicos: '8 Conteúdos',
-          titulos: 'Aprovados',
-          textos: 'Aprovados',
-          artes: 'Aprovados',
-          postagem: 'Feito',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        },
-        {
-          id: '15',
-          elemento: 'Paulo Romeu Pro',
-          servicos: '4 Conteúdos',
-          titulos: 'Vídeos',
-          textos: 'Parado',
-          artes: 'Captações',
-          postagem: 'Parado',
-          roteiro_videos: '',
-          captacao: '',
-          edicao_video: '',
-          informacoes: '',
-          pessoa: '👤'
-        }
-      ]
-    }
-  ]);
-
+  const { groups, updateGroups, createMonth, duplicateMonth } = useContentData();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
   const [duplicateMonthName, setDuplicateMonthName] = useState('');
@@ -286,7 +43,7 @@ export default function Content() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
   const toggleGroup = (groupId: string) => {
-    setGroups(groups.map(group => 
+    updateGroups(groups.map(group => 
       group.id === groupId 
         ? { ...group, isExpanded: !group.isExpanded }
         : group
@@ -310,40 +67,18 @@ export default function Content() {
     }
   };
 
-  const createNewMonth = () => {
+  const handleCreateMonth = () => {
     if (!newMonthName.trim()) return;
     
-    const newGroup: Group = {
-      id: newMonthName.toLowerCase().replace(/\s+/g, '-'),
-      name: newMonthName.toUpperCase(),
-      color: 'bg-orange-500',
-      isExpanded: true,
-      items: []
-    };
-    
-    setGroups([...groups, newGroup]);
+    createMonth(newMonthName);
     setNewMonthName('');
     setShowCreateDialog(false);
   };
 
-  const duplicateMonth = () => {
+  const handleDuplicateMonth = () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    const groupToDuplicate = groups.find(g => g.id === selectedGroupToDuplicate);
-    if (!groupToDuplicate) return;
-    
-    const newGroup: Group = {
-      id: duplicateMonthName.toLowerCase().replace(/\s+/g, '-'),
-      name: duplicateMonthName.toUpperCase(),
-      color: groupToDuplicate.color,
-      isExpanded: true,
-      items: groupToDuplicate.items.map(item => ({
-        ...item,
-        id: `${item.id}-${Date.now()}-${Math.random()}`
-      }))
-    };
-    
-    setGroups([...groups, newGroup]);
+    duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
     setDuplicateMonthName('');
     setSelectedGroupToDuplicate('');
     setShowDuplicateDialog(false);
@@ -356,91 +91,86 @@ export default function Content() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900">Criação Conteúdo</h1>
-            <Button variant="ghost" size="sm">
-              <ChevronDown className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Criar mês
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Novo Mês</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Nome do mês"
-                    value={newMonthName}
-                    onChange={(e) => setNewMonthName(e.target.value)}
-                  />
-                  <div className="flex space-x-2">
-                    <Button onClick={createNewMonth} className="bg-orange-600 hover:bg-orange-700">
-                      Criar
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
+        <div className="flex items-center space-x-2">
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Criar mês
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar Novo Mês</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome do mês"
+                  value={newMonthName}
+                  onChange={(e) => setNewMonthName(e.target.value)}
+                />
+                <div className="flex space-x-2">
+                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700">
+                    Criar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                    Cancelar
+                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Copy className="h-4 w-4 mr-1" />
-                  Duplicar mês
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {groups.map((group) => (
-                  <DropdownMenuItem
-                    key={group.id}
-                    onClick={() => {
-                      setSelectedGroupToDuplicate(group.id);
-                      setShowDuplicateDialog(true);
-                    }}
-                  >
-                    Duplicar {group.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicar mês
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {groups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => {
+                    setSelectedGroupToDuplicate(group.id);
+                    setShowDuplicateDialog(true);
+                  }}
+                >
+                  Duplicar {group.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Duplicar Mês</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Nome do novo mês"
-                    value={duplicateMonthName}
-                    onChange={(e) => setDuplicateMonthName(e.target.value)}
-                  />
-                  <div className="flex space-x-2">
-                    <Button onClick={duplicateMonth} className="bg-orange-600 hover:bg-orange-700">
-                      Duplicar
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
+          <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Duplicar Mês</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome do novo mês"
+                  value={duplicateMonthName}
+                  onChange={(e) => setDuplicateMonthName(e.target.value)}
+                />
+                <div className="flex space-x-2">
+                  <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700">
+                    Duplicar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+                    Cancelar
+                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
