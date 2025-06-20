@@ -19,29 +19,29 @@ export default function Dashboard() {
           title="Total de Clientes"
           value="24"
           icon={Users}
-          trend="+12%"
-          trendUp={true}
+          change={{ value: 12, trend: 'up' }}
+          color="blue"
         />
         <StatsCard
           title="Projetos Ativos"
           value="8"
           icon={FolderOpen}
-          trend="+3"
-          trendUp={true}
+          change={{ value: 3, trend: 'up' }}
+          color="green"
         />
         <StatsCard
           title="Campanhas"
           value="12"
           icon={Target}
-          trend="+8%"
-          trendUp={true}
+          change={{ value: 8, trend: 'up' }}
+          color="yellow"
         />
         <StatsCard
           title="Tarefas Pendentes"
           value="15"
           icon={CheckSquare}
-          trend="-2"
-          trendUp={false}
+          change={{ value: 2, trend: 'down' }}
+          color="red"
         />
       </div>
 
