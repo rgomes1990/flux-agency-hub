@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,7 @@ export default function ClientPasswords() {
   const [editingPassword, setEditingPassword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
-  const [confirmDelete, setConfirmDelete] =React(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Estados para formulário
   const [formData, setFormData] = useState({
