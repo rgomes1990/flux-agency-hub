@@ -185,6 +185,18 @@ export const useContentData = () => {
     return newGroup.id;
   };
 
+  const updateMonth = (groupId: string, newName: string) => {
+    setGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, name: newName.toUpperCase() }
+        : group
+    ));
+  };
+
+  const deleteMonth = (groupId: string) => {
+    setGroups(prev => prev.filter(group => group.id !== groupId));
+  };
+
   const duplicateMonth = (sourceGroupId: string, newMonthName: string) => {
     const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
     if (!groupToDuplicate) return null;
@@ -358,6 +370,8 @@ export const useContentData = () => {
     statuses,
     updateGroups,
     createMonth,
+    updateMonth,
+    deleteMonth,
     duplicateMonth,
     addStatus,
     updateStatus,

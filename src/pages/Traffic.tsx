@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,7 @@ import {
   ChevronRight,
   Copy,
   Settings,
+  Edit,
   Trash2,
   Paperclip,
   Eye
@@ -29,6 +29,8 @@ export default function Traffic() {
     statuses,
     updateGroups, 
     createMonth, 
+    updateMonth,
+    deleteMonth,
     duplicateMonth,
     addStatus,
     updateStatus,
@@ -60,9 +62,11 @@ export default function Traffic() {
   const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column', id: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [showFilePreview, setShowFilePreview] = useState(false);
+  const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
+  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -136,6 +140,29 @@ export default function Traffic() {
 
   const handleDeleteColumn = (columnId: string) => {
     deleteColumn(columnId);
+    setConfirmDelete(null);
+  };
+
+  const handleEditMonth = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      // Remove the "- TRÁFEGO" suffix for editing
+      const nameWithoutSuffix = group.name.replace(' - TRÁFEGO', '');
+      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
+      setShowEditMonthDialog(true);
+    }
+  };
+
+  const handleUpdateMonth = () => {
+    if (editingMonth && editingMonth.name.trim()) {
+      updateMonth(editingMonth.id, editingMonth.name);
+      setEditingMonth(null);
+      setShowEditMonthDialog(false);
+    }
+  };
+
+  const handleDeleteMonth = (groupId: string) => {
+    deleteMonth(groupId);
     setConfirmDelete(null);
   };
 
@@ -295,20 +322,39 @@ export default function Traffic() {
             <div key={group.id}>
               {/* Group Header */}
               <div 
-                className="bg-orange-50 border-b border-gray-200 cursor-pointer hover:bg-orange-100 transition-colors"
-                onClick={() => toggleGroup(group.id)}
+                className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors"
               >
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
-                    {group.isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-gray-600" />
-                    )}
+                    <button onClick={() => toggleGroup(group.id)}>
+                      {group.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                      )}
+                    </button>
                   </div>
-                  <div className="flex items-center space-x-2 p-2">
+                  <div className="flex items-center space-x-2 p-2 flex-1">
                     <div className={`w-3 h-3 rounded ${group.color}`}></div>
                     <span className="font-medium text-gray-900">{group.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 p-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEditMonth(group.id)}
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -491,6 +537,29 @@ export default function Traffic() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do mês"
+              value={editingMonth?.name || ''}
+              onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700">
+                Salvar
+              </Button>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -594,12 +663,16 @@ export default function Traffic() {
             handleDeleteClient(confirmDelete.id);
           } else if (confirmDelete?.type === 'column') {
             handleDeleteColumn(confirmDelete.id);
+          } else if (confirmDelete?.type === 'month') {
+            handleDeleteMonth(confirmDelete.id);
           }
         }}
         title="Confirmar Exclusão"
         message={
           confirmDelete?.type === 'client' 
             ? "Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+            : confirmDelete?.type === 'month'
+            ? "Tem certeza que deseja excluir este mês e todos os seus clientes? Esta ação não pode ser desfeita."
             : "Tem certeza que deseja excluir esta coluna? Esta ação não pode ser desfeita."
         }
         confirmText="Excluir"

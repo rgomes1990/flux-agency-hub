@@ -19,7 +19,7 @@ const Index = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Se está autenticado, vai para dashboard
+  // Se está autenticado e na página inicial, vai para dashboard
   return <Navigate to="/dashboard" replace />;
 };
 
