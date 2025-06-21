@@ -201,14 +201,15 @@ export const useContentData = () => {
     const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
     if (!groupToDuplicate) return null;
     
+    const timestamp = Date.now();
     const newGroup: Group = {
-      id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`,
       name: newMonthName.toUpperCase(),
       color: groupToDuplicate.color,
       isExpanded: true,
-      items: groupToDuplicate.items.map(item => ({
+      items: groupToDuplicate.items.map((item, index) => ({
         ...item,
-        id: `${item.id}-copy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${newMonthName.toLowerCase()}-item-${timestamp}-${index}`,
         // Reset status fields for new month
         titulos: '',
         textos: '',
@@ -224,12 +225,6 @@ export const useContentData = () => {
     };
     
     setGroups(prev => [...prev, newGroup]);
-    
-    // Refresh automático após duplicar
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
-    
     return newGroup.id;
   };
 

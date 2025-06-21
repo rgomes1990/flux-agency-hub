@@ -169,27 +169,30 @@ export const useTrafficData = () => {
     const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
     if (!groupToDuplicate) return null;
     
+    const timestamp = Date.now();
     const newGroup: TrafficGroup = {
-      id: newMonthName.toLowerCase().replace(/\s+/g, '-') + '-trafego',
+      id: newMonthName.toLowerCase().replace(/\s+/g, '-') + '-trafego-' + timestamp,
       name: newMonthName.toUpperCase() + ' - TRÁFEGO',
       color: groupToDuplicate.color,
       isExpanded: true,
-      items: groupToDuplicate.items.map(item => ({
+      items: groupToDuplicate.items.map((item, index) => ({
         ...item,
-        id: `${item.id}-${Date.now()}-${Math.random()}`,
+        id: `${newMonthName.toLowerCase()}-traffic-${timestamp}-${index}`,
         // Reset campos para novo mês
+        configuracao_campanha: '',
+        criacao_anuncios: '',
+        aprovacao_cliente: '',
+        ativacao: '',
+        monitoramento: '',
+        otimizacao: '',
+        relatorio: '',
+        informacoes: '',
         observacoes: '',
         attachments: []
       }))
     };
     
     setGroups(prev => [...prev, newGroup]);
-    
-    // Refresh automático após duplicar
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
-    
     return newGroup.id;
   };
 
