@@ -15,15 +15,6 @@ import ClientPasswords from './pages/ClientPasswords';
 import NotFound from './pages/NotFound';
 
 function App() {
-  // GitHub Pages SPA redirect handling
-  React.useEffect(() => {
-    const redirect = sessionStorage.redirect;
-    delete sessionStorage.redirect;
-    if (redirect && redirect !== location.href) {
-      history.replaceState(null, null, redirect);
-    }
-  }, []);
-
   return (
     <AuthProvider>
       <Router>
