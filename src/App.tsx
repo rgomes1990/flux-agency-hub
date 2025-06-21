@@ -17,7 +17,7 @@ import NotFound from './pages/NotFound';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/">
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
