@@ -14,6 +14,8 @@ interface TrafficItem {
   relatorio: string;
   informacoes: string;
   observacoes?: string;
+  attachments?: File[];
+  [key: string]: any; // Para colunas dinâmicas
 }
 
 interface TrafficGroup {
@@ -28,6 +30,7 @@ interface TrafficColumn {
   id: string;
   name: string;
   type: 'status' | 'text';
+  isDefault?: boolean;
 }
 
 interface ServiceStatus {
@@ -48,14 +51,14 @@ export const useTrafficData = () => {
   ]);
 
   const [columns, setColumns] = useState<TrafficColumn[]>([
-    { id: 'configuracao_campanha', name: 'Configuração Campanha', type: 'status' },
-    { id: 'criacao_anuncios', name: 'Criação Anúncios', type: 'status' },
-    { id: 'aprovacao_cliente', name: 'Aprovação Cliente', type: 'status' },
-    { id: 'ativacao', name: 'Ativação', type: 'status' },
-    { id: 'monitoramento', name: 'Monitoramento', type: 'status' },
-    { id: 'otimizacao', name: 'Otimização', type: 'status' },
-    { id: 'relatorio', name: 'Relatório', type: 'status' },
-    { id: 'informacoes', name: 'Informações', type: 'text' }
+    { id: 'configuracao_campanha', name: 'Configuração Campanha', type: 'status', isDefault: true },
+    { id: 'criacao_anuncios', name: 'Criação Anúncios', type: 'status', isDefault: true },
+    { id: 'aprovacao_cliente', name: 'Aprovação Cliente', type: 'status', isDefault: true },
+    { id: 'ativacao', name: 'Ativação', type: 'status', isDefault: true },
+    { id: 'monitoramento', name: 'Monitoramento', type: 'status', isDefault: true },
+    { id: 'otimizacao', name: 'Otimização', type: 'status', isDefault: true },
+    { id: 'relatorio', name: 'Relatório', type: 'status', isDefault: true },
+    { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
   ]);
 
   const [statuses, setStatuses] = useState<ServiceStatus[]>([
@@ -136,11 +139,20 @@ export const useTrafficData = () => {
       isExpanded: true,
       items: groupToDuplicate.items.map(item => ({
         ...item,
-        id: `${item.id}-${Date.now()}-${Math.random()}`
+        id: `${item.id}-${Date.now()}-${Math.random()}`,
+        // Reset campos para novo mês
+        observacoes: '',
+        attachments: []
       }))
     };
     
     setGroups(prev => [...prev, newGroup]);
+    
+    // Refresh automático após duplicar
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+    
     return newGroup.id;
   };
 
@@ -148,13 +160,33 @@ export const useTrafficData = () => {
     setStatuses(prev => [...prev, status]);
   };
 
+  const updateStatus = (statusId: string, updates: Partial<ServiceStatus>) => {
+    setStatuses(prev => prev.map(status => 
+      status.id === statusId ? { ...status, ...updates } : status
+    ));
+  };
+
+  const deleteStatus = (statusId: string) => {
+    setStatuses(prev => prev.filter(status => status.id !== statusId));
+  };
+
   const addColumn = (name: string, type: 'status' | 'text') => {
     const newColumn: TrafficColumn = {
       id: name.toLowerCase().replace(/\s+/g, '_'),
       name,
-      type
+      type,
+      isDefault: false
     };
     setColumns(prev => [...prev, newColumn]);
+    
+    // Adicionar a nova coluna a todos os itens existentes
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => ({
+        ...item,
+        [newColumn.id]: type === 'status' ? '' : ''
+      }))
+    })));
   };
 
   const updateColumn = (id: string, updates: Partial<TrafficColumn>) => {
@@ -164,7 +196,19 @@ export const useTrafficData = () => {
   };
 
   const deleteColumn = (id: string) => {
+    const columnToDelete = columns.find(col => col.id === id);
+    if (columnToDelete?.isDefault) return; // Não permitir deletar colunas padrão
+    
     setColumns(prev => prev.filter(col => col.id !== id));
+    
+    // Remover a coluna de todos os itens existentes
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        const { [id]: removed, ...rest } = item;
+        return rest;
+      })
+    })));
   };
 
   const updateItemStatus = (itemId: string, field: string, statusId: string) => {
@@ -190,8 +234,16 @@ export const useTrafficData = () => {
       monitoramento: '',
       otimizacao: '',
       relatorio: '',
-      informacoes: ''
+      informacoes: '',
+      attachments: []
     };
+
+    // Adicionar campos das colunas personalizadas
+    columns.forEach(column => {
+      if (!column.isDefault) {
+        newClient[column.id] = column.type === 'status' ? '' : '';
+      }
+    });
 
     setGroups(prev => prev.map(group => 
       group.id === groupId 
@@ -228,6 +280,8 @@ export const useTrafficData = () => {
     createMonth,
     duplicateMonth,
     addStatus,
+    updateStatus,
+    deleteStatus,
     addColumn,
     updateColumn,
     deleteColumn,

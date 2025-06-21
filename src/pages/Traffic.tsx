@@ -10,7 +10,8 @@ import {
   Copy,
   Settings,
   Trash2,
-  Paperclip
+  Paperclip,
+  Eye
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -18,6 +19,7 @@ import { useTrafficData } from '@/hooks/useTrafficData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { FilePreview } from '@/components/FilePreview';
 
 export default function Traffic() {
   const { 
@@ -28,6 +30,8 @@ export default function Traffic() {
     createMonth, 
     duplicateMonth,
     addStatus,
+    updateStatus,
+    deleteStatus,
     addColumn,
     updateColumn,
     deleteColumn,
@@ -55,6 +59,8 @@ export default function Traffic() {
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -129,6 +135,40 @@ export default function Traffic() {
   const handleDeleteColumn = (columnId: string) => {
     deleteColumn(columnId);
     setConfirmDelete(null);
+  };
+
+  const openClientDetails = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (client) {
+      setClientNotes(client.observacoes || '');
+      setClientFile(client.attachments?.[0] || null);
+      setShowClientDetails(clientId);
+    }
+  };
+
+  const saveClientDetails = () => {
+    if (showClientDetails) {
+      const updates: any = { observacoes: clientNotes };
+      
+      if (clientFile) {
+        updates.attachments = [clientFile];
+      }
+      
+      updateClient(showClientDetails, updates);
+    }
+    setShowClientDetails(null);
+    setClientNotes('');
+    setClientFile(null);
+  };
+
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
+  };
+
+  const getClientAttachments = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    return client?.attachments || [];
   };
 
   return (
@@ -285,12 +325,17 @@ export default function Traffic() {
                       />
                     </div>
                     <div className="w-48 p-2 border-r border-gray-200">
-                      <button
-                        onClick={() => setShowClientDetails(item.id)}
-                        className="text-sm text-blue-600 hover:underline font-medium text-left w-full"
-                      >
-                        {item.elemento}
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openClientDetails(item.id)}
+                          className="text-sm text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {item.elemento}
+                        </button>
+                        {getClientAttachments(item.id).length > 0 && (
+                          <Paperclip className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
                     </div>
                     <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
@@ -426,15 +471,19 @@ export default function Traffic() {
               <h4 className="font-medium">Colunas Existentes:</h4>
               {columns.map(column => (
                 <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                  <span className="text-sm">{column.name} ({column.type})</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <span className="text-sm">
+                    {column.name} ({column.type}) {column.isDefault && '(Padrão)'}
+                  </span>
+                  {!column.isDefault && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -469,17 +518,46 @@ export default function Traffic() {
                   />
                   <Paperclip className="h-4 w-4 text-gray-400" />
                 </div>
+                {clientFile && (
+                  <div className="mt-2 p-2 border rounded flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Paperclip className="h-4 w-4" />
+                      <span className="text-sm truncate">{clientFile.name}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openFilePreview(clientFile)}
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                {/* Show existing attachments */}
+                {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
+                    {getClientAttachments(showClientDetails).map((file, index) => (
+                      <div key={index} className="p-2 border rounded flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          <Paperclip className="h-4 w-4" />
+                          <span className="text-sm truncate">{file.name}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openFilePreview(file)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex space-x-2">
                 <Button 
-                  onClick={() => {
-                    if (showClientDetails) {
-                      updateClient(showClientDetails, { observacoes: clientNotes });
-                    }
-                    setShowClientDetails(null);
-                    setClientNotes('');
-                    setClientFile(null);
-                  }}
+                  onClick={saveClientDetails}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
                   Salvar
@@ -497,7 +575,15 @@ export default function Traffic() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={addStatus}
-        onAddColumn={() => {}}
+        onUpdateStatus={updateStatus}
+        onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
+      />
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
       />
 
       <ConfirmationDialog

@@ -15,6 +15,7 @@ interface ContentItem {
   informacoes: string;
   observacoes?: string;
   attachments?: File[];
+  [key: string]: any; // Para colunas dinâmicas
 }
 
 interface Group {
@@ -29,6 +30,13 @@ interface ServiceStatus {
   id: string;
   name: string;
   color: string;
+}
+
+interface ContentColumn {
+  id: string;
+  name: string;
+  type: 'status' | 'text';
+  isDefault?: boolean;
 }
 
 export const useContentData = () => {
@@ -69,6 +77,17 @@ export const useContentData = () => {
     }
   ]);
 
+  const [columns, setColumns] = useState<ContentColumn[]>([
+    { id: 'titulos', name: 'Títulos', type: 'status', isDefault: true },
+    { id: 'textos', name: 'Textos', type: 'status', isDefault: true },
+    { id: 'artes', name: 'Artes', type: 'status', isDefault: true },
+    { id: 'postagem', name: 'Postagem', type: 'status', isDefault: true },
+    { id: 'roteiro_videos', name: 'Roteiro de Vídeos', type: 'status', isDefault: true },
+    { id: 'captacao', name: 'Captação', type: 'status', isDefault: true },
+    { id: 'edicao_video', name: 'Edição de Vídeo', type: 'status', isDefault: true },
+    { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
+  ]);
+
   const [statuses, setStatuses] = useState<ServiceStatus[]>([
     { id: 'aprovados', name: 'Aprovados', color: 'bg-green-500' },
     { id: 'feito', name: 'Feito', color: 'bg-blue-500' },
@@ -81,6 +100,7 @@ export const useContentData = () => {
   useEffect(() => {
     const savedData = localStorage.getItem('contentData');
     const savedStatuses = localStorage.getItem('contentStatuses');
+    const savedColumns = localStorage.getItem('contentColumns');
     
     if (savedData) {
       try {
@@ -98,6 +118,14 @@ export const useContentData = () => {
         console.error('Erro ao carregar status:', error);
       }
     }
+
+    if (savedColumns) {
+      try {
+        setColumns(JSON.parse(savedColumns));
+      } catch (error) {
+        console.error('Erro ao carregar colunas:', error);
+      }
+    }
   }, []);
 
   // Salvar dados no localStorage sempre que groups mudar
@@ -109,6 +137,11 @@ export const useContentData = () => {
   useEffect(() => {
     localStorage.setItem('contentStatuses', JSON.stringify(statuses));
   }, [statuses]);
+
+  // Salvar colunas no localStorage sempre que columns mudar
+  useEffect(() => {
+    localStorage.setItem('contentColumns', JSON.stringify(columns));
+  }, [columns]);
 
   const updateGroups = (newGroups: Group[]) => {
     setGroups(newGroups);
@@ -154,11 +187,62 @@ export const useContentData = () => {
     };
     
     setGroups(prev => [...prev, newGroup]);
+    
+    // Refresh automático após duplicar
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+    
     return newGroup.id;
   };
 
   const addStatus = (status: ServiceStatus) => {
     setStatuses(prev => [...prev, status]);
+  };
+
+  const updateStatus = (statusId: string, updates: Partial<ServiceStatus>) => {
+    setStatuses(prev => prev.map(status => 
+      status.id === statusId ? { ...status, ...updates } : status
+    ));
+  };
+
+  const deleteStatus = (statusId: string) => {
+    setStatuses(prev => prev.filter(status => status.id !== statusId));
+  };
+
+  const addColumn = (name: string, type: 'status' | 'text') => {
+    const newColumn: ContentColumn = {
+      id: name.toLowerCase().replace(/\s+/g, '_'),
+      name,
+      type,
+      isDefault: false
+    };
+    setColumns(prev => [...prev, newColumn]);
+    
+    // Adicionar a nova coluna a todos os itens existentes
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => ({
+        ...item,
+        [newColumn.id]: type === 'status' ? '' : ''
+      }))
+    })));
+  };
+
+  const deleteColumn = (columnId: string) => {
+    const columnToDelete = columns.find(col => col.id === columnId);
+    if (columnToDelete?.isDefault) return; // Não permitir deletar colunas padrão
+    
+    setColumns(prev => prev.filter(col => col.id !== columnId));
+    
+    // Remover a coluna de todos os itens existentes
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        const { [columnId]: removed, ...rest } = item;
+        return rest;
+      })
+    })));
   };
 
   const updateItemStatus = (itemId: string, field: string, statusId: string) => {
@@ -187,6 +271,13 @@ export const useContentData = () => {
       informacoes: '',
       attachments: []
     };
+
+    // Adicionar campos das colunas personalizadas
+    columns.forEach(column => {
+      if (!column.isDefault) {
+        newClient[column.id] = column.type === 'status' ? '' : '';
+      }
+    });
 
     setGroups(prev => prev.map(group => 
       group.id === groupId 
@@ -217,11 +308,16 @@ export const useContentData = () => {
 
   return {
     groups,
+    columns,
     statuses,
     updateGroups,
     createMonth,
     duplicateMonth,
     addStatus,
+    updateStatus,
+    deleteStatus,
+    addColumn,
+    deleteColumn,
     updateItemStatus,
     addClient,
     deleteClient,
