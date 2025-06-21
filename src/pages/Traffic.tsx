@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,8 @@ export default function Traffic() {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    getClientFiles
   } = useTrafficData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -141,12 +143,13 @@ export default function Traffic() {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client) {
       setClientNotes(client.observacoes || '');
-      setClientFile(client.attachments?.[0] || null);
+      const files = getClientFiles(clientId);
+      setClientFile(files[0] || null);
       setShowClientDetails(clientId);
     }
   };
 
-  const saveClientDetails = () => {
+  const saveClientDetails = async () => {
     if (showClientDetails) {
       const updates: any = { observacoes: clientNotes };
       
@@ -154,7 +157,7 @@ export default function Traffic() {
         updates.attachments = [clientFile];
       }
       
-      updateClient(showClientDetails, updates);
+      await updateClient(showClientDetails, updates);
     }
     setShowClientDetails(null);
     setClientNotes('');
@@ -167,8 +170,7 @@ export default function Traffic() {
   };
 
   const getClientAttachments = (clientId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    return client?.attachments || [];
+    return getClientFiles(clientId);
   };
 
   return (

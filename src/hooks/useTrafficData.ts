@@ -13,7 +13,7 @@ interface TrafficItem {
   relatorio: string;
   informacoes: string;
   observacoes?: string;
-  attachments?: File[];
+  attachments?: { name: string; data: string; type: string }[]; // Changed to serializable format
   [key: string]: any; // Para colunas dinâmicas
 }
 
@@ -37,6 +37,32 @@ interface ServiceStatus {
   name: string;
   color: string;
 }
+
+// Helper function to convert File to serializable format
+const fileToSerializable = async (file: File): Promise<{ name: string; data: string; type: string }> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        name: file.name,
+        data: reader.result as string,
+        type: file.type
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+// Helper function to convert serializable format back to File
+const serializableToFile = (serialized: { name: string; data: string; type: string }): File => {
+  const byteCharacters = atob(serialized.data.split(',')[1]);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new File([byteArray], serialized.name, { type: serialized.type });
+};
 
 export const useTrafficData = () => {
   const [groups, setGroups] = useState<TrafficGroup[]>([
@@ -259,7 +285,16 @@ export const useTrafficData = () => {
     })));
   };
 
-  const updateClient = (itemId: string, updates: Partial<TrafficItem>) => {
+  const updateClient = async (itemId: string, updates: Partial<TrafficItem>) => {
+    // Convert File objects to serializable format if attachments are being updated
+    if (updates.attachments && updates.attachments.length > 0) {
+      const firstAttachment = updates.attachments[0];
+      if (firstAttachment instanceof File) {
+        const serializedFile = await fileToSerializable(firstAttachment);
+        updates.attachments = [serializedFile as any];
+      }
+    }
+
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => 
@@ -268,6 +303,19 @@ export const useTrafficData = () => {
           : item
       )
     })));
+  };
+
+  // Helper function to get File objects from attachments
+  const getClientFiles = (clientId: string): File[] => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (!client?.attachments) return [];
+    
+    return client.attachments.map(attachment => {
+      if ('data' in attachment && 'name' in attachment && 'type' in attachment) {
+        return serializableToFile(attachment as { name: string; data: string; type: string });
+      }
+      return attachment as File;
+    });
   };
 
   return {
@@ -286,6 +334,7 @@ export const useTrafficData = () => {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    getClientFiles
   };
 };
