@@ -198,34 +198,55 @@ export const useContentData = () => {
   };
 
   const duplicateMonth = (sourceGroupId: string, newMonthName: string) => {
-    const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-    if (!groupToDuplicate) return null;
-    
-    const timestamp = Date.now();
-    const newGroup: Group = {
-      id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`,
-      name: newMonthName.toUpperCase(),
-      color: groupToDuplicate.color,
-      isExpanded: true,
-      items: groupToDuplicate.items.map((item, index) => ({
-        ...item,
-        id: `${newMonthName.toLowerCase()}-item-${timestamp}-${index}`,
-        // Reset status fields for new month
-        titulos: '',
-        textos: '',
-        artes: '',
-        postagem: '',
-        roteiro_videos: '',
-        captacao: '',
-        edicao_video: '',
-        informacoes: '',
-        observacoes: '',
-        attachments: []
-      }))
-    };
-    
-    setGroups(prev => [...prev, newGroup]);
-    return newGroup.id;
+    try {
+      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
+      if (!groupToDuplicate) {
+        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
+        return null;
+      }
+      
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
+      
+      const newGroup: Group = {
+        id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-${timestamp}-${randomId}`,
+        name: newMonthName.toUpperCase(),
+        color: groupToDuplicate.color,
+        isExpanded: true,
+        items: groupToDuplicate.items.map((item, index) => {
+          const newItemId = `content-${newMonthName.toLowerCase()}-${timestamp}-${index}`;
+          console.log('Criando novo item:', newItemId);
+          
+          return {
+            ...item,
+            id: newItemId,
+            // Reset status fields for new month
+            titulos: '',
+            textos: '',
+            artes: '',
+            postagem: '',
+            roteiro_videos: '',
+            captacao: '',
+            edicao_video: '',
+            informacoes: '',
+            observacoes: '',
+            attachments: []
+          };
+        })
+      };
+      
+      console.log('Duplicando grupo:', newGroup);
+      setGroups(prev => {
+        const updated = [...prev, newGroup];
+        console.log('Grupos atualizados:', updated.length);
+        return updated;
+      });
+      
+      return newGroup.id;
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+      return null;
+    }
   };
 
   const addStatus = (status: ServiceStatus) => {

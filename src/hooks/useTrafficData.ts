@@ -166,34 +166,55 @@ export const useTrafficData = () => {
   };
 
   const duplicateMonth = (sourceGroupId: string, newMonthName: string) => {
-    const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-    if (!groupToDuplicate) return null;
-    
-    const timestamp = Date.now();
-    const newGroup: TrafficGroup = {
-      id: newMonthName.toLowerCase().replace(/\s+/g, '-') + '-trafego-' + timestamp,
-      name: newMonthName.toUpperCase() + ' - TRÁFEGO',
-      color: groupToDuplicate.color,
-      isExpanded: true,
-      items: groupToDuplicate.items.map((item, index) => ({
-        ...item,
-        id: `${newMonthName.toLowerCase()}-traffic-${timestamp}-${index}`,
-        // Reset campos para novo mês
-        configuracao_campanha: '',
-        criacao_anuncios: '',
-        aprovacao_cliente: '',
-        ativacao: '',
-        monitoramento: '',
-        otimizacao: '',
-        relatorio: '',
-        informacoes: '',
-        observacoes: '',
-        attachments: []
-      }))
-    };
-    
-    setGroups(prev => [...prev, newGroup]);
-    return newGroup.id;
+    try {
+      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
+      if (!groupToDuplicate) {
+        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
+        return null;
+      }
+      
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
+      
+      const newGroup: TrafficGroup = {
+        id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}-${randomId}`,
+        name: newMonthName.toUpperCase() + ' - TRÁFEGO',
+        color: groupToDuplicate.color,
+        isExpanded: true,
+        items: groupToDuplicate.items.map((item, index) => {
+          const newItemId = `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`;
+          console.log('Criando novo item de tráfego:', newItemId);
+          
+          return {
+            ...item,
+            id: newItemId,
+            // Reset todos os campos para novo mês
+            configuracao_campanha: '',
+            criacao_anuncios: '',
+            aprovacao_cliente: '',
+            ativacao: '',
+            monitoramento: '',
+            otimizacao: '',
+            relatorio: '',
+            informacoes: '',
+            observacoes: '',
+            attachments: []
+          };
+        })
+      };
+      
+      console.log('Duplicando grupo de tráfego:', newGroup);
+      setGroups(prev => {
+        const updated = [...prev, newGroup];
+        console.log('Grupos de tráfego atualizados:', updated.length);
+        return updated;
+      });
+      
+      return newGroup.id;
+    } catch (error) {
+      console.error('Erro ao duplicar mês de tráfego:', error);
+      return null;
+    }
   };
 
   const addStatus = (status: ServiceStatus) => {
