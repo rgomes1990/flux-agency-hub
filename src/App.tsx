@@ -16,8 +16,8 @@ import NotFound from './pages/NotFound';
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -65,8 +65,8 @@ function App() {
           } />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 
