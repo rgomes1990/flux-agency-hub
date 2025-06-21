@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -335,7 +334,6 @@ export function ServiceTable() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={addCustomStatus}
-        onAddColumn={addCustomColumn}
       />
     </div>
   );

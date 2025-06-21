@@ -201,12 +201,13 @@ export const useTrafficData = () => {
     
     setColumns(prev => prev.filter(col => col.id !== id));
     
-    // Remover a coluna de todos os itens existentes
+    // Remover a coluna de todos os itens existentes mantendo a tipagem correta
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => {
-        const { [id]: removed, ...rest } = item;
-        return rest;
+        const updatedItem = { ...item };
+        delete updatedItem[id];
+        return updatedItem;
       })
     })));
   };

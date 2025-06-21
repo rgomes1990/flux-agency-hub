@@ -235,12 +235,13 @@ export const useContentData = () => {
     
     setColumns(prev => prev.filter(col => col.id !== columnId));
     
-    // Remover a coluna de todos os itens existentes
+    // Remover a coluna de todos os itens existentes mantendo a tipagem correta
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => {
-        const { [columnId]: removed, ...rest } = item;
-        return rest;
+        const updatedItem = { ...item };
+        delete updatedItem[columnId];
+        return updatedItem;
       })
     })));
   };
