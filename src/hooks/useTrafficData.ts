@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface TrafficItem {
@@ -196,9 +195,7 @@ export const useTrafficData = () => {
   };
 
   const deleteColumn = (id: string) => {
-    const columnToDelete = columns.find(col => col.id === id);
-    if (columnToDelete?.isDefault) return; // Não permitir deletar colunas padrão
-    
+    // Allow deletion of any column, including default ones
     setColumns(prev => prev.filter(col => col.id !== id));
     
     // Remover a coluna de todos os itens existentes mantendo a tipagem correta

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface ContentItem {
@@ -230,9 +229,7 @@ export const useContentData = () => {
   };
 
   const deleteColumn = (columnId: string) => {
-    const columnToDelete = columns.find(col => col.id === columnId);
-    if (columnToDelete?.isDefault) return; // Não permitir deletar colunas padrão
-    
+    // Allow deletion of any column, including default ones
     setColumns(prev => prev.filter(col => col.id !== columnId));
     
     // Remover a coluna de todos os itens existentes mantendo a tipagem correta

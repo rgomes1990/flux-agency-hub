@@ -474,18 +474,16 @@ export default function Content() {
               {columns.map(column => (
                 <div key={column.id} className="flex items-center justify-between p-2 border rounded">
                   <span className="text-sm">
-                    {column.name} ({column.type}) {column.isDefault && '(Padrão)'}
+                    {column.name} ({column.type})
                   </span>
-                  {!column.isDefault && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               ))}
             </div>
