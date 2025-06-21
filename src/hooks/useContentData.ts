@@ -14,6 +14,7 @@ interface ContentItem {
   edicao_video: string;
   informacoes: string;
   observacoes?: string;
+  attachments?: File[];
 }
 
 interface Group {
@@ -83,7 +84,8 @@ export const useContentData = () => {
     
     if (savedData) {
       try {
-        setGroups(JSON.parse(savedData));
+        const parsedData = JSON.parse(savedData);
+        setGroups(parsedData);
       } catch (error) {
         console.error('Erro ao carregar dados do conteúdo:', error);
       }
@@ -114,7 +116,7 @@ export const useContentData = () => {
 
   const createMonth = (monthName: string) => {
     const newGroup: Group = {
-      id: monthName.toLowerCase().replace(/\s+/g, '-'),
+      id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
       name: monthName.toUpperCase(),
       color: 'bg-orange-500',
       isExpanded: true,
@@ -130,13 +132,24 @@ export const useContentData = () => {
     if (!groupToDuplicate) return null;
     
     const newGroup: Group = {
-      id: newMonthName.toLowerCase().replace(/\s+/g, '-'),
+      id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
       name: newMonthName.toUpperCase(),
       color: groupToDuplicate.color,
       isExpanded: true,
       items: groupToDuplicate.items.map(item => ({
         ...item,
-        id: `${item.id}-${Date.now()}-${Math.random()}`
+        id: `${item.id}-copy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        // Reset status fields for new month
+        titulos: '',
+        textos: '',
+        artes: '',
+        postagem: '',
+        roteiro_videos: '',
+        captacao: '',
+        edicao_video: '',
+        informacoes: '',
+        observacoes: '',
+        attachments: []
       }))
     };
     
@@ -161,7 +174,7 @@ export const useContentData = () => {
 
   const addClient = (groupId: string, clientData: Partial<ContentItem>) => {
     const newClient: ContentItem = {
-      id: `client-${Date.now()}`,
+      id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       elemento: clientData.elemento || 'Novo Cliente',
       servicos: clientData.servicos || '',
       titulos: '',
@@ -171,7 +184,8 @@ export const useContentData = () => {
       roteiro_videos: '',
       captacao: '',
       edicao_video: '',
-      informacoes: ''
+      informacoes: '',
+      attachments: []
     };
 
     setGroups(prev => prev.map(group => 

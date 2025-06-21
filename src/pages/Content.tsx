@@ -89,18 +89,20 @@ export default function Content() {
     setShowCreateDialog(false);
   };
 
-  const handleDuplicateMonth = () => {
+  const handleDuplicateMonth = async () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    // Close dialog first to prevent freezing
-    setShowDuplicateDialog(false);
-    
-    // Use setTimeout to prevent blocking the UI
-    setTimeout(() => {
+    try {
+      setShowDuplicateDialog(false);
+      
+      // Create the duplicate month
       duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
-    }, 100);
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+    }
   };
 
   const handleCreateClient = () => {
@@ -126,13 +128,34 @@ export default function Content() {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client) {
       setClientNotes(client.observacoes || '');
+      setClientFile(client.attachments?.[0] || null);
       setShowClientDetails(clientId);
     }
+  };
+
+  const saveClientDetails = () => {
+    if (showClientDetails) {
+      const updates: any = { observacoes: clientNotes };
+      
+      if (clientFile) {
+        updates.attachments = [clientFile];
+      }
+      
+      updateClient(showClientDetails, updates);
+    }
+    setShowClientDetails(null);
+    setClientNotes('');
+    setClientFile(null);
   };
 
   const openFilePreview = (file: File) => {
     setPreviewFile(file);
     setShowFilePreview(true);
+  };
+
+  const getClientAttachments = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    return client?.attachments || [];
   };
 
   return (
@@ -287,12 +310,17 @@ export default function Content() {
                       />
                     </div>
                     <div className="w-48 p-2 border-r border-gray-200">
-                      <button
-                        onClick={() => openClientDetails(item.id)}
-                        className="text-sm text-blue-600 hover:underline font-medium text-left w-full"
-                      >
-                        {item.elemento}
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openClientDetails(item.id)}
+                          className="text-sm text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {item.elemento}
+                        </button>
+                        {getClientAttachments(item.id).length > 0 && (
+                          <Paperclip className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
                     </div>
                     <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
@@ -479,17 +507,31 @@ export default function Content() {
                     </Button>
                   </div>
                 )}
+                {/* Show existing attachments */}
+                {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
+                    {getClientAttachments(showClientDetails).map((file, index) => (
+                      <div key={index} className="p-2 border rounded flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          <Paperclip className="h-4 w-4" />
+                          <span className="text-sm truncate">{file.name}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openFilePreview(file)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex space-x-2">
                 <Button 
-                  onClick={() => {
-                    if (showClientDetails) {
-                      updateClient(showClientDetails, { observacoes: clientNotes });
-                    }
-                    setShowClientDetails(null);
-                    setClientNotes('');
-                    setClientFile(null);
-                  }}
+                  onClick={saveClientDetails}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
                   Salvar
@@ -510,7 +552,20 @@ export default function Content() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              As colunas do sistema de conteúdo são fixas. Use o menu "Gerenciar Status" para personalizar os status.
+              As colunas do sistema de conteúdo são fixas e representam as etapas do processo de criação de conteúdo:
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="p-2 bg-gray-50 rounded">• Títulos</div>
+              <div className="p-2 bg-gray-50 rounded">• Textos</div>
+              <div className="p-2 bg-gray-50 rounded">• Artes</div>
+              <div className="p-2 bg-gray-50 rounded">• Postagem</div>
+              <div className="p-2 bg-gray-50 rounded">• Roteiro de Vídeos</div>
+              <div className="p-2 bg-gray-50 rounded">• Captação</div>
+              <div className="p-2 bg-gray-50 rounded">• Edição de Vídeo</div>
+              <div className="p-2 bg-gray-50 rounded">• Informações</div>
+            </div>
+            <p className="text-sm text-gray-600">
+              Use o menu "Gerenciar Status" para personalizar os status de cada coluna.
             </p>
             <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
               Fechar

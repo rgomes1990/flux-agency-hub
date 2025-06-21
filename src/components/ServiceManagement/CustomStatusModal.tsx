@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface CustomStatusModalProps {
   open: boolean;
@@ -26,10 +25,9 @@ const colorOptions = [
   { name: 'Vinho', value: 'bg-red-800' },
 ];
 
-export function CustomStatusModal({ open, onOpenChange, onAddStatus, onAddColumn }: CustomStatusModalProps) {
+export function CustomStatusModal({ open, onOpenChange, onAddStatus }: CustomStatusModalProps) {
   const [statusName, setStatusName] = useState('');
   const [selectedColor, setSelectedColor] = useState('bg-blue-500');
-  const [columnName, setColumnName] = useState('');
 
   const handleAddStatus = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,82 +42,46 @@ export function CustomStatusModal({ open, onOpenChange, onAddStatus, onAddColumn
     }
   };
 
-  const handleAddColumn = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (columnName.trim()) {
-      onAddColumn(columnName);
-      setColumnName('');
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Personalizar Sistema</DialogTitle>
+          <DialogTitle>Criar Novo Status</DialogTitle>
         </DialogHeader>
         
-        <Tabs defaultValue="status" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="status">Novo Status</TabsTrigger>
-            <TabsTrigger value="column">Nova Coluna</TabsTrigger>
-          </TabsList>
+        <form onSubmit={handleAddStatus} className="space-y-4">
+          <div>
+            <Label htmlFor="statusName">Nome do Status</Label>
+            <Input
+              id="statusName"
+              value={statusName}
+              onChange={(e) => setStatusName(e.target.value)}
+              placeholder="Ex: Em Revisão"
+              required
+            />
+          </div>
           
-          <TabsContent value="status">
-            <form onSubmit={handleAddStatus} className="space-y-4">
-              <div>
-                <Label htmlFor="statusName">Nome do Status</Label>
-                <Input
-                  id="statusName"
-                  value={statusName}
-                  onChange={(e) => setStatusName(e.target.value)}
-                  placeholder="Ex: Em Revisão"
-                  required
+          <div>
+            <Label>Cor do Status</Label>
+            <div className="grid grid-cols-5 gap-2 mt-2">
+              {colorOptions.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  className={`w-8 h-8 rounded-full ${color.value} ${
+                    selectedColor === color.value ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                  }`}
+                  onClick={() => setSelectedColor(color.value)}
+                  title={color.name}
                 />
-              </div>
-              
-              <div>
-                <Label>Cor do Status</Label>
-                <div className="grid grid-cols-5 gap-2 mt-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      className={`w-8 h-8 rounded-full ${color.value} ${
-                        selectedColor === color.value ? 'ring-2 ring-offset-2 ring-gray-400' : ''
-                      }`}
-                      onClick={() => setSelectedColor(color.value)}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              <Button type="submit" className="w-full">
-                Criar Status
-              </Button>
-            </form>
-          </TabsContent>
+              ))}
+            </div>
+          </div>
           
-          <TabsContent value="column">
-            <form onSubmit={handleAddColumn} className="space-y-4">
-              <div>
-                <Label htmlFor="columnName">Nome da Coluna</Label>
-                <Input
-                  id="columnName"
-                  value={columnName}
-                  onChange={(e) => setColumnName(e.target.value)}
-                  placeholder="Ex: Vídeos, Stories"
-                  required
-                />
-              </div>
-              
-              <Button type="submit" className="w-full">
-                Criar Coluna
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+          <Button type="submit" className="w-full">
+            Criar Status
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

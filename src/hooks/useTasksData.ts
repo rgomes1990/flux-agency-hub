@@ -148,11 +148,11 @@ export const useTasksData = () => {
     })));
   };
 
-  const addColumn = (columnName: string) => {
+  const addColumn = (columnName: string, color: string = 'bg-gray-100') => {
     const newColumn: Column = {
-      id: columnName.toLowerCase().replace(/\s+/g, '-'),
+      id: `column-${Date.now()}`,
       title: columnName,
-      color: 'bg-gray-100',
+      color: color,
       tasks: []
     };
     
@@ -169,6 +169,12 @@ export const useTasksData = () => {
     ));
   };
 
+  const updateColumnColor = (columnId: string, color: string) => {
+    setColumns(prev => prev.map(col => 
+      col.id === columnId ? { ...col, color: color } : col
+    ));
+  };
+
   return {
     columns,
     updateColumns,
@@ -177,6 +183,7 @@ export const useTasksData = () => {
     deleteTask,
     addColumn,
     deleteColumn,
-    editColumn
+    editColumn,
+    updateColumnColor
   };
 };

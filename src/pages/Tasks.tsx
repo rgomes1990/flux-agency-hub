@@ -31,7 +31,8 @@ export default function Tasks() {
     deleteTask,
     addColumn,
     deleteColumn,
-    editColumn
+    editColumn,
+    updateColumnColor
   } = useTasksData();
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -113,14 +114,7 @@ export default function Tasks() {
   const createNewColumn = () => {
     if (!newColumnName.trim()) return;
     
-    addColumn(newColumnName);
-    // Update color after adding
-    const newColumns = [...columns];
-    const lastColumn = newColumns[newColumns.length - 1];
-    if (lastColumn) {
-      lastColumn.color = newColumnColor;
-      updateColumns(newColumns);
-    }
+    addColumn(newColumnName, newColumnColor);
     
     setNewColumnName('');
     setNewColumnColor('bg-gray-100');
@@ -310,7 +304,10 @@ export default function Tasks() {
                   <h4 className="font-medium">Colunas Existentes:</h4>
                   {columns.map(column => (
                     <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                      <span className="text-sm">{column.title}</span>
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-4 h-4 rounded ${column.color}`}></div>
+                        <span className="text-sm">{column.title}</span>
+                      </div>
                       <Button
                         size="sm"
                         variant="ghost"
