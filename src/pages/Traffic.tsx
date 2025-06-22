@@ -12,7 +12,8 @@ import {
   Edit,
   Trash2,
   Paperclip,
-  Eye
+  Eye,
+  Menu
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -21,8 +22,10 @@ import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Traffic() {
+  const isMobile = useIsMobile();
   const { 
     groups, 
     columns,
@@ -67,6 +70,7 @@ export default function Traffic() {
   const [showFilePreview, setShowFilePreview] = useState(false);
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -101,13 +105,17 @@ export default function Traffic() {
     setShowCreateDialog(false);
   };
 
-  const handleDuplicateMonth = () => {
+  const handleDuplicateMonth = async () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-    setDuplicateMonthName('');
-    setSelectedGroupToDuplicate('');
-    setShowDuplicateDialog(false);
+    try {
+      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      setDuplicateMonthName('');
+      setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+    }
   };
 
   const handleCreateClient = () => {
@@ -146,7 +154,6 @@ export default function Traffic() {
   const handleEditMonth = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      // Remove the "- TRÁFEGO" suffix for editing
       const nameWithoutSuffix = group.name.replace(' - TRÁFEGO', '');
       setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
@@ -208,20 +215,29 @@ export default function Traffic() {
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900">Tráfego Pago</h1>
           </div>
+          {isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center space-x-2">
+      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
+        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
                 <Plus className="h-4 w-4 mr-1" />
                 Criar mês
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
               <DialogHeader>
                 <DialogTitle>Criar Novo Mês</DialogTitle>
               </DialogHeader>
@@ -232,10 +248,10 @@ export default function Traffic() {
                   onChange={(e) => setNewMonthName(e.target.value)}
                 />
                 <div className="flex space-x-2">
-                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700">
+                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
                     Criar
                   </Button>
-                  <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
                     Cancelar
                   </Button>
                 </div>
@@ -245,7 +261,7 @@ export default function Traffic() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
                 <Copy className="h-4 w-4 mr-1" />
                 Duplicar mês
               </Button>
@@ -269,6 +285,7 @@ export default function Traffic() {
             variant="outline" 
             size="sm"
             onClick={() => setShowClientDialog(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Plus className="h-4 w-4 mr-1" />
             Novo Cliente
@@ -278,6 +295,7 @@ export default function Traffic() {
             variant="outline" 
             size="sm"
             onClick={() => setShowColumnDialog(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Colunas
@@ -287,6 +305,7 @@ export default function Traffic() {
             variant="outline" 
             size="sm"
             onClick={() => setShowStatusModal(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Status
@@ -296,7 +315,7 @@ export default function Traffic() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <div className="min-w-full">
+        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
@@ -321,9 +340,7 @@ export default function Traffic() {
           {groups.map((group) => (
             <div key={group.id}>
               {/* Group Header */}
-              <div 
-                className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors"
-              >
+              <div className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors">
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
                     <button onClick={() => toggleGroup(group.id)}>
@@ -426,7 +443,7 @@ export default function Traffic() {
 
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Duplicar Mês</DialogTitle>
           </DialogHeader>
@@ -437,10 +454,10 @@ export default function Traffic() {
               onChange={(e) => setDuplicateMonthName(e.target.value)}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700">
+              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
                 Duplicar
               </Button>
-              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -449,7 +466,7 @@ export default function Traffic() {
       </Dialog>
 
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Novo Cliente</DialogTitle>
           </DialogHeader>
@@ -478,10 +495,10 @@ export default function Traffic() {
               </select>
             </div>
             <div className="flex space-x-2">
-              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700">
+              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700 flex-1">
                 Criar
               </Button>
-              <Button variant="outline" onClick={() => setShowClientDialog(false)}>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -490,7 +507,7 @@ export default function Traffic() {
       </Dialog>
 
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Gerenciar Colunas</DialogTitle>
           </DialogHeader>
@@ -538,7 +555,7 @@ export default function Traffic() {
       </Dialog>
 
       <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Editar Mês</DialogTitle>
           </DialogHeader>
@@ -549,10 +566,10 @@ export default function Traffic() {
               onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700">
+              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
                 Salvar
               </Button>
-              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)}>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -561,7 +578,7 @@ export default function Traffic() {
       </Dialog>
 
       <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={`max-w-md ${isMobile ? 'w-[95vw] max-w-none' : ''}`}>
           <DialogHeader>
             <DialogTitle>Detalhes do Cliente</DialogTitle>
           </DialogHeader>
@@ -602,7 +619,6 @@ export default function Traffic() {
                     </Button>
                   </div>
                 )}
-                {/* Show existing attachments */}
                 {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
                   <div className="mt-2">
                     <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
@@ -627,11 +643,11 @@ export default function Traffic() {
               <div className="flex space-x-2">
                 <Button 
                   onClick={saveClientDetails}
-                  className="bg-orange-600 hover:bg-orange-700"
+                  className="bg-orange-600 hover:bg-orange-700 flex-1"
                 >
                   Salvar
                 </Button>
-                <Button variant="outline" onClick={() => setShowClientDetails(null)}>
+                <Button variant="outline" onClick={() => setShowClientDetails(null)} className="flex-1">
                   Cancelar
                 </Button>
               </div>

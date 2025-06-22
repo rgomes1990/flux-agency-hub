@@ -131,13 +131,24 @@ export const useTrafficData = () => {
         name: newMonthName.toUpperCase() + ' - TRÁFEGO',
         color: groupToDuplicate.color,
         isExpanded: true,
-        items: groupToDuplicate.items.map((item, index) => ({
-          ...item,
-          id: `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
-          configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
-          ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
-          informacoes: '', observacoes: '', attachments: []
-        }))
+        items: groupToDuplicate.items.map((item, index) => {
+          const duplicatedItem = {
+            ...item,
+            id: `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
+            configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
+            ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
+            informacoes: '', observacoes: '', attachments: []
+          };
+          
+          // Reset all additional columns
+          columns.forEach(column => {
+            if (!column.isDefault) {
+              duplicatedItem[column.id] = column.type === 'status' ? '' : '';
+            }
+          });
+          
+          return duplicatedItem;
+        })
       };
       
       console.log('Novo grupo criado:', newGroup);
@@ -148,7 +159,6 @@ export const useTrafficData = () => {
         return updated;
       });
       
-      // Registrar na auditoria
       await logAudit('traffic', newGroupId, 'INSERT', null, { 
         month_name: newMonthName,
         duplicated_from: sourceGroupId 
@@ -176,7 +186,6 @@ export const useTrafficData = () => {
     
     setGroups(prev => [...prev, newGroup]);
     
-    // Registrar na auditoria
     await logAudit('traffic', newGroup.id, 'INSERT', null, { month_name: monthName });
     
     return newGroup.id;
@@ -191,7 +200,6 @@ export const useTrafficData = () => {
         : group
     ));
     
-    // Registrar na auditoria
     await logAudit('traffic', groupId, 'UPDATE', 
       { name: oldGroup?.name }, 
       { name: newName.toUpperCase() + ' - TRÁFEGO' }
@@ -203,7 +211,6 @@ export const useTrafficData = () => {
     
     setGroups(prev => prev.filter(group => group.id !== groupId));
     
-    // Registrar na auditoria
     await logAudit('traffic', groupId, 'DELETE', { name: groupToDelete?.name }, null);
   };
 
@@ -270,7 +277,6 @@ export const useTrafficData = () => {
       )
     })));
     
-    // Registrar na auditoria
     await logAudit('traffic', itemId, 'UPDATE', 
       { [field]: oldItem?.[field] }, 
       { [field]: statusId }
@@ -299,7 +305,6 @@ export const useTrafficData = () => {
         : group
     ));
     
-    // Registrar na auditoria
     await logAudit('traffic', newClient.id, 'INSERT', null, {
       elemento: clientData.elemento,
       group_id: groupId
@@ -316,7 +321,6 @@ export const useTrafficData = () => {
       items: group.items.filter(item => item.id !== itemId)
     })));
     
-    // Registrar na auditoria
     await logAudit('traffic', itemId, 'DELETE', { elemento: clientToDelete?.elemento }, null);
   };
 
@@ -358,7 +362,6 @@ export const useTrafficData = () => {
       )
     })));
     
-    // Registrar na auditoria
     await logAudit('traffic', itemId, 'UPDATE', 
       { elemento: oldClient?.elemento }, 
       { elemento: updates.elemento }

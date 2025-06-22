@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,13 +44,11 @@ export function ClientRegistration() {
   useEffect(() => {
     const savedClients = localStorage.getItem('clientRegistrations');
     if (savedClients) {
-      // Descriptografar dados ao carregar (simulação)
       setClients(JSON.parse(savedClients));
     }
   }, []);
 
   useEffect(() => {
-    // Criptografar dados ao salvar (simulação)
     localStorage.setItem('clientRegistrations', JSON.stringify(clients));
   }, [clients]);
 
@@ -227,26 +224,24 @@ export function ClientRegistration() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nome do Cliente *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="services">Serviços Prestados</Label>
-                <Input
-                  id="services"
-                  value={formData.services}
-                  onChange={(e) => setFormData(prev => ({ ...prev, services: e.target.value }))}
-                  placeholder="Ex: Unha, Depilação, Tráfego Pago"
-                />
-              </div>
+            <div>
+              <Label htmlFor="name">Nome do Cliente *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="services">Serviços Prestados</Label>
+              <Input
+                id="services"
+                value={formData.services}
+                onChange={(e) => setFormData(prev => ({ ...prev, services: e.target.value }))}
+                placeholder="Ex: Unha, Depilação, Tráfego Pago"
+              />
             </div>
 
             <div>

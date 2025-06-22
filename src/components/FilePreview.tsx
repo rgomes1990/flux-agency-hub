@@ -19,12 +19,19 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
         const url = URL.createObjectURL(file);
         setFileUrl(url);
         
-        // Cleanup function to revoke the URL when component unmounts or file changes
         return () => {
           URL.revokeObjectURL(url);
         };
       } catch (error) {
         console.error('Error creating object URL:', error);
+        setFileUrl(null);
+      }
+    } else if (file && typeof file === 'object' && 'data' in file && 'name' in file) {
+      // Handle serialized files from localStorage
+      try {
+        setFileUrl(file.data as string);
+      } catch (error) {
+        console.error('Error setting file URL:', error);
         setFileUrl(null);
       }
     } else {
@@ -34,15 +41,17 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
 
   if (!file) return null;
 
-  const isImage = file.type ? file.type.startsWith('image/') : false;
-  const isPDF = file.type === 'application/pdf';
+  const isImage = file.type ? file.type.startsWith('image/') : 
+    (typeof file === 'object' && 'type' in file && file.type?.startsWith('image/'));
+  const isPDF = file.type === 'application/pdf' || 
+    (typeof file === 'object' && 'type' in file && file.type === 'application/pdf');
 
   const downloadFile = () => {
     if (!fileUrl) return;
     
     const link = document.createElement('a');
     link.href = fileUrl;
-    link.download = file.name;
+    link.download = file.name || 'arquivo';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -55,7 +64,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center space-x-2">
               {isImage ? <FileImage className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-              <span>{file.name}</span>
+              <span className="truncate">{file.name || 'Arquivo'}</span>
             </DialogTitle>
             <div className="flex space-x-2">
               <Button onClick={downloadFile} variant="outline" size="sm" disabled={!fileUrl}>
@@ -79,7 +88,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
           ) : isImage ? (
             <img 
               src={fileUrl} 
-              alt={file.name}
+              alt={file.name || 'Imagem'}
               className="max-w-full h-auto rounded-lg"
             />
           ) : isPDF ? (
