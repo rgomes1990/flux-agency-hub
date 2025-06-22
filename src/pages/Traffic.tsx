@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,7 +80,15 @@ export default function Traffic() {
         mes: newItem.mes,
         status: newItem.status,
         observacoes: newItem.observacoes,
-        attachments: serializedAttachments
+        attachments: serializedAttachments,
+        investimento: 0,
+        resultado: 0,
+        roi: 0,
+        roas: 0,
+        ctr: 0,
+        cpc: 0,
+        cpm: 0,
+        conversoes: 0
       });
       
       setNewItem({
@@ -336,10 +343,13 @@ export default function Traffic() {
                   <p className="text-sm font-medium text-gray-700">Anexos:</p>
                   <div className="space-y-1">
                     {item.attachments.map((file: any, index: number) => (
-                      <FilePreview
-                        key={index}
-                        file={file}
-                      />
+                      <div key={index} className="p-2 bg-gray-50 rounded">
+                        <FilePreview
+                          file={file}
+                          open={false}
+                          onOpenChange={() => {}}
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>

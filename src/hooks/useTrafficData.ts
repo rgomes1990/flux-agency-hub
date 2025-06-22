@@ -5,6 +5,7 @@ export interface TrafficData {
   id: string;
   cliente: string;
   mes: string;
+  status: string; // Added this property
   investimento: number;
   resultado: number;
   roi: number;
