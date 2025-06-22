@@ -33,7 +33,13 @@ export const useAuditData = () => {
         return;
       }
 
-      setAuditLogs(data || []);
+      // Converter os dados para o tipo correto
+      const formattedLogs: AuditLog[] = (data || []).map(log => ({
+        ...log,
+        ip_address: log.ip_address ? String(log.ip_address) : undefined
+      }));
+
+      setAuditLogs(formattedLogs);
     } catch (error) {
       console.error('Erro ao carregar logs de auditoria:', error);
     } finally {

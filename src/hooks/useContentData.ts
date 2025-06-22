@@ -376,6 +376,21 @@ export const useContentData = () => {
     );
   };
 
+  const getClientFiles = (clientId: string): File[] => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (!client || !client.attachments) return [];
+    
+    return client.attachments.map(attachment => {
+      const byteCharacters = atob(attachment.data.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new File([byteArray], attachment.name, { type: attachment.type });
+    });
+  };
+
   return {
     groups,
     columns,
@@ -394,6 +409,7 @@ export const useContentData = () => {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    getClientFiles
   };
 };
