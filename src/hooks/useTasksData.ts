@@ -84,8 +84,7 @@ export const useTasksData = () => {
     const savedData = localStorage.getItem('tasksData');
     if (savedData) {
       try {
-        const parsedData = JSON.parse(savedData);
-        setColumns(parsedData);
+        setColumns(JSON.parse(savedData));
       } catch (error) {
         console.error('Erro ao carregar dados das tarefas:', error);
       }
@@ -123,7 +122,7 @@ export const useTasksData = () => {
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
       estimatedHours: taskData.estimatedHours || 4,
       actualHours: taskData.actualHours || 0,
-      attachments: taskData.attachments
+      attachments: taskData.attachments || []
     };
 
     setColumns(columns.map(col => {

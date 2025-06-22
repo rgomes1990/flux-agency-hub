@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
 
-export interface ClientPassword {
+interface ClientPassword {
   id: string;
   cliente: string;
   plataforma: string;
@@ -14,40 +15,65 @@ export interface ClientPassword {
 
 export const useClientPasswordsData = () => {
   const [passwords, setPasswords] = useState<ClientPassword[]>([]);
+  const { logAudit } = useAuth();
 
   useEffect(() => {
-    const savedData = localStorage.getItem('clientPasswords');
+    const savedData = localStorage.getItem('clientPasswordsData');
     if (savedData) {
       try {
         setPasswords(JSON.parse(savedData));
       } catch (error) {
-        console.error('Erro ao carregar senhas:', error);
+        console.error('Erro ao carregar senhas dos clientes:', error);
       }
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('clientPasswords', JSON.stringify(passwords));
+    localStorage.setItem('clientPasswordsData', JSON.stringify(passwords));
   }, [passwords]);
 
-  const addPassword = (newPassword: Omit<ClientPassword, 'id' | 'createdAt'>) => {
-    const passwordWithId: ClientPassword = {
-      ...newPassword,
-      id: `password-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  const addPassword = async (passwordData: Omit<ClientPassword, 'id' | 'createdAt'>) => {
+    const newPassword: ClientPassword = {
+      id: `password-${Date.now()}`,
+      ...passwordData,
       createdAt: new Date().toISOString()
     };
-    setPasswords(prev => [passwordWithId, ...prev]);
-    return passwordWithId.id;
+    
+    setPasswords(prev => [newPassword, ...prev]);
+    
+    // Registrar na auditoria
+    await logAudit('client_passwords', newPassword.id, 'INSERT', null, {
+      cliente: passwordData.cliente,
+      plataforma: passwordData.plataforma
+    });
+    
+    return newPassword.id;
   };
 
-  const updatePassword = (id: string, updates: Partial<ClientPassword>) => {
+  const updatePassword = async (id: string, updates: Partial<ClientPassword>) => {
+    const oldPassword = passwords.find(p => p.id === id);
+    
     setPasswords(prev => prev.map(password => 
       password.id === id ? { ...password, ...updates } : password
     ));
+    
+    // Registrar na auditoria
+    await logAudit('client_passwords', id, 'UPDATE', 
+      { cliente: oldPassword?.cliente, plataforma: oldPassword?.plataforma },
+      { cliente: updates.cliente, plataforma: updates.plataforma }
+    );
   };
 
-  const deletePassword = (id: string) => {
+  const deletePassword = async (id: string) => {
+    const passwordToDelete = passwords.find(p => p.id === id);
+    
     setPasswords(prev => prev.filter(password => password.id !== id));
+    
+    // Registrar na auditoria
+    await logAudit('client_passwords', id, 'DELETE', 
+      { cliente: passwordToDelete?.cliente, plataforma: passwordToDelete?.plataforma }, 
+      null
+    );
   };
 
   return {
