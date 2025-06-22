@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FileImage, FileText, Download, X } from 'lucide-react';
@@ -11,13 +11,35 @@ interface FilePreviewProps {
 }
 
 export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (file && file instanceof File && file.size > 0) {
+      try {
+        const url = URL.createObjectURL(file);
+        setFileUrl(url);
+        
+        // Cleanup function to revoke the URL when component unmounts or file changes
+        return () => {
+          URL.revokeObjectURL(url);
+        };
+      } catch (error) {
+        console.error('Error creating object URL:', error);
+        setFileUrl(null);
+      }
+    } else {
+      setFileUrl(null);
+    }
+  }, [file]);
+
   if (!file) return null;
 
   const isImage = file.type ? file.type.startsWith('image/') : false;
   const isPDF = file.type === 'application/pdf';
-  const fileUrl = URL.createObjectURL(file);
 
   const downloadFile = () => {
+    if (!fileUrl) return;
+    
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = file.name;
@@ -36,7 +58,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
               <span>{file.name}</span>
             </DialogTitle>
             <div className="flex space-x-2">
-              <Button onClick={downloadFile} variant="outline" size="sm">
+              <Button onClick={downloadFile} variant="outline" size="sm" disabled={!fileUrl}>
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
@@ -48,24 +70,26 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
         </DialogHeader>
         
         <div className="mt-4">
-          {isImage && (
+          {!fileUrl ? (
+            <div className="text-center py-8">
+              <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">Erro ao carregar o arquivo</p>
+              <p className="text-sm text-gray-500 mt-2">O arquivo pode estar corrompido ou inválido</p>
+            </div>
+          ) : isImage ? (
             <img 
               src={fileUrl} 
               alt={file.name}
               className="max-w-full h-auto rounded-lg"
             />
-          )}
-          
-          {isPDF && (
+          ) : isPDF ? (
             <iframe
               src={fileUrl}
               width="100%"
               height="600px"
               className="border rounded-lg"
             />
-          )}
-          
-          {!isImage && !isPDF && (
+          ) : (
             <div className="text-center py-8">
               <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600">Preview não disponível para este tipo de arquivo</p>
