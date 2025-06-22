@@ -1,417 +1,518 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Paperclip, FileText, Image, File } from 'lucide-react';
+import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 
-interface SerializedFile {
-  name: string;
-  size: number;
-  type: string;
-  data: string;
-}
+const colorOptions = [
+  { name: 'Cinza', value: 'bg-gray-100' },
+  { name: 'Azul', value: 'bg-blue-100' },
+  { name: 'Verde', value: 'bg-green-100' },
+  { name: 'Amarelo', value: 'bg-yellow-100' },
+  { name: 'Vermelho', value: 'bg-red-100' },
+  { name: 'Roxo', value: 'bg-purple-100' },
+  { name: 'Rosa', value: 'bg-pink-100' },
+  { name: 'Laranja', value: 'bg-orange-100' }
+];
 
 export default function Tasks() {
-  const { columns, moveTask, addTask, updateTask, deleteTask } = useTasksData();
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<any>(null);
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    assignee: '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
-    attachments: [] as File[]
-  });
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setNewTask(prev => ({ 
-        ...prev, 
-        attachments: [...prev.attachments, ...files]
-      }));
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setNewTask(prev => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, i) => i !== index)
-    }));
-  };
-
-  const serializeFiles = async (files: File[]): Promise<SerializedFile[]> => {
-    const serializedFiles: SerializedFile[] = [];
-    
-    for (const file of files) {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-      
-      serializedFiles.push({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data: dataUrl
-      });
-    }
-    
-    return serializedFiles;
-  };
-
-  const handleAddTask = async () => {
-    if (newTask.title.trim()) {
-      const serializedAttachments = await serializeFiles(newTask.attachments);
-      
-      addTask('todo', {
-        title: newTask.title,
-        description: newTask.description,
-        assignee: newTask.assignee,
-        priority: newTask.priority,
-        attachments: serializedAttachments
-      });
-      
-      setNewTask({
-        title: '',
-        description: '',
-        assignee: '',
-        priority: 'medium',
-        attachments: []
-      });
-      setIsAddTaskOpen(false);
-    }
-  };
-
-  const handleEditTask = async (task: any) => {
-    if (editingTask) {
-      const serializedAttachments = await serializeFiles(newTask.attachments);
-      
-      updateTask(task.id, {
-        ...newTask,
-        attachments: serializedAttachments
-      });
-      
-      setEditingTask(null);
-      setNewTask({
-        title: '',
-        description: '',
-        assignee: '',
-        priority: 'medium',
-        attachments: []
-      });
-    }
-  };
-
-  const startEditing = (task: any) => {
-    setEditingTask(task);
-    setNewTask({
-      title: task.title,
-      description: task.description || '',
-      assignee: task.assignee || '',
-      priority: task.priority || 'medium',
-      attachments: []
-    });
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <Image className="h-4 w-4" />;
-    if (type === 'application/pdf') return <FileText className="h-4 w-4" />;
-    return <File className="h-4 w-4" />;
-  };
+  const { 
+    columns, 
+    updateColumns, 
+    updateTaskTitle, 
+    createTask, 
+    deleteTask,
+    addColumn,
+    deleteColumn,
+    editColumn,
+    updateColumnColor
+  } = useTasksData();
+  
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false);
+  const [showTaskDetailsDialog, setShowTaskDetailsDialog] = useState<string | null>(null);
+  const [selectedColumn, setSelectedColumn] = useState('');
+  const [selectedPosition, setSelectedPosition] = useState<number>(0);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnColor, setNewColumnColor] = useState('bg-gray-100');
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  const [editingColumnName, setEditingColumnName] = useState('');
+  const [taskFiles, setTaskFiles] = useState<File[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'column', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'urgent': return 'bg-red-500 text-white';
+      case 'high': return 'bg-orange-500 text-white';
+      case 'medium': return 'bg-yellow-500 text-white';
+      case 'low': return 'bg-green-500 text-white';
+      default: return 'bg-gray-500 text-white';
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'todo': return 'bg-gray-100 text-gray-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'review': return 'bg-yellow-100 text-yellow-800';
-      case 'done': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getPriorityText = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'Urgente';
+      case 'high': return 'Alta';
+      case 'medium': return 'Média';
+      case 'low': return 'Baixa';
+      default: return priority;
     }
+  };
+
+  const createNewTask = () => {
+    if (!newTaskTitle.trim() || !selectedColumn) return;
+
+    createTask(selectedColumn, { 
+      title: newTaskTitle,
+      description: newTaskDescription,
+      priority: newTaskPriority,
+      attachments: taskFiles
+    }, selectedPosition);
+
+    setNewTaskTitle('');
+    setNewTaskDescription('');
+    setNewTaskPriority('medium');
+    setSelectedColumn('');
+    setSelectedPosition(0);
+    setTaskFiles([]);
+    setShowNewTaskDialog(false);
+  };
+
+  const startEditing = (taskId: string, currentTitle: string) => {
+    setEditingTaskId(taskId);
+    setEditingTitle(currentTitle);
+  };
+
+  const saveEdit = () => {
+    if (editingTaskId && editingTitle.trim()) {
+      updateTaskTitle(editingTaskId, editingTitle);
+    }
+    setEditingTaskId(null);
+    setEditingTitle('');
+  };
+
+  const cancelEdit = () => {
+    setEditingTaskId(null);
+    setEditingTitle('');
+  };
+
+  const createNewColumn = () => {
+    if (!newColumnName.trim()) return;
+    
+    addColumn(newColumnName, newColumnColor);
+    
+    setNewColumnName('');
+    setNewColumnColor('bg-gray-100');
+    setShowColumnDialog(false);
+  };
+
+  const startEditingColumn = (columnId: string, currentName: string) => {
+    setEditingColumnId(columnId);
+    setEditingColumnName(currentName);
+  };
+
+  const saveColumnEdit = () => {
+    if (editingColumnId && editingColumnName.trim()) {
+      editColumn(editingColumnId, editingColumnName);
+    }
+    setEditingColumnId(null);
+    setEditingColumnName('');
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setTaskFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask(taskId);
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+    setConfirmDelete(null);
+  };
+
+  const getTaskDetails = (taskId: string) => {
+    for (const column of columns) {
+      const task = column.tasks.find(t => t.id === taskId);
+      if (task) return task;
+    }
+    return null;
+  };
+
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 h-screen bg-gray-50">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Tarefas</h1>
-          <p className="text-gray-600 mt-1">Gerencie suas tarefas e projetos</p>
+          <p className="text-gray-600 mt-1">Gerencie suas tarefas no estilo Kanban</p>
         </div>
-        
-        <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Tarefa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Nova Tarefa</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Título</Label>
+        <div className="flex space-x-2">
+          <Dialog open={showNewTaskDialog} onOpenChange={setShowNewTaskDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-orange-600 hover:bg-orange-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tarefa
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar Nova Tarefa</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
                 <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Digite o título da tarefa"
+                  placeholder="Título da tarefa"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
                 />
-              </div>
-              
-              <div>
-                <Label htmlFor="description">Descrição</Label>
                 <Textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Digite a descrição da tarefa"
-                  rows={3}
+                  placeholder="Descrição da tarefa"
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
                 />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="assignee">Responsável</Label>
-                  <Input
-                    id="assignee"
-                    value={newTask.assignee}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, assignee: e.target.value }))}
-                    placeholder="Nome do responsável"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="priority">Prioridade</Label>
-                  <Select value={newTask.priority} onValueChange={(value: 'low' | 'medium' | 'high') => setNewTask(prev => ({ ...prev, priority: value }))}>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Prioridade</label>
+                  <Select value={newTaskPriority} onValueChange={(value: any) => setNewTaskPriority(value)}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione a prioridade" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Baixa</SelectItem>
                       <SelectItem value="medium">Média</SelectItem>
                       <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="attachments">Anexos</Label>
-                <div className="mt-2">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                    className="w-full"
-                  >
-                    <Paperclip className="h-4 w-4 mr-2" />
-                    Anexar Arquivos
-                  </Button>
-                  
-                  {newTask.attachments.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      {newTask.attachments.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center space-x-2">
-                            {getFileIcon(file.type)}
-                            <span className="text-sm">{file.name}</span>
-                            <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Anexos</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      className="text-sm"
+                      accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.bitmap"
+                    />
+                    <Paperclip className="h-4 w-4 text-gray-400" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Coluna</label>
+                  <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma coluna" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns.map(col => (
+                        <SelectItem key={col.id} value={col.id}>{col.title}</SelectItem>
                       ))}
-                    </div>
-                  )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedColumn && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Posição</label>
+                    <Select value={selectedPosition.toString()} onValueChange={(value) => setSelectedPosition(Number(value))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a posição" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columns.find(col => col.id === selectedColumn)?.tasks.map((_, index) => (
+                          <SelectItem key={index} value={index.toString()}>Posição {index + 1}</SelectItem>
+                        ))}
+                        <SelectItem value={(columns.find(col => col.id === selectedColumn)?.tasks.length || 0).toString()}>
+                          Última posição
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex space-x-2">
+                  <Button onClick={createNewTask} className="bg-orange-600 hover:bg-orange-700">
+                    Criar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowNewTaskDialog(false)}>
+                    Cancelar
+                  </Button>
                 </div>
               </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsAddTaskOpen(false)}>
-                  Cancelar
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Gerenciar Colunas
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Gerenciar Colunas</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome da nova coluna"
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cor da Coluna</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {colorOptions.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        className={`w-full h-8 rounded ${color.value} border-2 ${
+                          newColumnColor === color.value ? 'border-gray-800' : 'border-gray-300'
+                        }`}
+                        onClick={() => setNewColumnColor(color.value)}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <Button onClick={createNewColumn} className="w-full">
+                  Criar Nova Coluna
                 </Button>
-                <Button onClick={handleAddTask}>
-                  Criar Tarefa
-                </Button>
+                
+                <div className="space-y-2">
+                  <h4 className="font-medium">Colunas Existentes:</h4>
+                  {columns.map(column => (
+                    <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-4 h-4 rounded ${column.color}`}></div>
+                        <span className="text-sm">{column.title}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid gap-6 h-[calc(100vh-200px)]`} style={{gridTemplateColumns: `repeat(${columns.length}, minmax(300px, 1fr))`}}>
         {columns.map((column) => (
-          <Card key={column.id} className="h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center justify-between">
-                {column.title}
-                <Badge variant="secondary">{column.tasks.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <div key={column.id} className="flex flex-col">
+            <div className={`${column.color} rounded-t-lg p-3 border-b-2 border-gray-200`}>
+              <div className="flex items-center justify-between">
+                {editingColumnId === column.id ? (
+                  <div className="flex items-center space-x-2 flex-1">
+                    <Input
+                      value={editingColumnName}
+                      onChange={(e) => setEditingColumnName(e.target.value)}
+                      className="bg-white text-sm"
+                      onKeyPress={(e) => e.key === 'Enter' && saveColumnEdit()}
+                    />
+                    <Button size="sm" onClick={saveColumnEdit}>
+                      <Save className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingColumnId(null)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="font-semibold text-gray-800">{column.title}</h3>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="bg-white text-gray-700">
+                        {column.tasks.length}
+                      </Badge>
+                      <Button 
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => startEditingColumn(column.id, column.title)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex-1 bg-white rounded-b-lg p-3 space-y-3 overflow-y-auto shadow-sm border border-gray-200">
               {column.tasks.map((task) => (
-                <Card key={task.id} className="p-3 bg-white border shadow-sm hover:shadow-md transition-shadow">
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between">
-                      <h4 className="font-medium text-sm">{task.title}</h4>
+                <Card key={task.id} className="cursor-pointer hover:shadow-md transition-shadow border border-gray-200">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <Badge className={getPriorityColor(task.priority)}>
+                        {getPriorityText(task.priority)}
+                      </Badge>
                       <div className="flex space-x-1">
-                        <Button
-                          variant="ghost"
+                        <Button 
+                          variant="ghost" 
                           size="sm"
-                          onClick={() => startEditing(task)}
+                          onClick={() => setShowTaskDetailsDialog(task.id)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => startEditing(task.id, task.title)}
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="ghost"
+                        <Button 
+                          variant="ghost" 
                           size="sm"
-                          onClick={() => deleteTask(task.id)}
+                          onClick={() => setConfirmDelete({ type: 'task', id: task.id })}
+                          className="text-red-600 hover:text-red-800"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
-                    
-                    {task.description && (
-                      <p className="text-xs text-gray-600">{task.description}</p>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {editingTaskId === task.id ? (
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Input
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className="text-sm"
+                          onKeyPress={(e) => e.key === 'Enter' && saveEdit()}
+                        />
+                        <Button size="sm" onClick={saveEdit}>
+                          <Save className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={cancelEdit}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium">{task.title}</p>
                     )}
-                    
-                    <div className="flex flex-wrap gap-1">
-                      <Badge className={getPriorityColor(task.priority)} variant="secondary">
-                        {task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Média' : 'Baixa'}
-                      </Badge>
-                      <Badge className={getStatusColor(column.id)} variant="secondary">
-                        {column.title}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Task Details Dialog - Simplified */}
+      <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Tarefa</DialogTitle>
+          </DialogHeader>
+          {showTaskDetailsDialog && (
+            <div className="space-y-4">
+              {(() => {
+                const task = getTaskDetails(showTaskDetailsDialog);
+                if (!task) return <p>Tarefa não encontrada</p>;
+                
+                return (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-lg">{task.title}</h3>
+                      <Badge className={`${getPriorityColor(task.priority)} mt-2`}>
+                        {getPriorityText(task.priority)}
                       </Badge>
                     </div>
                     
-                    {task.assignee && (
-                      <p className="text-xs text-gray-500">👤 {task.assignee}</p>
-                    )}
+                    <div>
+                      <label className="font-medium">Descrição:</label>
+                      <p className="text-gray-600 mt-1">{task.description}</p>
+                    </div>
                     
                     {task.attachments && task.attachments.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-500">📎 Anexos:</p>
-                        <div className="space-y-1">
-                          {task.attachments.map((file: SerializedFile, index: number) => (
-                            <FilePreview
-                              key={index}
-                              file={file}
-                            />
+                      <div>
+                        <label className="font-medium">Anexos:</label>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {task.attachments.map((file, index) => (
+                            <div key={index} className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                              <button
+                                onClick={() => openFilePreview(file)}
+                                className="flex items-center space-x-2 text-sm text-blue-600 w-full text-left"
+                              >
+                                <Paperclip className="h-4 w-4" />
+                                <span className="truncate">{file.name}</span>
+                              </button>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
-                </Card>
-              ))}
-              
-              {column.tasks.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-sm">Nenhuma tarefa</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {editingTask && (
-        <Dialog open={!!editingTask} onOpenChange={() => setEditingTask(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Tarefa</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-title">Título</Label>
-                <Input
-                  id="edit-title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="edit-description">Descrição</Label>
-                <Textarea
-                  id="edit-description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-assignee">Responsável</Label>
-                  <Input
-                    id="edit-assignee"
-                    value={newTask.assignee}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, assignee: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="edit-priority">Prioridade</Label>
-                  <Select value={newTask.priority} onValueChange={(value: 'low' | 'medium' | 'high') => setNewTask(prev => ({ ...prev, priority: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baixa</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setEditingTask(null)}>
-                  Cancelar
-                </Button>
-                <Button onClick={() => handleEditTask(editingTask)}>
-                  Salvar
-                </Button>
-              </div>
+                  </>
+                );
+              })()}
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
+      />
+
+      <ConfirmationDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.type === 'task') {
+            handleDeleteTask(confirmDelete.id);
+          } else if (confirmDelete?.type === 'column') {
+            handleDeleteColumn(confirmDelete.id);
+          }
+        }}
+        title="Confirmar Exclusão"
+        message={
+          confirmDelete?.type === 'task' 
+            ? "Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita."
+            : "Tem certeza que deseja excluir esta coluna? Todas as tarefas serão perdidas. Esta ação não pode ser desfeita."
+        }
+        confirmText="Excluir"
+      />
     </div>
   );
 }

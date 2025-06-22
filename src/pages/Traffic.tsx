@@ -1,439 +1,698 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Plus, 
+  ChevronDown, 
+  ChevronRight,
+  Copy,
+  Settings,
+  Edit,
+  Trash2,
+  Paperclip,
+  Eye,
+  Menu
+} from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Calendar, Users, Paperclip } from 'lucide-react';
 import { useTrafficData } from '@/hooks/useTrafficData';
+import { StatusButton } from '@/components/ServiceManagement/StatusButton';
+import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Traffic() {
+  const isMobile = useIsMobile();
   const { 
-    data,
-    addData,
-    updateData,
-    deleteData,
+    groups, 
+    columns,
+    statuses,
+    updateGroups, 
+    createMonth, 
+    updateMonth,
+    deleteMonth,
     duplicateMonth,
-    getClients,
-    getMonths
+    addStatus,
+    updateStatus,
+    deleteStatus,
+    addColumn,
+    updateColumn,
+    deleteColumn,
+    updateItemStatus,
+    addClient,
+    deleteClient,
+    updateClient,
+    getClientFiles
   } = useTrafficData();
+  
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [newMonthName, setNewMonthName] = useState('');
+  const [duplicateMonthName, setDuplicateMonthName] = useState('');
+  const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showClientDialog, setShowClientDialog] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientServices, setNewClientServices] = useState('');
+  const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+  const [clientFile, setClientFile] = useState<File | null>(null);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
+  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [newItem, setNewItem] = useState({
-    cliente: '',
-    mes: '',
-    status: 'Planejamento',
-    observacoes: '',
-    attachments: [] as File[]
-  });
+  const toggleGroup = (groupId: string) => {
+    updateGroups(groups.map(group => 
+      group.id === groupId 
+        ? { ...group, isExpanded: !group.isExpanded }
+        : group
+    ));
+  };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setNewItem(prev => ({ 
-        ...prev, 
-        attachments: [...prev.attachments, ...files]
-      }));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = groups.flatMap(group => group.items.map(item => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems([]);
     }
   };
 
-  const removeFile = (index: number) => {
-    setNewItem(prev => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, i) => i !== index)
-    }));
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems([...selectedItems, itemId]);
+    } else {
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+    }
   };
 
-  const serializeFiles = async (files: File[]) => {
-    const serializedFiles = [];
+  const handleCreateMonth = () => {
+    if (!newMonthName.trim()) return;
     
-    for (const file of files) {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-      
-      serializedFiles.push({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data: dataUrl
-      });
-    }
+    createMonth(newMonthName);
+    setNewMonthName('');
+    setShowCreateDialog(false);
+  };
+
+  const handleDuplicateMonth = async () => {
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    return serializedFiles;
-  };
-
-  const handleAddItem = async () => {
-    if (newItem.cliente.trim() && newItem.mes.trim()) {
-      const serializedAttachments = await serializeFiles(newItem.attachments);
-      
-      addData({
-        cliente: newItem.cliente,
-        mes: newItem.mes,
-        status: newItem.status,
-        observacoes: newItem.observacoes,
-        attachments: serializedAttachments,
-        investimento: 0,
-        resultado: 0,
-        roi: 0,
-        roas: 0,
-        ctr: 0,
-        cpc: 0,
-        cpm: 0,
-        conversoes: 0
-      });
-      
-      setNewItem({
-        cliente: '',
-        mes: '',
-        status: 'Planejamento',
-        observacoes: '',
-        attachments: []
-      });
-      setIsAddModalOpen(false);
+    try {
+      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      setDuplicateMonthName('');
+      setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
     }
   };
 
-  const handleEditItem = async (item: any) => {
-    if (editingItem) {
-      const serializedAttachments = await serializeFiles(newItem.attachments);
-      
-      updateData(item.id, {
-        ...newItem,
-        attachments: [...(item.attachments || []), ...serializedAttachments]
-      });
-      
-      setEditingItem(null);
-      setNewItem({
-        cliente: '',
-        mes: '',
-        status: 'Planejamento',
-        observacoes: '',
-        attachments: []
-      });
-    }
-  };
-
-  const startEditing = (item: any) => {
-    setEditingItem(item);
-    setNewItem({
-      cliente: item.cliente,
-      mes: item.mes,
-      status: item.status,
-      observacoes: item.observacoes || '',
-      attachments: []
+  const handleCreateClient = () => {
+    if (!newClientName.trim() || !selectedGroupForClient) return;
+    
+    addClient(selectedGroupForClient, {
+      elemento: newClientName,
+      servicos: newClientServices
     });
+    
+    setNewClientName('');
+    setNewClientServices('');
+    setSelectedGroupForClient('');
+    setShowClientDialog(false);
   };
 
-  const handleDuplicateMonth = () => {
-    if (selectedMonth) {
-      duplicateMonth(selectedMonth);
-      setSelectedMonth('');
+  const handleCreateColumn = () => {
+    if (!newColumnName.trim()) return;
+    
+    addColumn(newColumnName, newColumnType);
+    setNewColumnName('');
+    setNewColumnType('status');
+    setShowColumnDialog(false);
+  };
+
+  const handleDeleteClient = (clientId: string) => {
+    deleteClient(clientId);
+    setConfirmDelete(null);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+    setConfirmDelete(null);
+  };
+
+  const handleEditMonth = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      const nameWithoutSuffix = group.name.replace(' - TRÁFEGO', '');
+      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
+      setShowEditMonthDialog(true);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Planejamento': return 'bg-blue-100 text-blue-800';
-      case 'Em Andamento': return 'bg-yellow-100 text-yellow-800';
-      case 'Revisão': return 'bg-orange-100 text-orange-800';
-      case 'Aprovado': return 'bg-green-100 text-green-800';
-      case 'Pausado': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleUpdateMonth = () => {
+    if (editingMonth && editingMonth.name.trim()) {
+      updateMonth(editingMonth.id, editingMonth.name);
+      setEditingMonth(null);
+      setShowEditMonthDialog(false);
     }
   };
 
-  const statusOptions = ['Planejamento', 'Em Andamento', 'Revisão', 'Aprovado', 'Pausado'];
-  const clients = getClients();
-  const months = getMonths();
+  const handleDeleteMonth = (groupId: string) => {
+    deleteMonth(groupId);
+    setConfirmDelete(null);
+  };
+
+  const openClientDetails = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (client) {
+      setClientNotes(client.observacoes || '');
+      const files = getClientFiles(clientId);
+      setClientFile(files[0] || null);
+      setShowClientDetails(clientId);
+    }
+  };
+
+  const saveClientDetails = async () => {
+    if (showClientDetails) {
+      const updates: any = { observacoes: clientNotes };
+      
+      if (clientFile) {
+        updates.attachments = [clientFile];
+      }
+      
+      await updateClient(showClientDetails, updates);
+    }
+    setShowClientDetails(null);
+    setClientNotes('');
+    setClientFile(null);
+  };
+
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
+  };
+
+  const getClientAttachments = (clientId: string) => {
+    return getClientFiles(clientId);
+  };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Tráfego Pago</h1>
-          <p className="text-gray-600 mt-1">Gerencie campanhas de tráfego pago</p>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div className="flex gap-2">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Selecionar mês" />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((month) => (
-                  <SelectItem key={month} value={month}>{month}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              onClick={handleDuplicateMonth}
-              disabled={!selectedMonth}
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-lg font-semibold text-gray-900">Tráfego Pago</h1>
+          </div>
+          {isMobile && (
+            <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
             >
-              <Calendar className="h-4 w-4 mr-2" />
-              Duplicar
+              <Menu className="h-4 w-4" />
             </Button>
-          </div>
-          
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          )}
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
+        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Item
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Plus className="h-4 w-4 mr-1" />
+                Criar mês
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
               <DialogHeader>
-                <DialogTitle>Novo Item de Tráfego</DialogTitle>
+                <DialogTitle>Criar Novo Mês</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cliente">Cliente</Label>
-                    <Input
-                      id="cliente"
-                      value={newItem.cliente}
-                      onChange={(e) => setNewItem(prev => ({ ...prev, cliente: e.target.value }))}
-                      placeholder="Nome do cliente"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="mes">Mês</Label>
-                    <Input
-                      id="mes"
-                      value={newItem.mes}
-                      onChange={(e) => setNewItem(prev => ({ ...prev, mes: e.target.value }))}
-                      placeholder="Ex: Janeiro 2024"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={newItem.status} onValueChange={(value) => setNewItem(prev => ({ ...prev, status: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((status) => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={newItem.observacoes}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, observacoes: e.target.value }))}
-                    placeholder="Observações sobre a campanha"
-                    rows={3}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="attachments">Anexos</Label>
-                  <div className="mt-2">
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('file-upload')?.click()}
-                      className="w-full"
-                    >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Anexar Arquivos
-                    </Button>
-                    
-                    {newItem.attachments.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {newItem.attachments.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm">{file.name}</span>
-                              <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
-                    Cancelar
+                <Input
+                  placeholder="Nome do mês"
+                  value={newMonthName}
+                  onChange={(e) => setNewMonthName(e.target.value)}
+                />
+                <div className="flex space-x-2">
+                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+                    Criar
                   </Button>
-                  <Button onClick={handleAddItem}>
-                    Criar Item
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
+                    Cancelar
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicar mês
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {groups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => {
+                    setSelectedGroupToDuplicate(group.id);
+                    setShowDuplicateDialog(true);
+                  }}
+                >
+                  Duplicar {group.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowClientDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowColumnDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Colunas
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowStatusModal(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Status
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-        {data.map((item) => (
-          <Card key={item.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-lg">{item.cliente}</CardTitle>
-                  <p className="text-sm text-gray-600 mt-1">{item.mes}</p>
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+          {/* Table Header */}
+          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            <div className="flex items-center min-w-max">
+              <div className="w-8 flex items-center justify-center p-2">
+                <Checkbox
+                  checked={selectedItems.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </div>
+              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+              <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              {columns.map((column) => (
+                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                  {column.name}
                 </div>
-                <div className="flex space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => startEditing(item)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteData(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              ))}
+              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
+            </div>
+          </div>
+
+          {/* Table Body */}
+          {groups.map((group) => (
+            <div key={group.id}>
+              {/* Group Header */}
+              <div className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors">
+                <div className="flex items-center min-w-max">
+                  <div className="w-8 flex items-center justify-center p-2">
+                    <button onClick={() => toggleGroup(group.id)}>
+                      {group.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2 p-2 flex-1">
+                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                    <span className="font-medium text-gray-900">{group.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 p-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEditMonth(group.id)}
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Badge className={getStatusColor(item.status)} variant="secondary">
-                {item.status}
-              </Badge>
-              
-              {item.observacoes && (
-                <p className="text-sm text-gray-600">{item.observacoes}</p>
-              )}
-              
-              {item.attachments && item.attachments.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Anexos:</p>
-                  <div className="space-y-1">
-                    {item.attachments.map((file: any, index: number) => (
-                      <div key={index} className="p-2 bg-gray-50 rounded">
-                        <FilePreview
-                          file={file}
-                          open={false}
-                          onOpenChange={() => {}}
-                        />
+
+              {/* Group Items */}
+              {group.isExpanded && group.items.map((item, index) => (
+                <div 
+                  key={item.id} 
+                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                >
+                  <div className="flex items-center min-w-max">
+                    <div className="w-8 flex items-center justify-center p-2">
+                      <Checkbox
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                      />
+                    </div>
+                    <div className="w-48 p-2 border-r border-gray-200">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openClientDetails(item.id)}
+                          className="text-sm text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {item.elemento}
+                        </button>
+                        {getClientAttachments(item.id).length > 0 && (
+                          <Paperclip className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
+                      {item.servicos}
+                    </div>
+                    {columns.map((column) => (
+                      <div key={column.id} className="w-32 p-2 border-r border-gray-200">
+                        {column.type === 'status' ? (
+                          <StatusButton
+                            currentStatus={(item as any)[column.id] || ''}
+                            statuses={statuses}
+                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
+                          />
+                        ) : (
+                          <Input
+                            value={(item as any)[column.id] || ''}
+                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto"
+                            placeholder="..."
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <div className="w-20 p-2 flex space-x-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Duplicar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do novo mês"
+              value={duplicateMonthName}
+              onChange={(e) => setDuplicateMonthName(e.target.value)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+                Duplicar
+              </Button>
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Novo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do cliente"
+              value={newClientName}
+              onChange={(e) => setNewClientName(e.target.value)}
+            />
+            <Input
+              placeholder="Serviços (ex: Campanha Google Ads)"
+              value={newClientServices}
+              onChange={(e) => setNewClientServices(e.target.value)}
+            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mês</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={selectedGroupForClient}
+                onChange={(e) => setSelectedGroupForClient(e.target.value)}
+              >
+                <option value="">Selecione um mês</option>
+                {groups.map(group => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700 flex-1">
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Colunas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome da coluna"
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo da Coluna</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={newColumnType}
+                onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
+              >
+                <option value="status">Status (com cores)</option>
+                <option value="text">Texto livre</option>
+              </select>
+            </div>
+            <Button onClick={handleCreateColumn} className="w-full bg-orange-600 hover:bg-orange-700">
+              Criar Coluna
+            </Button>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">Colunas Existentes:</h4>
+              {columns.map(column => (
+                <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">
+                    {column.name} ({column.type})
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Editar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do mês"
+              value={editingMonth?.name || ''}
+              onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+                Salvar
+              </Button>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
+        <DialogContent className={`max-w-md ${isMobile ? 'w-[95vw] max-w-none' : ''}`}>
+          <DialogHeader>
+            <DialogTitle>Detalhes do Cliente</DialogTitle>
+          </DialogHeader>
+          {showClientDetails && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Observações</label>
+                <Textarea
+                  value={clientNotes}
+                  onChange={(e) => setClientNotes(e.target.value)}
+                  placeholder="Adicione suas observações..."
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Anexar Arquivo</label>
+                <div className="mt-1 flex items-center space-x-2">
+                  <input
+                    type="file"
+                    onChange={(e) => setClientFile(e.target.files?.[0] || null)}
+                    className="text-sm"
+                    accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                  />
+                  <Paperclip className="h-4 w-4 text-gray-400" />
+                </div>
+                {clientFile && (
+                  <div className="mt-2 p-2 border rounded flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Paperclip className="h-4 w-4" />
+                      <span className="text-sm truncate">{clientFile.name}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openFilePreview(clientFile)}
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
+                    {getClientAttachments(showClientDetails).map((file, index) => (
+                      <div key={index} className="p-2 border rounded flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          <Paperclip className="h-4 w-4" />
+                          <span className="text-sm truncate">{file.name}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openFilePreview(file)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        
-        {data.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum item encontrado</h3>
-            <p className="text-gray-600 mb-4">Comece criando seu primeiro item de tráfego pago.</p>
-            <Button onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Primeiro Item
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {editingItem && (
-        <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Item</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-cliente">Cliente</Label>
-                  <Input
-                    id="edit-cliente"
-                    value={newItem.cliente}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, cliente: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="edit-mes">Mês</Label>
-                  <Input
-                    id="edit-mes"
-                    value={newItem.mes}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, mes: e.target.value }))}
-                  />
-                </div>
+                )}
               </div>
-              
-              <div>
-                <Label htmlFor="edit-status">Status</Label>
-                <Select value={newItem.status} onValueChange={(value) => setNewItem(prev => ({ ...prev, status: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((status) => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="edit-observacoes">Observações</Label>
-                <Textarea
-                  id="edit-observacoes"
-                  value={newItem.observacoes}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, observacoes: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setEditingItem(null)}>
-                  Cancelar
-                </Button>
-                <Button onClick={() => handleEditItem(editingItem)}>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={saveClientDetails}
+                  className="bg-orange-600 hover:bg-orange-700 flex-1"
+                >
                   Salvar
+                </Button>
+                <Button variant="outline" onClick={() => setShowClientDetails(null)} className="flex-1">
+                  Cancelar
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <CustomStatusModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        onAddStatus={addStatus}
+        onUpdateStatus={updateStatus}
+        onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
+      />
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
+      />
+
+      <ConfirmationDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.type === 'client') {
+            handleDeleteClient(confirmDelete.id);
+          } else if (confirmDelete?.type === 'column') {
+            handleDeleteColumn(confirmDelete.id);
+          } else if (confirmDelete?.type === 'month') {
+            handleDeleteMonth(confirmDelete.id);
+          }
+        }}
+        title="Confirmar Exclusão"
+        message={
+          confirmDelete?.type === 'client' 
+            ? "Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+            : confirmDelete?.type === 'month'
+            ? "Tem certeza que deseja excluir este mês e todos os seus clientes? Esta ação não pode ser desfeita."
+            : "Tem certeza que deseja excluir esta coluna? Esta ação não pode ser desfeita."
+        }
+        confirmText="Excluir"
+      />
     </div>
   );
 }

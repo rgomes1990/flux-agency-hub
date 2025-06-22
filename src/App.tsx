@@ -3,9 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeProvider } from '@/components/theme-provider';
-import { AuthProvider } from '@/hooks/useAuth';
 import MainLayout from '@/components/Layout/MainLayout';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import Users from '@/pages/Users';
@@ -36,105 +35,103 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-        <AuthProvider>
-          <Router>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Dashboard />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/users" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Users />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/clients" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Clients />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/traffic" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Traffic />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/content" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Content />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/calendar" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Calendar />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/projects" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Projects />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/tasks" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Tasks />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/campaigns" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Campaigns />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Reports />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/client-passwords" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <ClientPasswords />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/audit" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Audit />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Settings />
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Router>
-        </AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Users />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/clients" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Clients />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/traffic" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Traffic />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/content" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Content />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/calendar" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Calendar />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/projects" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Projects />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tasks" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Tasks />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/campaigns" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Campaigns />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Reports />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/client-passwords" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ClientPasswords />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/audit" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Audit />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Settings />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
         <Toaster />
       </ThemeProvider>
     </QueryClientProvider>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface Task {
@@ -8,7 +7,6 @@ interface Task {
   type: string;
   priority: 'urgent' | 'high' | 'medium' | 'low';
   assignedTo: string;
-  assignee: string; // Added this property
   client: string;
   project: string;
   dueDate: string;
@@ -71,7 +69,6 @@ export const useTasksData = () => {
           type: 'design',
           priority: 'high',
           assignedTo: 'João Design',
-          assignee: 'João Design',
           client: 'Empresa ABC',
           project: 'Website Institucional',
           dueDate: '2024-01-20',
@@ -92,7 +89,6 @@ export const useTasksData = () => {
           type: 'development',
           priority: 'high',
           assignedTo: 'Carlos Dev',
-          assignee: 'Carlos Dev',
           client: 'Tech Corp',
           project: 'Sistema CRM',
           dueDate: '2024-01-25',
@@ -199,7 +195,6 @@ export const useTasksData = () => {
       type: taskData.type || 'general',
       priority: taskData.priority || 'medium',
       assignedTo: taskData.assignedTo || 'Usuário',
-      assignee: taskData.assignee || taskData.assignedTo || 'Usuário',
       client: taskData.client || 'Cliente',
       project: taskData.project || 'Projeto',
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
@@ -222,53 +217,6 @@ export const useTasksData = () => {
     }));
 
     return newTask.id;
-  };
-
-  const addTask = (columnId: string, taskData: Partial<Task>) => {
-    return createTask(columnId, taskData);
-  };
-
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
-    setColumns(columns.map(col => ({
-      ...col,
-      tasks: col.tasks.map(task => 
-        task.id === taskId ? { ...task, ...updates } : task
-      )
-    })));
-  };
-
-  const moveTask = (taskId: string, fromColumnId: string, toColumnId: string) => {
-    let taskToMove: Task | null = null;
-    
-    // Find and remove the task from the source column
-    const updatedColumns = columns.map(col => {
-      if (col.id === fromColumnId) {
-        const taskIndex = col.tasks.findIndex(task => task.id === taskId);
-        if (taskIndex !== -1) {
-          taskToMove = col.tasks[taskIndex];
-          return {
-            ...col,
-            tasks: col.tasks.filter(task => task.id !== taskId)
-          };
-        }
-      }
-      return col;
-    });
-
-    // Add the task to the destination column
-    if (taskToMove) {
-      const finalColumns = updatedColumns.map(col => {
-        if (col.id === toColumnId) {
-          return {
-            ...col,
-            tasks: [...col.tasks, taskToMove!]
-          };
-        }
-        return col;
-      });
-      
-      setColumns(finalColumns);
-    }
   };
 
   const deleteTask = (taskId: string) => {
@@ -310,9 +258,6 @@ export const useTasksData = () => {
     updateColumns,
     updateTaskTitle,
     createTask,
-    addTask,
-    updateTask,
-    moveTask,
     deleteTask,
     addColumn,
     deleteColumn,
