@@ -23,6 +23,8 @@ export default function ClientPasswords() {
   const [formData, setFormData] = useState({
     cliente: '',
     plataforma: '',
+    usuario: '',
+    senha: '',
     observacoes: '',
     attachments: [] as File[]
   });
@@ -31,6 +33,8 @@ export default function ClientPasswords() {
     setFormData({
       cliente: '',
       plataforma: '',
+      usuario: '',
+      senha: '',
       observacoes: '',
       attachments: []
     });
@@ -55,6 +59,8 @@ export default function ClientPasswords() {
     setFormData({
       cliente: password.cliente,
       plataforma: password.plataforma,
+      usuario: password.usuario || '',
+      senha: password.senha || '',
       observacoes: password.observacoes || '',
       attachments: password.attachments || []
     });
@@ -111,6 +117,8 @@ export default function ClientPasswords() {
                 <tr className="border-b">
                   <th className="text-left p-3">Cliente</th>
                   <th className="text-left p-3">Plataforma</th>
+                  <th className="text-left p-3">Usuário</th>
+                  <th className="text-left p-3">Senha</th>
                   <th className="text-left p-3">Data</th>
                   <th className="text-left p-3">Anexos</th>
                   <th className="text-left p-3">Ações</th>
@@ -124,6 +132,21 @@ export default function ClientPasswords() {
                     </td>
                     <td className="p-3">
                       <Badge variant="outline">{password.plataforma}</Badge>
+                    </td>
+                    <td className="p-3 font-mono text-sm">{password.usuario}</td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">
+                          {showPasswords[password.id] ? password.senha : '••••••••'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => togglePasswordVisibility(password.id)}
+                        >
+                          {showPasswords[password.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </td>
                     <td className="p-3 text-sm text-gray-600">
                       {format(new Date(password.createdAt), 'dd/MM/yyyy', { locale: ptBR })}
@@ -209,6 +232,31 @@ export default function ClientPasswords() {
                   onChange={(e) => setFormData(prev => ({ ...prev, plataforma: e.target.value }))}
                   required
                   placeholder="Ex: Instagram, Facebook, Google Ads"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="usuario">Usuário *</Label>
+                <Input
+                  id="usuario"
+                  value={formData.usuario}
+                  onChange={(e) => setFormData(prev => ({ ...prev, usuario: e.target.value }))}
+                  required
+                  placeholder="Nome de usuário ou email"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="senha">Senha *</Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  value={formData.senha}
+                  onChange={(e) => setFormData(prev => ({ ...prev, senha: e.target.value }))}
+                  required
+                  placeholder="Senha"
                 />
               </div>
             </div>

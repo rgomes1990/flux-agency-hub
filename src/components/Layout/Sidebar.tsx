@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
@@ -72,3 +71,5 @@ export function Sidebar() {
     </div>
   );
 }
+
+export default Sidebar;
