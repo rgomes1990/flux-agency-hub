@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit2, Trash2, Eye, EyeOff, Shield, Paperclip } from 'lucide-react';
+import { Plus, Edit2, Trash2, Shield, Paperclip } from 'lucide-react';
 import { useClientPasswordsData } from '@/hooks/useClientPasswordsData';
 import { FilePreview } from '@/components/FilePreview';
 import { format } from 'date-fns';
@@ -17,12 +17,13 @@ export default function ClientPasswords() {
   const { passwords, addPassword, updatePassword, deletePassword } = useClientPasswordsData();
   const [showModal, setShowModal] = useState(false);
   const [editingPassword, setEditingPassword] = useState<string | null>(null);
-  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [showFilePreview, setShowFilePreview] = useState(false);
   const [formData, setFormData] = useState({
     cliente: '',
     plataforma: '',
+    usuario: '',
+    senha: '',
     observacoes: '',
     attachments: [] as File[]
   });
@@ -31,6 +32,8 @@ export default function ClientPasswords() {
     setFormData({
       cliente: '',
       plataforma: '',
+      usuario: '',
+      senha: '',
       observacoes: '',
       attachments: []
     });
@@ -55,6 +58,8 @@ export default function ClientPasswords() {
     setFormData({
       cliente: password.cliente,
       plataforma: password.plataforma,
+      usuario: password.usuario || '',
+      senha: password.senha || '',
       observacoes: password.observacoes || '',
       attachments: password.attachments || []
     });
@@ -65,13 +70,6 @@ export default function ClientPasswords() {
     if (confirm('Tem certeza que deseja excluir esta senha?')) {
       await deletePassword(passwordId);
     }
-  };
-
-  const togglePasswordVisibility = (passwordId: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [passwordId]: !prev[passwordId]
-    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
