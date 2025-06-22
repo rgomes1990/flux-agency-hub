@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, Search, Lock, Eye, EyeOff } from 'lucide-react';
@@ -17,46 +19,46 @@ export default function ClientPasswords() {
 
   // Estados para formulário
   const [formData, setFormData] = useState({
-    clientName: '',
-    platform: '',
-    login: '',
-    password: ''
+    cliente: '',
+    plataforma: '',
+    usuario: '',
+    senha: ''
   });
 
   const [editFormData, setEditFormData] = useState({
-    clientName: '',
-    platform: '',
-    login: '',
-    password: ''
+    cliente: '',
+    plataforma: '',
+    usuario: '',
+    senha: ''
   });
 
   const handleCreatePassword = () => {
-    if (!formData.clientName.trim() || !formData.platform.trim() || 
-        !formData.login.trim() || !formData.password.trim()) return;
+    if (!formData.cliente.trim() || !formData.plataforma.trim() || 
+        !formData.usuario.trim() || !formData.senha.trim()) return;
     
-    addPassword(formData.clientName, formData.platform, formData.login, formData.password);
-    setFormData({ clientName: '', platform: '', login: '', password: '' });
+    addPassword(formData);
+    setFormData({ cliente: '', plataforma: '', usuario: '', senha: '' });
     setShowCreateDialog(false);
   };
 
   const startEditing = (passwordItem: any) => {
     setEditingPassword(passwordItem.id);
     setEditFormData({
-      clientName: passwordItem.clientName,
-      platform: passwordItem.platform,
-      login: passwordItem.login,
-      password: passwordItem.password
+      cliente: passwordItem.cliente,
+      plataforma: passwordItem.plataforma,
+      usuario: passwordItem.usuario,
+      senha: passwordItem.senha
     });
   };
 
   const handleUpdatePassword = () => {
-    if (!editingPassword || !editFormData.clientName.trim() || 
-        !editFormData.platform.trim() || !editFormData.login.trim() || 
-        !editFormData.password.trim()) return;
+    if (!editingPassword || !editFormData.cliente.trim() || 
+        !editFormData.plataforma.trim() || !editFormData.usuario.trim() || 
+        !editFormData.senha.trim()) return;
     
     updatePassword(editingPassword, editFormData);
     setEditingPassword(null);
-    setEditFormData({ clientName: '', platform: '', login: '', password: '' });
+    setEditFormData({ cliente: '', plataforma: '', usuario: '', senha: '' });
   };
 
   const handleDeletePassword = (passwordId: string) => {
@@ -72,8 +74,8 @@ export default function ClientPasswords() {
   };
 
   const filteredPasswords = passwords.filter(password =>
-    password.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    password.platform.toLowerCase().includes(searchTerm.toLowerCase())
+    password.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    password.plataforma.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -97,24 +99,25 @@ export default function ClientPasswords() {
             <div className="space-y-4">
               <Input
                 placeholder="Nome do Cliente"
-                value={formData.clientName}
-                onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+                value={formData.cliente}
+                onChange={(e) => setFormData(prev => ({ ...prev, cliente: e.target.value }))}
               />
-              <Input
+              <Textarea
                 placeholder="Plataforma/Serviço (ex: Facebook Ads, Google Analytics, Website, etc.)"
-                value={formData.platform}
-                onChange={(e) => setFormData(prev => ({ ...prev, platform: e.target.value }))}
+                value={formData.plataforma}
+                onChange={(e) => setFormData(prev => ({ ...prev, plataforma: e.target.value }))}
+                rows={3}
               />
               <Input
                 placeholder="Login/Email"
-                value={formData.login}
-                onChange={(e) => setFormData(prev => ({ ...prev, login: e.target.value }))}
+                value={formData.usuario}
+                onChange={(e) => setFormData(prev => ({ ...prev, usuario: e.target.value }))}
               />
               <Input
                 type="password"
                 placeholder="Senha"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                value={formData.senha}
+                onChange={(e) => setFormData(prev => ({ ...prev, senha: e.target.value }))}
               />
               <div className="flex space-x-2">
                 <Button onClick={handleCreatePassword} className="bg-orange-600 hover:bg-orange-700">
@@ -148,7 +151,7 @@ export default function ClientPasswords() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Lock className="h-5 w-5 text-gray-500" />
-                  <CardTitle className="text-lg">{passwordItem.clientName}</CardTitle>
+                  <CardTitle className="text-lg">{passwordItem.cliente}</CardTitle>
                 </div>
                 <div className="flex space-x-1">
                   <Button
@@ -172,11 +175,11 @@ export default function ClientPasswords() {
             <CardContent className="space-y-2">
               <div>
                 <p className="text-sm font-medium text-gray-700">Plataforma:</p>
-                <p className="text-sm text-gray-600">{passwordItem.platform}</p>
+                <p className="text-sm text-gray-600">{passwordItem.plataforma}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Login:</p>
-                <p className="text-sm text-gray-600">{passwordItem.login}</p>
+                <p className="text-sm text-gray-600">{passwordItem.usuario}</p>
               </div>
               <div>
                 <div className="flex items-center justify-between">
@@ -190,7 +193,7 @@ export default function ClientPasswords() {
                   </Button>
                 </div>
                 <p className="text-sm text-gray-600 font-mono">
-                  {showPasswords[passwordItem.id] ? passwordItem.password : '•'.repeat(passwordItem.password.length)}
+                  {showPasswords[passwordItem.id] ? passwordItem.senha : '•'.repeat(passwordItem.senha.length)}
                 </p>
               </div>
             </CardContent>
@@ -206,24 +209,25 @@ export default function ClientPasswords() {
           <div className="space-y-4">
             <Input
               placeholder="Nome do Cliente"
-              value={editFormData.clientName}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, clientName: e.target.value }))}
+              value={editFormData.cliente}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, cliente: e.target.value }))}
             />
-            <Input
+            <Textarea
               placeholder="Plataforma/Serviço"
-              value={editFormData.platform}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, platform: e.target.value }))}
+              value={editFormData.plataforma}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, plataforma: e.target.value }))}
+              rows={3}
             />
             <Input
               placeholder="Login/Email"
-              value={editFormData.login}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, login: e.target.value }))}
+              value={editFormData.usuario}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, usuario: e.target.value }))}
             />
             <Input
               type="password"
               placeholder="Senha"
-              value={editFormData.password}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, password: e.target.value }))}
+              value={editFormData.senha}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, senha: e.target.value }))}
             />
             <div className="flex space-x-2">
               <Button onClick={handleUpdatePassword} className="bg-orange-600 hover:bg-orange-700">
