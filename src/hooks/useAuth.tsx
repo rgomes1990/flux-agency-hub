@@ -84,29 +84,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      const hashedPassword = await hashPassword(password);
+      console.log('=== INÍCIO DO LOGIN ===');
+      console.log('Username:', username);
+      console.log('Password:', password);
       
-      // Buscar usuário no Supabase
+      const hashedPassword = await hashPassword(password);
+      console.log('Hash gerado:', hashedPassword);
+      
+      // Primeiro, vamos verificar se há usuários na tabela
+      const { data: allUsers, error: countError } = await supabase
+        .from('app_users')
+        .select('*');
+      
+      console.log('Todos os usuários na tabela:', allUsers);
+      console.log('Erro na consulta geral:', countError);
+      
+      // Buscar usuário específico no Supabase
       const { data: users, error } = await supabase
         .from('app_users')
         .select('*')
         .eq('username', username)
-        .eq('is_active', true)
-        .limit(1);
+        .eq('is_active', true);
+
+      console.log('Consulta específica - Dados:', users);
+      console.log('Consulta específica - Erro:', error);
 
       if (error) {
-        console.error('Erro na consulta:', error);
+        console.error('Erro na consulta específica:', error);
         return { error: { message: 'Erro ao verificar credenciais' } };
       }
 
       if (!users || users.length === 0) {
+        console.log('Nenhum usuário encontrado com username:', username);
         return { error: { message: 'Credenciais inválidas' } };
       }
 
       const foundUser = users[0];
+      console.log('Usuário encontrado:', foundUser);
+      console.log('Hash armazenado:', foundUser.password_hash);
+      console.log('Hash fornecido:', hashedPassword);
+      console.log('Hashes são iguais?', foundUser.password_hash === hashedPassword);
       
       // Verificar se as senhas coincidem
       if (foundUser.password_hash !== hashedPassword) {
+        console.log('Senhas não coincidem!');
         return { error: { message: 'Credenciais inválidas' } };
       }
 
@@ -121,6 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Registrar login na auditoria
       await logAudit('auth', foundUser.id, 'LOGIN');
       
+      console.log('Login realizado com sucesso!');
+      console.log('=== FIM DO LOGIN ===');
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
