@@ -84,14 +84,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      const hashedPassword = await hashPassword(password);
+      console.log('=== DEBUG LOGIN ===');
+      console.log('1. Username fornecido:', username);
+      console.log('2. Senha fornecida:', password);
       
-      // Buscar usuário específico no Supabase
+      const hashedPassword = await hashPassword(password);
+      console.log('3. Hash gerado da senha:', hashedPassword);
+      console.log('4. Hash esperado para "admin123":', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9');
+      
+      // Primeiro, vamos ver todos os usuários na tabela
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('app_users')
+        .select('*');
+      
+      console.log('5. Todos os usuários na tabela:', allUsers);
+      console.log('6. Erro ao buscar todos os usuários:', allUsersError);
+      
+      // Buscar usuário específico
       const { data: users, error } = await supabase
         .from('app_users')
         .select('*')
         .eq('username', username)
         .eq('is_active', true);
+
+      console.log('7. Resultado da consulta específica:', users);
+      console.log('8. Erro da consulta específica:', error);
 
       if (error) {
         console.error('Erro na consulta específica:', error);
@@ -99,15 +116,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!users || users.length === 0) {
+        console.log('9. Nenhum usuário encontrado para username:', username);
         return { error: { message: 'Credenciais inválidas' } };
       }
 
       const foundUser = users[0];
+      console.log('10. Usuário encontrado:', foundUser);
+      console.log('11. Hash armazenado no banco:', foundUser.password_hash);
+      console.log('12. Hash calculado:', hashedPassword);
+      console.log('13. Os hashes são iguais?', foundUser.password_hash === hashedPassword);
       
       // Verificar se as senhas coincidem
       if (foundUser.password_hash !== hashedPassword) {
+        console.log('14. FALHA: Hashes não coincidem!');
         return { error: { message: 'Credenciais inválidas' } };
       }
+
+      console.log('15. SUCCESS: Hashes coincidem!');
 
       const userSession = {
         id: foundUser.id,
@@ -120,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Registrar login na auditoria
       await logAudit('auth', foundUser.id, 'LOGIN');
       
+      console.log('16. Login realizado com sucesso!');
+      console.log('=== FIM DEBUG LOGIN ===');
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
