@@ -1,4 +1,5 @@
 
+
 -- Primeiro, vamos criar uma tabela de usuários personalizada no banco
 CREATE TABLE IF NOT EXISTS public.app_users (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -67,10 +68,10 @@ CREATE POLICY "System can insert audit logs"
   FOR INSERT 
   WITH CHECK (true);
 
--- Remover usuário admin existente se houver
+-- Limpar qualquer usuário admin existente
 DELETE FROM public.app_users WHERE username = 'admin';
 
--- Criar um usuário admin padrão (senha: admin123) com hash SHA-256
+-- Criar um usuário admin padrão (senha: admin123) com hash SHA-256 correto
 INSERT INTO public.app_users (username, password_hash, created_at)
-VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', now())
-ON CONFLICT (username) DO UPDATE SET password_hash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', now());
+

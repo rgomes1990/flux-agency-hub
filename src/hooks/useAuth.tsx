@@ -84,10 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      console.log('Tentando fazer login com:', username);
-      
       const hashedPassword = await hashPassword(password);
-      console.log('Hash da senha gerado:', hashedPassword);
       
       // Buscar usuário no Supabase
       const { data: users, error } = await supabase
@@ -97,28 +94,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('is_active', true)
         .limit(1);
 
-      console.log('Resultado da consulta:', { users, error });
-
       if (error) {
         console.error('Erro na consulta:', error);
         return { error: { message: 'Erro ao verificar credenciais' } };
       }
 
       if (!users || users.length === 0) {
-        console.log('Usuário não encontrado ou inativo');
         return { error: { message: 'Credenciais inválidas' } };
       }
 
       const foundUser = users[0];
-      console.log('Usuário encontrado:', { 
-        username: foundUser.username, 
-        storedHash: foundUser.password_hash,
-        providedHash: hashedPassword 
-      });
       
       // Verificar se as senhas coincidem
       if (foundUser.password_hash !== hashedPassword) {
-        console.log('Hash das senhas não coincidem');
         return { error: { message: 'Credenciais inválidas' } };
       }
 
@@ -133,7 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Registrar login na auditoria
       await logAudit('auth', foundUser.id, 'LOGIN');
       
-      console.log('Login realizado com sucesso');
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
