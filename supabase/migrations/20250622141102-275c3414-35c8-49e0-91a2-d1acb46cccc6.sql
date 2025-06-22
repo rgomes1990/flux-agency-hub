@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   table_name TEXT NOT NULL,
   record_id TEXT NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+  action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT')),
   old_values JSONB,
   new_values JSONB,
   user_id UUID REFERENCES public.app_users(id),
@@ -67,7 +67,10 @@ CREATE POLICY "System can insert audit logs"
   FOR INSERT 
   WITH CHECK (true);
 
--- Criar um usuário admin padrão (senha: admin123)
+-- Remover usuário admin existente se houver
+DELETE FROM public.app_users WHERE username = 'admin';
+
+-- Criar um usuário admin padrão (senha: admin123) com hash SHA-256
 INSERT INTO public.app_users (username, password_hash, created_at)
-VALUES ('admin', '$2b$10$rH8Q7Z.KaFxUhWjWwzqGj.N5.8B9cNSYo8xJXkXl9fG2h4V.YJaGC', now())
-ON CONFLICT (username) DO NOTHING;
+VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', now())
+ON CONFLICT (username) DO UPDATE SET password_hash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';

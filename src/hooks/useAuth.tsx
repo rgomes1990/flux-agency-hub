@@ -31,7 +31,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Função para hash de senha simples (em produção, use bcrypt adequadamente)
+// Função para hash de senha SHA-256
 const hashPassword = async (password: string): Promise<string> => {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -84,16 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
+      console.log('Tentando fazer login com:', username);
+      
       const hashedPassword = await hashPassword(password);
+      console.log('Hash da senha gerado:', hashedPassword);
       
       // Buscar usuário no Supabase
       const { data: users, error } = await supabase
         .from('app_users')
         .select('*')
         .eq('username', username)
-        .eq('password_hash', hashedPassword)
         .eq('is_active', true)
         .limit(1);
+
+      console.log('Resultado da consulta:', { users, error });
 
       if (error) {
         console.error('Erro na consulta:', error);
@@ -101,11 +105,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!users || users.length === 0) {
+        console.log('Usuário não encontrado ou inativo');
         return { error: { message: 'Credenciais inválidas' } };
       }
 
       const foundUser = users[0];
+      console.log('Usuário encontrado:', { 
+        username: foundUser.username, 
+        storedHash: foundUser.password_hash,
+        providedHash: hashedPassword 
+      });
       
+      // Verificar se as senhas coincidem
+      if (foundUser.password_hash !== hashedPassword) {
+        console.log('Hash das senhas não coincidem');
+        return { error: { message: 'Credenciais inválidas' } };
+      }
+
       const userSession = {
         id: foundUser.id,
         username: foundUser.username
@@ -117,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Registrar login na auditoria
       await logAudit('auth', foundUser.id, 'LOGIN');
       
+      console.log('Login realizado com sucesso');
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
