@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 
 interface Task {
@@ -12,12 +13,7 @@ interface Task {
   dueDate: string;
   estimatedHours: number;
   actualHours: number;
-  attachments?: Array<{
-    name: string;
-    size: number;
-    type: string;
-    data: string;
-  }>;
+  attachments?: File[];
 }
 
 interface Column {
@@ -26,34 +22,6 @@ interface Column {
   color: string;
   tasks: Task[];
 }
-
-// Função para serializar arquivos
-const serializeFile = (file: File): Promise<{name: string, size: number, type: string, data: string}> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data: reader.result as string
-      });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
-// Função para deserializar arquivos
-const deserializeFile = (serializedFile: {name: string, size: number, type: string, data: string}): File => {
-  const byteCharacters = atob(serializedFile.data.split(',')[1]);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new File([byteArray], serializedFile.name, { type: serializedFile.type });
-};
 
 export const useTasksData = () => {
   const [columns, setColumns] = useState<Column[]>([
@@ -117,25 +85,7 @@ export const useTasksData = () => {
     if (savedData) {
       try {
         const parsedData = JSON.parse(savedData);
-        // Deserializar arquivos ao carregar
-        const columnsWithFiles = parsedData.map((col: Column) => ({
-          ...col,
-          tasks: col.tasks.map(task => ({
-            ...task,
-            attachments: task.attachments?.map((serializedFile: any) => {
-              if (typeof serializedFile === 'object' && serializedFile.data) {
-                try {
-                  return deserializeFile(serializedFile);
-                } catch (error) {
-                  console.error('Erro ao deserializar arquivo:', error);
-                  return serializedFile;
-                }
-              }
-              return serializedFile;
-            })
-          }))
-        }));
-        setColumns(columnsWithFiles);
+        setColumns(parsedData);
       } catch (error) {
         console.error('Erro ao carregar dados das tarefas:', error);
       }
@@ -144,34 +94,7 @@ export const useTasksData = () => {
 
   // Salvar dados no localStorage sempre que columns mudar
   useEffect(() => {
-    const saveData = async () => {
-      try {
-        // Serializar arquivos antes de salvar
-        const columnsToSave = await Promise.all(
-          columns.map(async (col) => ({
-            ...col,
-            tasks: await Promise.all(
-              col.tasks.map(async (task) => ({
-                ...task,
-                attachments: task.attachments ? await Promise.all(
-                  task.attachments.map(async (file) => {
-                    if (file instanceof File) {
-                      return await serializeFile(file);
-                    }
-                    return file;
-                  })
-                ) : undefined
-              }))
-            )
-          }))
-        );
-        localStorage.setItem('tasksData', JSON.stringify(columnsToSave));
-      } catch (error) {
-        console.error('Erro ao salvar dados das tarefas:', error);
-      }
-    };
-    
-    saveData();
+    localStorage.setItem('tasksData', JSON.stringify(columns));
   }, [columns]);
 
   const updateColumns = (newColumns: Column[]) => {
@@ -200,7 +123,7 @@ export const useTasksData = () => {
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
       estimatedHours: taskData.estimatedHours || 4,
       actualHours: taskData.actualHours || 0,
-      attachments: taskData.attachments as any
+      attachments: taskData.attachments
     };
 
     setColumns(columns.map(col => {

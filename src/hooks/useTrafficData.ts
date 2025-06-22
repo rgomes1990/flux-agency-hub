@@ -15,92 +15,248 @@ export interface TrafficData {
   conversoes: number;
   attachments?: File[];
   observacoes?: string;
+  elemento: string;
+  servicos: string;
+}
+
+export interface TrafficGroup {
+  id: string;
+  name: string;
+  color: string;
+  isExpanded: boolean;
+  items: TrafficData[];
+}
+
+export interface TrafficColumn {
+  id: string;
+  name: string;
+  type: 'status' | 'text';
+}
+
+export interface TrafficStatus {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export const useTrafficData = () => {
-  const [data, setData] = useState<TrafficData[]>([]);
+  const [groups, setGroups] = useState<TrafficGroup[]>([]);
+  const [columns, setColumns] = useState<TrafficColumn[]>([
+    { id: 'status', name: 'Status', type: 'status' }
+  ]);
+  const [statuses, setStatuses] = useState<TrafficStatus[]>([
+    { id: 'pending', name: 'Pendente', color: 'bg-yellow-500' },
+    { id: 'active', name: 'Ativo', color: 'bg-green-500' },
+    { id: 'paused', name: 'Pausado', color: 'bg-red-500' }
+  ]);
 
   useEffect(() => {
-    const savedData = localStorage.getItem('trafficData');
-    if (savedData) {
+    const savedGroups = localStorage.getItem('trafficGroups');
+    if (savedGroups) {
       try {
-        setData(JSON.parse(savedData));
+        setGroups(JSON.parse(savedGroups));
       } catch (error) {
-        console.error('Erro ao carregar dados de tráfego:', error);
+        console.error('Erro ao carregar grupos de tráfego:', error);
+      }
+    }
+
+    const savedColumns = localStorage.getItem('trafficColumns');
+    if (savedColumns) {
+      try {
+        setColumns(JSON.parse(savedColumns));
+      } catch (error) {
+        console.error('Erro ao carregar colunas de tráfego:', error);
+      }
+    }
+
+    const savedStatuses = localStorage.getItem('trafficStatuses');
+    if (savedStatuses) {
+      try {
+        setStatuses(JSON.parse(savedStatuses));
+      } catch (error) {
+        console.error('Erro ao carregar status de tráfego:', error);
       }
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('trafficData', JSON.stringify(data));
-  }, [data]);
+    localStorage.setItem('trafficGroups', JSON.stringify(groups));
+  }, [groups]);
 
-  const addData = (newData: Omit<TrafficData, 'id'>) => {
-    const dataWithId: TrafficData = {
-      ...newData,
-      id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    setData(prev => [dataWithId, ...prev]);
-    return dataWithId.id;
+  useEffect(() => {
+    localStorage.setItem('trafficColumns', JSON.stringify(columns));
+  }, [columns]);
+
+  useEffect(() => {
+    localStorage.setItem('trafficStatuses', JSON.stringify(statuses));
+  }, [statuses]);
+
+  const updateGroups = (newGroups: TrafficGroup[]) => {
+    setGroups(newGroups);
   };
 
-  const updateData = (id: string, updates: Partial<TrafficData>) => {
-    setData(prev => prev.map(item => 
-      item.id === id ? { ...item, ...updates } : item
+  const createMonth = (monthName: string) => {
+    const newGroup: TrafficGroup = {
+      id: `group-${Date.now()}`,
+      name: `${monthName} - TRÁFEGO`,
+      color: 'bg-orange-100',
+      isExpanded: true,
+      items: []
+    };
+    setGroups(prev => [newGroup, ...prev]);
+  };
+
+  const updateMonth = (groupId: string, newName: string) => {
+    setGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, name: `${newName} - TRÁFEGO` }
+        : group
     ));
   };
 
-  const deleteData = (id: string) => {
-    setData(prev => prev.filter(item => item.id !== id));
+  const deleteMonth = (groupId: string) => {
+    setGroups(prev => prev.filter(group => group.id !== groupId));
   };
 
-  const duplicateMonth = (mes: string) => {
-    const monthData = data.filter(item => item.mes === mes);
-    
-    if (monthData.length === 0) {
-      console.warn('Nenhum dado encontrado para o mês:', mes);
-      return;
-    }
+  const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
+    const sourceGroup = groups.find(g => g.id === sourceGroupId);
+    if (!sourceGroup) return;
 
-    // Criar uma nova data baseada no mês atual + 1
-    const [year, month] = mes.split('-');
-    const nextMonth = new Date(parseInt(year), parseInt(month), 1);
-    const newMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
-
-    // Usar setTimeout para evitar travamento da UI
-    setTimeout(() => {
-      const duplicatedData = monthData.map(item => ({
+    const newGroup: TrafficGroup = {
+      id: `group-${Date.now()}`,
+      name: `${newMonthName} - TRÁFEGO`,
+      color: sourceGroup.color,
+      isExpanded: true,
+      items: sourceGroup.items.map(item => ({
         ...item,
         id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        mes: newMonth,
-        // Resetar métricas de resultado
         resultado: 0,
         conversoes: 0,
         roi: 0,
         roas: 0
-      }));
+      }))
+    };
 
-      setData(prev => [...duplicatedData, ...prev]);
-    }, 100);
+    setGroups(prev => [newGroup, ...prev]);
   };
 
-  const getClients = () => {
-    const clients = [...new Set(data.map(item => item.cliente))];
-    return clients.sort();
+  const addStatus = (status: Omit<TrafficStatus, 'id'>) => {
+    const newStatus: TrafficStatus = {
+      ...status,
+      id: `status-${Date.now()}`
+    };
+    setStatuses(prev => [...prev, newStatus]);
   };
 
-  const getMonths = () => {
-    const months = [...new Set(data.map(item => item.mes))];
-    return months.sort().reverse();
+  const updateStatus = (statusId: string, updates: Partial<TrafficStatus>) => {
+    setStatuses(prev => prev.map(status => 
+      status.id === statusId ? { ...status, ...updates } : status
+    ));
+  };
+
+  const deleteStatus = (statusId: string) => {
+    setStatuses(prev => prev.filter(status => status.id !== statusId));
+  };
+
+  const addColumn = (name: string, type: 'status' | 'text') => {
+    const newColumn: TrafficColumn = {
+      id: `column-${Date.now()}`,
+      name,
+      type
+    };
+    setColumns(prev => [...prev, newColumn]);
+  };
+
+  const updateColumn = (columnId: string, updates: Partial<TrafficColumn>) => {
+    setColumns(prev => prev.map(column => 
+      column.id === columnId ? { ...column, ...updates } : column
+    ));
+  };
+
+  const deleteColumn = (columnId: string) => {
+    setColumns(prev => prev.filter(column => column.id !== columnId));
+  };
+
+  const updateItemStatus = (itemId: string, columnId: string, statusId: string) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === itemId 
+          ? { ...item, [columnId]: statusId }
+          : item
+      )
+    })));
+  };
+
+  const addClient = (groupId: string, clientData: { elemento: string; servicos: string }) => {
+    const newClient: TrafficData = {
+      id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      cliente: clientData.elemento,
+      elemento: clientData.elemento,
+      servicos: clientData.servicos,
+      mes: new Date().toISOString().split('T')[0].slice(0, 7),
+      investimento: 0,
+      resultado: 0,
+      roi: 0,
+      roas: 0,
+      ctr: 0,
+      cpc: 0,
+      cpm: 0,
+      conversoes: 0
+    };
+
+    setGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, items: [...group.items, newClient] }
+        : group
+    ));
+  };
+
+  const deleteClient = (clientId: string) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== clientId)
+    })));
+  };
+
+  const updateClient = (clientId: string, updates: Partial<TrafficData>) => {
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === clientId ? { ...item, ...updates } : item
+      )
+    })));
+  };
+
+  const getClientFiles = (clientId: string): File[] => {
+    for (const group of groups) {
+      const client = group.items.find(item => item.id === clientId);
+      if (client && client.attachments) {
+        return client.attachments;
+      }
+    }
+    return [];
   };
 
   return {
-    data,
-    addData,
-    updateData,
-    deleteData,
+    groups,
+    columns,
+    statuses,
+    updateGroups,
+    createMonth,
+    updateMonth,
+    deleteMonth,
     duplicateMonth,
-    getClients,
-    getMonths
+    addStatus,
+    updateStatus,
+    deleteStatus,
+    addColumn,
+    updateColumn,
+    deleteColumn,
+    updateItemStatus,
+    addClient,
+    deleteClient,
+    updateClient,
+    getClientFiles
   };
 };
