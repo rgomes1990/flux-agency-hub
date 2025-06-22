@@ -13,7 +13,7 @@ interface FilePreviewProps {
 export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
   if (!file) return null;
 
-  const isImage = file.type.startsWith('image/');
+  const isImage = file.type ? file.type.startsWith('image/') : false;
   const isPDF = file.type === 'application/pdf';
   const fileUrl = URL.createObjectURL(file);
 
