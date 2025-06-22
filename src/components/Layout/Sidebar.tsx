@@ -3,80 +3,72 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
+  Users, 
+  TrendingUp, 
   FileText, 
-  CheckSquare, 
-  TrendingUp,
-  Users,
-  Lock
+  Calendar,
+  FolderOpen,
+  Target,
+  BarChart3,
+  Settings,
+  Shield,
+  Database,
+  Eye
 } from 'lucide-react';
 
-const menuItems = [
-  {
-    name: 'Dashboard',
-    icon: LayoutDashboard,
-    path: '/dashboard'
-  },
-  {
-    name: 'Conteúdo',
-    icon: FileText,
-    path: '/content'
-  },
-  {
-    name: 'Tarefas',
-    icon: CheckSquare,
-    path: '/tasks'
-  },
-  {
-    name: 'Tráfego Pago',
-    icon: TrendingUp,
-    path: '/traffic'
-  },
-  {
-    name: 'Usuários',
-    icon: Users,
-    path: '/users'
-  },
-  {
-    name: 'Senhas Clientes',
-    icon: Lock,
-    path: '/client-passwords'
-  }
+const navigation = [
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Usuários', href: '/users', icon: Users },
+  { name: 'Clientes', href: '/clients', icon: Users },
+  { name: 'Tráfego Pago', href: '/traffic', icon: TrendingUp },
+  { name: 'Conteúdo', href: '/content', icon: FileText },
+  { name: 'Calendário', href: '/calendar', icon: Calendar },
+  { name: 'Projetos', href: '/projects', icon: FolderOpen },
+  { name: 'Tarefas', href: '/tasks', icon: Target },
+  { name: 'Campanhas', href: '/campaigns', icon: Target },
+  { name: 'Relatórios', href: '/reports', icon: BarChart3 },
+  { name: 'Senhas Clientes', href: '/client-passwords', icon: Shield },
+  { name: 'Auditoria', href: '/audit', icon: Database },
+  { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
-export default function Sidebar() {
+export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className="w-64 bg-blue-900 border-r border-blue-800 h-screen flex flex-col">
-      <div className="p-6 border-b border-blue-800">
-        <h1 className="text-xl font-bold text-white">RSG Tarefas</h1>
-        <p className="text-sm text-blue-200 mt-1">Agência de Marketing</p>
-      </div>
-      
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            
-            return (
-              <li key={item.name}>
+    <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+      <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
+        <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
+          <div className="flex items-center flex-shrink-0 px-4">
+            <h1 className="text-xl font-bold text-orange-600">DIGITAL SOUL</h1>
+          </div>
+          <nav className="mt-8 flex-1 px-2 space-y-1">
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
                 <NavLink
-                  to={item.path}
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-blue-700 text-white'
-                      : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-                  }`}
+                  key={item.name}
+                  to={item.href}
+                  className={`
+                    group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors
+                    ${isActive 
+                      ? 'bg-orange-100 text-orange-900' 
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }
+                  `}
                 >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.name}</span>
+                  <item.icon
+                    className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                      isActive ? 'text-orange-500' : 'text-gray-400 group-hover:text-gray-500'
+                    }`}
+                  />
+                  {item.name}
                 </NavLink>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    </aside>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+    </div>
   );
 }
