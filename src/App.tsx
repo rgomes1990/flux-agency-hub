@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
@@ -11,6 +10,7 @@ import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
 import Users from './pages/Users';
 import ClientPasswords from './pages/ClientPasswords';
+import Audit from './pages/Audit';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -59,6 +59,13 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ClientPasswords />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/audit" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Audit />
               </MainLayout>
             </ProtectedRoute>
           } />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
 
 interface TrafficItem {
   id: string;
@@ -13,8 +14,8 @@ interface TrafficItem {
   relatorio: string;
   informacoes: string;
   observacoes?: string;
-  attachments?: { name: string; data: string; type: string }[]; // Changed to serializable format
-  [key: string]: any; // Para colunas dinâmicas
+  attachments?: { name: string; data: string; type: string }[];
+  [key: string]: any;
 }
 
 interface TrafficGroup {
@@ -37,32 +38,6 @@ interface ServiceStatus {
   name: string;
   color: string;
 }
-
-// Helper function to convert File to serializable format
-const fileToSerializable = async (file: File): Promise<{ name: string; data: string; type: string }> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve({
-        name: file.name,
-        data: reader.result as string,
-        type: file.type
-      });
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
-// Helper function to convert serializable format back to File
-const serializableToFile = (serialized: { name: string; data: string; type: string }): File => {
-  const byteCharacters = atob(serialized.data.split(',')[1]);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new File([byteArray], serialized.name, { type: serialized.type });
-};
 
 export const useTrafficData = () => {
   const [groups, setGroups] = useState<TrafficGroup[]>([
@@ -93,6 +68,8 @@ export const useTrafficData = () => {
     { id: 'em-andamento', name: 'Em Andamento', color: 'bg-yellow-500' },
     { id: 'revisao', name: 'Em Revisão', color: 'bg-purple-500' }
   ]);
+
+  const { logAudit } = useAuth();
 
   useEffect(() => {
     const savedData = localStorage.getItem('trafficData');
@@ -136,11 +113,59 @@ export const useTrafficData = () => {
     localStorage.setItem('trafficStatuses', JSON.stringify(statuses));
   }, [statuses]);
 
+  const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
+    try {
+      console.log('Iniciando duplicação de mês de tráfego:', { sourceGroupId, newMonthName });
+      
+      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
+      if (!groupToDuplicate) {
+        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
+        return null;
+      }
+      
+      const timestamp = Date.now();
+      const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`;
+      
+      const newGroup: TrafficGroup = {
+        id: newGroupId,
+        name: newMonthName.toUpperCase() + ' - TRÁFEGO',
+        color: groupToDuplicate.color,
+        isExpanded: true,
+        items: groupToDuplicate.items.map((item, index) => ({
+          ...item,
+          id: `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
+          configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
+          ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
+          informacoes: '', observacoes: '', attachments: []
+        }))
+      };
+      
+      console.log('Novo grupo criado:', newGroup);
+      
+      setGroups(prev => {
+        const updated = [...prev, newGroup];
+        console.log('Grupos atualizados:', updated.length);
+        return updated;
+      });
+      
+      // Registrar na auditoria
+      await logAudit('traffic', newGroupId, 'INSERT', null, { 
+        month_name: newMonthName,
+        duplicated_from: sourceGroupId 
+      });
+      
+      return newGroupId;
+    } catch (error) {
+      console.error('Erro ao duplicar mês de tráfego:', error);
+      return null;
+    }
+  };
+
   const updateGroups = (newGroups: TrafficGroup[]) => {
     setGroups(newGroups);
   };
 
-  const createMonth = (monthName: string) => {
+  const createMonth = async (monthName: string) => {
     const newGroup: TrafficGroup = {
       id: monthName.toLowerCase().replace(/\s+/g, '-') + '-trafego',
       name: monthName.toUpperCase() + ' - TRÁFEGO',
@@ -150,71 +175,36 @@ export const useTrafficData = () => {
     };
     
     setGroups(prev => [...prev, newGroup]);
+    
+    // Registrar na auditoria
+    await logAudit('traffic', newGroup.id, 'INSERT', null, { month_name: monthName });
+    
     return newGroup.id;
   };
 
-  const updateMonth = (groupId: string, newName: string) => {
+  const updateMonth = async (groupId: string, newName: string) => {
+    const oldGroup = groups.find(g => g.id === groupId);
+    
     setGroups(prev => prev.map(group => 
       group.id === groupId 
         ? { ...group, name: newName.toUpperCase() + ' - TRÁFEGO' }
         : group
     ));
+    
+    // Registrar na auditoria
+    await logAudit('traffic', groupId, 'UPDATE', 
+      { name: oldGroup?.name }, 
+      { name: newName.toUpperCase() + ' - TRÁFEGO' }
+    );
   };
 
-  const deleteMonth = (groupId: string) => {
+  const deleteMonth = async (groupId: string) => {
+    const groupToDelete = groups.find(g => g.id === groupId);
+    
     setGroups(prev => prev.filter(group => group.id !== groupId));
-  };
-
-  const duplicateMonth = (sourceGroupId: string, newMonthName: string) => {
-    try {
-      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-      if (!groupToDuplicate) {
-        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
-        return null;
-      }
-      
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substr(2, 9);
-      
-      const newGroup: TrafficGroup = {
-        id: `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}-${randomId}`,
-        name: newMonthName.toUpperCase() + ' - TRÁFEGO',
-        color: groupToDuplicate.color,
-        isExpanded: true,
-        items: groupToDuplicate.items.map((item, index) => {
-          const newItemId = `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`;
-          console.log('Criando novo item de tráfego:', newItemId);
-          
-          return {
-            ...item,
-            id: newItemId,
-            // Reset todos os campos para novo mês
-            configuracao_campanha: '',
-            criacao_anuncios: '',
-            aprovacao_cliente: '',
-            ativacao: '',
-            monitoramento: '',
-            otimizacao: '',
-            relatorio: '',
-            informacoes: '',
-            observacoes: '',
-            attachments: []
-          };
-        })
-      };
-      
-      console.log('Duplicando grupo de tráfego:', newGroup);
-      setGroups(prev => {
-        const updated = [...prev, newGroup];
-        console.log('Grupos de tráfego atualizados:', updated.length);
-        return updated;
-      });
-      
-      return newGroup.id;
-    } catch (error) {
-      console.error('Erro ao duplicar mês de tráfego:', error);
-      return null;
-    }
+    
+    // Registrar na auditoria
+    await logAudit('traffic', groupId, 'DELETE', { name: groupToDelete?.name }, null);
   };
 
   const addStatus = (status: ServiceStatus) => {
@@ -240,7 +230,6 @@ export const useTrafficData = () => {
     };
     setColumns(prev => [...prev, newColumn]);
     
-    // Adicionar a nova coluna a todos os itens existentes
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => ({
@@ -257,10 +246,8 @@ export const useTrafficData = () => {
   };
 
   const deleteColumn = (id: string) => {
-    // Allow deletion of any column, including default ones
     setColumns(prev => prev.filter(col => col.id !== id));
     
-    // Remover a coluna de todos os itens existentes mantendo a tipagem correta
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => {
@@ -271,7 +258,9 @@ export const useTrafficData = () => {
     })));
   };
 
-  const updateItemStatus = (itemId: string, field: string, statusId: string) => {
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    const oldItem = groups.flatMap(g => g.items).find(item => item.id === itemId);
+    
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.map(item => 
@@ -280,25 +269,24 @@ export const useTrafficData = () => {
           : item
       )
     })));
+    
+    // Registrar na auditoria
+    await logAudit('traffic', itemId, 'UPDATE', 
+      { [field]: oldItem?.[field] }, 
+      { [field]: statusId }
+    );
   };
 
-  const addClient = (groupId: string, clientData: Partial<TrafficItem>) => {
+  const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
     const newClient: TrafficItem = {
       id: `traffic-client-${Date.now()}`,
       elemento: clientData.elemento || 'Novo Cliente',
       servicos: clientData.servicos || '',
-      configuracao_campanha: '',
-      criacao_anuncios: '',
-      aprovacao_cliente: '',
-      ativacao: '',
-      monitoramento: '',
-      otimizacao: '',
-      relatorio: '',
-      informacoes: '',
-      attachments: []
+      configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
+      ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
+      informacoes: '', attachments: []
     };
 
-    // Adicionar campos das colunas personalizadas
     columns.forEach(column => {
       if (!column.isDefault) {
         newClient[column.id] = column.type === 'status' ? '' : '';
@@ -310,24 +298,54 @@ export const useTrafficData = () => {
         ? { ...group, items: [...group.items, newClient] }
         : group
     ));
+    
+    // Registrar na auditoria
+    await logAudit('traffic', newClient.id, 'INSERT', null, {
+      elemento: clientData.elemento,
+      group_id: groupId
+    });
 
     return newClient.id;
   };
 
-  const deleteClient = (itemId: string) => {
+  const deleteClient = async (itemId: string) => {
+    const clientToDelete = groups.flatMap(g => g.items).find(item => item.id === itemId);
+    
     setGroups(prev => prev.map(group => ({
       ...group,
       items: group.items.filter(item => item.id !== itemId)
     })));
+    
+    // Registrar na auditoria
+    await logAudit('traffic', itemId, 'DELETE', { elemento: clientToDelete?.elemento }, null);
   };
 
   const updateClient = async (itemId: string, updates: Partial<TrafficItem>) => {
-    // Convert File objects to serializable format if attachments are being updated
+    const oldClient = groups.flatMap(g => g.items).find(item => item.id === itemId);
+    
     if (updates.attachments && updates.attachments.length > 0) {
       const firstAttachment = updates.attachments[0];
       if (firstAttachment instanceof File) {
-        const serializedFile = await fileToSerializable(firstAttachment);
-        updates.attachments = [serializedFile as any];
+        const reader = new FileReader();
+        reader.onload = () => {
+          const serializedFile = {
+            name: firstAttachment.name,
+            data: reader.result as string,
+            type: firstAttachment.type
+          };
+          updates.attachments = [serializedFile as any];
+          
+          setGroups(prev => prev.map(group => ({
+            ...group,
+            items: group.items.map(item => 
+              item.id === itemId 
+                ? { ...item, ...updates }
+                : item
+            )
+          })));
+        };
+        reader.readAsDataURL(firstAttachment);
+        return;
       }
     }
 
@@ -339,16 +357,27 @@ export const useTrafficData = () => {
           : item
       )
     })));
+    
+    // Registrar na auditoria
+    await logAudit('traffic', itemId, 'UPDATE', 
+      { elemento: oldClient?.elemento }, 
+      { elemento: updates.elemento }
+    );
   };
 
-  // Helper function to get File objects from attachments
   const getClientFiles = (clientId: string): File[] => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (!client?.attachments) return [];
     
     return client.attachments.map(attachment => {
       if ('data' in attachment && 'name' in attachment && 'type' in attachment) {
-        return serializableToFile(attachment as { name: string; data: string; type: string });
+        const byteCharacters = atob(attachment.data.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new File([byteArray], attachment.name, { type: attachment.type });
       }
       return attachment as File;
     });
