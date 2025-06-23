@@ -1,5 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ContentItem {
   id: string;
@@ -45,16 +47,7 @@ interface ServiceStatus {
 }
 
 export const useContentData = () => {
-  const [groups, setGroups] = useState<ContentGroup[]>([
-    {
-      id: 'janeiro-conteudo',
-      name: 'JANEIRO - CONTEÚDO',
-      color: 'bg-blue-500',
-      isExpanded: true,
-      items: []
-    }
-  ]);
-
+  const [groups, setGroups] = useState<ContentGroup[]>([]);
   const [columns, setColumns] = useState<ContentColumn[]>([
     { id: 'janeiro', name: 'Janeiro', type: 'status', isDefault: true },
     { id: 'fevereiro', name: 'Fevereiro', type: 'status', isDefault: true },
@@ -79,49 +72,112 @@ export const useContentData = () => {
     { id: 'revisao', name: 'Em Revisão', color: 'bg-purple-500' }
   ]);
 
-  const { logAudit } = useAuth();
+  const { logAudit, user } = useAuth();
+
+  // Carregar dados do Supabase
+  const loadContentData = async () => {
+    try {
+      console.log('Carregando dados de conteúdo...');
+      
+      const { data, error } = await supabase
+        .from('content_data')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao carregar dados de conteúdo:', error);
+        return;
+      }
+
+      console.log('Dados de conteúdo carregados:', data);
+
+      if (data && data.length > 0) {
+        const groupsMap = new Map<string, ContentGroup>();
+
+        data.forEach(item => {
+          const itemData = typeof item.item_data === 'string' ? JSON.parse(item.item_data) : item.item_data;
+          
+          if (!groupsMap.has(item.group_id)) {
+            groupsMap.set(item.group_id, {
+              id: item.group_id,
+              name: item.group_name,
+              color: item.group_color || 'bg-blue-500',
+              isExpanded: item.is_expanded,
+              items: []
+            });
+          }
+
+          const group = groupsMap.get(item.group_id)!;
+          group.items.push(itemData);
+        });
+
+        setGroups(Array.from(groupsMap.values()));
+      } else {
+        // Se não há dados, criar grupo padrão
+        setGroups([{
+          id: 'janeiro-conteudo',
+          name: 'JANEIRO - CONTEÚDO',
+          color: 'bg-blue-500',
+          isExpanded: true,
+          items: []
+        }]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados de conteúdo:', error);
+    }
+  };
+
+  // Salvar dados no Supabase
+  const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
+    try {
+      console.log('Salvando dados de conteúdo...', newGroups);
+      
+      // Limpar dados existentes
+      const { error: deleteError } = await supabase
+        .from('content_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (deleteError) {
+        console.error('Erro ao limpar dados existentes:', deleteError);
+      }
+
+      // Inserir novos dados
+      const insertData = [];
+      for (const group of newGroups) {
+        for (const item of group.items) {
+          insertData.push({
+            user_id: user?.id || null,
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
+            is_expanded: group.isExpanded,
+            item_data: JSON.stringify(item)
+          });
+        }
+      }
+
+      if (insertData.length > 0) {
+        const { error } = await supabase
+          .from('content_data')
+          .insert(insertData);
+
+        if (error) {
+          console.error('Erro ao salvar dados de conteúdo:', error);
+          throw error;
+        }
+        
+        console.log('Dados de conteúdo salvos com sucesso');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar dados de conteúdo:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
-    const savedData = localStorage.getItem('contentData');
-    const savedColumns = localStorage.getItem('contentColumns');
-    const savedStatuses = localStorage.getItem('contentStatuses');
-    
-    if (savedData) {
-      try {
-        setGroups(JSON.parse(savedData));
-      } catch (error) {
-        console.error('Erro ao carregar dados do conteúdo:', error);
-      }
-    }
-    
-    if (savedColumns) {
-      try {
-        setColumns(JSON.parse(savedColumns));
-      } catch (error) {
-        console.error('Erro ao carregar colunas do conteúdo:', error);
-      }
-    }
-    
-    if (savedStatuses) {
-      try {
-        setStatuses(JSON.parse(savedStatuses));
-      } catch (error) {
-        console.error('Erro ao carregar status do conteúdo:', error);
-      }
-    }
+    loadContentData();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('contentData', JSON.stringify(groups));
-  }, [groups]);
-
-  useEffect(() => {
-    localStorage.setItem('contentColumns', JSON.stringify(columns));
-  }, [columns]);
-
-  useEffect(() => {
-    localStorage.setItem('contentStatuses', JSON.stringify(statuses));
-  }, [statuses]);
 
   const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
     try {
@@ -150,13 +206,9 @@ export const useContentData = () => {
         }))
       };
       
-      console.log('Novo grupo criado:', newGroup);
-      
-      setGroups(prev => {
-        const updated = [...prev, newGroup];
-        console.log('Grupos atualizados:', updated.length);
-        return updated;
-      });
+      const newGroups = [...groups, newGroup];
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
       
       // Registrar na auditoria
       await logAudit('content', newGroupId, 'INSERT', null, { 
@@ -171,8 +223,9 @@ export const useContentData = () => {
     }
   };
 
-  const updateGroups = (newGroups: ContentGroup[]) => {
+  const updateGroups = async (newGroups: ContentGroup[]) => {
     setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
   };
 
   const createMonth = async (monthName: string) => {
@@ -184,7 +237,9 @@ export const useContentData = () => {
       items: []
     };
     
-    setGroups(prev => [...prev, newGroup]);
+    const newGroups = [...groups, newGroup];
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', newGroup.id, 'INSERT', null, { month_name: monthName });
@@ -195,11 +250,14 @@ export const useContentData = () => {
   const updateMonth = async (groupId: string, newName: string) => {
     const oldGroup = groups.find(g => g.id === groupId);
     
-    setGroups(prev => prev.map(group => 
+    const newGroups = groups.map(group => 
       group.id === groupId 
         ? { ...group, name: newName.toUpperCase() + ' - CONTEÚDO' }
         : group
-    ));
+    );
+    
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', groupId, 'UPDATE', 
@@ -211,7 +269,9 @@ export const useContentData = () => {
   const deleteMonth = async (groupId: string) => {
     const groupToDelete = groups.find(g => g.id === groupId);
     
-    setGroups(prev => prev.filter(group => group.id !== groupId));
+    const newGroups = groups.filter(group => group.id !== groupId);
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', groupId, 'DELETE', { name: groupToDelete?.name }, null);
@@ -241,13 +301,16 @@ export const useContentData = () => {
     setColumns(prev => [...prev, newColumn]);
     
     // Adicionar a nova coluna a todos os itens existentes
-    setGroups(prev => prev.map(group => ({
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => ({
         ...item,
         [newColumn.id]: type === 'status' ? '' : ''
       }))
-    })));
+    }));
+    
+    setGroups(newGroups);
+    saveContentToDatabase(newGroups);
   };
 
   const updateColumn = (id: string, updates: Partial<ContentColumn>) => {
@@ -259,27 +322,33 @@ export const useContentData = () => {
   const deleteColumn = (id: string) => {
     setColumns(prev => prev.filter(col => col.id !== id));
     
-    setGroups(prev => prev.map(group => ({
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => {
         const updatedItem = { ...item };
         delete updatedItem[id];
         return updatedItem;
       })
-    })));
+    }));
+    
+    setGroups(newGroups);
+    saveContentToDatabase(newGroups);
   };
 
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
     const oldItem = groups.flatMap(g => g.items).find(item => item.id === itemId);
     
-    setGroups(prev => prev.map(group => ({
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => 
         item.id === itemId 
           ? { ...item, [field]: statusId }
           : item
       )
-    })));
+    }));
+    
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', itemId, 'UPDATE', 
@@ -304,11 +373,14 @@ export const useContentData = () => {
       }
     });
 
-    setGroups(prev => prev.map(group => 
+    const newGroups = groups.map(group => 
       group.id === groupId 
         ? { ...group, items: [...group.items, newClient] }
         : group
-    ));
+    );
+    
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', newClient.id, 'INSERT', null, {
@@ -322,10 +394,13 @@ export const useContentData = () => {
   const deleteClient = async (itemId: string) => {
     const clientToDelete = groups.flatMap(g => g.items).find(item => item.id === itemId);
     
-    setGroups(prev => prev.map(group => ({
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.filter(item => item.id !== itemId)
-    })));
+    }));
+    
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', itemId, 'DELETE', { elemento: clientToDelete?.elemento }, null);
@@ -338,7 +413,7 @@ export const useContentData = () => {
       const firstAttachment = updates.attachments[0];
       if (firstAttachment instanceof File) {
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
           const serializedFile = {
             name: firstAttachment.name,
             data: reader.result as string,
@@ -346,28 +421,34 @@ export const useContentData = () => {
           };
           updates.attachments = [serializedFile as any];
           
-          setGroups(prev => prev.map(group => ({
+          const newGroups = groups.map(group => ({
             ...group,
             items: group.items.map(item => 
               item.id === itemId 
                 ? { ...item, ...updates }
                 : item
             )
-          })));
+          }));
+          
+          setGroups(newGroups);
+          await saveContentToDatabase(newGroups);
         };
         reader.readAsDataURL(firstAttachment);
         return;
       }
     }
 
-    setGroups(prev => prev.map(group => ({
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => 
         item.id === itemId 
           ? { ...item, ...updates }
           : item
       )
-    })));
+    }));
+    
+    setGroups(newGroups);
+    await saveContentToDatabase(newGroups);
     
     // Registrar na auditoria
     await logAudit('content', itemId, 'UPDATE', 

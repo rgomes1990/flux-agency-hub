@@ -67,12 +67,13 @@ export default function Content() {
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
 
-  const toggleGroup = (groupId: string) => {
-    updateGroups(groups.map(group => 
+  const toggleGroup = async (groupId: string) => {
+    const newGroups = groups.map(group => 
       group.id === groupId 
         ? { ...group, isExpanded: !group.isExpanded }
         : group
-    ));
+    );
+    await updateGroups(newGroups);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -92,10 +93,10 @@ export default function Content() {
     }
   };
 
-  const handleCreateMonth = () => {
+  const handleCreateMonth = async () => {
     if (!newMonthName.trim()) return;
     
-    createMonth(newMonthName);
+    await createMonth(newMonthName);
     setNewMonthName('');
     setShowCreateDialog(false);
   };
@@ -107,7 +108,7 @@ export default function Content() {
       setShowDuplicateDialog(false);
       
       // Create the duplicate month
-      duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
       
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
@@ -116,10 +117,10 @@ export default function Content() {
     }
   };
 
-  const handleCreateClient = () => {
+  const handleCreateClient = async () => {
     if (!newClientName.trim() || !selectedGroupForClient) return;
     
-    addClient(selectedGroupForClient, {
+    await addClient(selectedGroupForClient, {
       elemento: newClientName,
       servicos: newClientServices
     });
@@ -139,8 +140,8 @@ export default function Content() {
     setShowColumnDialog(false);
   };
 
-  const handleDeleteClient = (clientId: string) => {
-    deleteClient(clientId);
+  const handleDeleteClient = async (clientId: string) => {
+    await deleteClient(clientId);
     setConfirmDelete(null);
   };
 
@@ -157,16 +158,16 @@ export default function Content() {
     }
   };
 
-  const handleUpdateMonth = () => {
+  const handleUpdateMonth = async () => {
     if (editingMonth && editingMonth.name.trim()) {
-      updateMonth(editingMonth.id, editingMonth.name);
+      await updateMonth(editingMonth.id, editingMonth.name);
       setEditingMonth(null);
       setShowEditMonthDialog(false);
     }
   };
 
-  const handleDeleteMonth = (groupId: string) => {
-    deleteMonth(groupId);
+  const handleDeleteMonth = async (groupId: string) => {
+    await deleteMonth(groupId);
     setConfirmDelete(null);
   };
 
