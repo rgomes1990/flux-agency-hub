@@ -21,6 +21,7 @@ import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Content() {
   const { 
@@ -44,12 +45,14 @@ export default function Content() {
     getClientFiles
   } = useContentData();
   
+  const { toast } = useToast();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
   const [duplicateMonthName, setDuplicateMonthName] = useState('');
   const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
@@ -96,24 +99,49 @@ export default function Content() {
   const handleCreateMonth = async () => {
     if (!newMonthName.trim()) return;
     
-    await createMonth(newMonthName);
-    setNewMonthName('');
-    setShowCreateDialog(false);
+    try {
+      await createMonth(newMonthName);
+      setNewMonthName('');
+      setShowCreateDialog(false);
+      
+      toast({
+        title: "Sucesso",
+        description: "Mês criado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao criar mês:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar mês. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDuplicateMonth = async () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
+    setIsDuplicating(true);
     try {
-      setShowDuplicateDialog(false);
-      
-      // Create the duplicate month
       await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
       
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+      
+      toast({
+        title: "Sucesso",
+        description: "Mês duplicado com sucesso!",
+      });
     } catch (error) {
       console.error('Erro ao duplicar mês:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao duplicar mês. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDuplicating(false);
     }
   };
 
@@ -249,9 +277,9 @@ export default function Content() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={isDuplicating}>
                 <Copy className="h-4 w-4 mr-1" />
-                Duplicar mês
+                {isDuplicating ? 'Duplicando...' : 'Duplicar mês'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -435,12 +463,21 @@ export default function Content() {
               placeholder="Nome do novo mês"
               value={duplicateMonthName}
               onChange={(e) => setDuplicateMonthName(e.target.value)}
+              disabled={isDuplicating}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700">
-                Duplicar
+              <Button 
+                onClick={handleDuplicateMonth} 
+                className="bg-orange-600 hover:bg-orange-700"
+                disabled={isDuplicating}
+              >
+                {isDuplicating ? 'Duplicando...' : 'Duplicar'}
               </Button>
-              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDuplicateDialog(false)}
+                disabled={isDuplicating}
+              >
                 Cancelar
               </Button>
             </div>

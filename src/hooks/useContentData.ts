@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -74,6 +73,66 @@ export const useContentData = () => {
 
   const { logAudit, user } = useAuth();
 
+  // Carregar colunas personalizadas do Supabase
+  const loadColumns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('column_config')
+        .select('*')
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao carregar colunas:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const customColumns = data.map(col => ({
+          id: col.column_id,
+          name: col.column_name,
+          type: col.column_type as 'status' | 'text',
+          isDefault: col.is_default || false
+        }));
+
+        // Combinar colunas padrão com personalizadas
+        const defaultColumns = columns.filter(col => col.isDefault);
+        setColumns([...defaultColumns, ...customColumns.filter(col => !col.isDefault)]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar colunas:', error);
+    }
+  };
+
+  // Carregar status personalizados do Supabase
+  const loadStatuses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('status_config')
+        .select('*')
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao carregar status:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const customStatuses = data.map(status => ({
+          id: status.status_id,
+          name: status.status_name,
+          color: status.status_color
+        }));
+
+        setStatuses(prev => {
+          const defaultStatuses = prev.slice(0, 5); // Manter os 5 primeiros padrões
+          return [...defaultStatuses, ...customStatuses];
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar status:', error);
+    }
+  };
+
   // Carregar dados do Supabase
   const loadContentData = async () => {
     try {
@@ -127,24 +186,32 @@ export const useContentData = () => {
     }
   };
 
-  // Salvar dados no Supabase
+  // Salvar dados no Supabase - CORRIGIDO: não deletar todos os dados
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
     try {
       console.log('Salvando dados de conteúdo...', newGroups);
       
-      // Limpar dados existentes
-      const { error: deleteError } = await supabase
+      // Primeiro, buscar dados existentes para comparar
+      const { data: existingData } = await supabase
         .from('content_data')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .select('group_id, item_data');
 
-      if (deleteError) {
-        console.error('Erro ao limpar dados existentes:', deleteError);
-      }
-
-      // Inserir novos dados
-      const insertData = [];
+      const existingGroupIds = new Set(existingData?.map(item => item.group_id) || []);
+      
+      // Inserir apenas grupos novos ou atualizados
       for (const group of newGroups) {
+        // Deletar apenas dados deste grupo específico
+        const { error: deleteError } = await supabase
+          .from('content_data')
+          .delete()
+          .eq('group_id', group.id);
+
+        if (deleteError) {
+          console.error('Erro ao limpar dados do grupo:', deleteError);
+        }
+
+        // Inserir dados atualizados do grupo
+        const insertData = [];
         for (const item of group.items) {
           insertData.push({
             user_id: user?.id || null,
@@ -155,20 +222,20 @@ export const useContentData = () => {
             item_data: JSON.stringify(item)
           });
         }
-      }
 
-      if (insertData.length > 0) {
-        const { error } = await supabase
-          .from('content_data')
-          .insert(insertData);
+        if (insertData.length > 0) {
+          const { error } = await supabase
+            .from('content_data')
+            .insert(insertData);
 
-        if (error) {
-          console.error('Erro ao salvar dados de conteúdo:', error);
-          throw error;
+          if (error) {
+            console.error('Erro ao salvar dados do grupo:', error);
+            throw error;
+          }
         }
-        
-        console.log('Dados de conteúdo salvos com sucesso');
       }
+      
+      console.log('Dados de conteúdo salvos com sucesso');
     } catch (error) {
       console.error('Erro ao salvar dados de conteúdo:', error);
       throw error;
@@ -177,6 +244,8 @@ export const useContentData = () => {
 
   useEffect(() => {
     loadContentData();
+    loadColumns();
+    loadStatuses();
   }, []);
 
   const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
@@ -186,7 +255,7 @@ export const useContentData = () => {
       const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
       if (!groupToDuplicate) {
         console.error('Grupo não encontrado para duplicação:', sourceGroupId);
-        return null;
+        throw new Error('Grupo não encontrado');
       }
       
       const timestamp = Date.now();
@@ -219,7 +288,7 @@ export const useContentData = () => {
       return newGroupId;
     } catch (error) {
       console.error('Erro ao duplicar mês de conteúdo:', error);
-      return null;
+      throw error;
     }
   };
 
@@ -229,22 +298,27 @@ export const useContentData = () => {
   };
 
   const createMonth = async (monthName: string) => {
-    const newGroup: ContentGroup = {
-      id: monthName.toLowerCase().replace(/\s+/g, '-') + '-conteudo',
-      name: monthName.toUpperCase() + ' - CONTEÚDO',
-      color: 'bg-blue-500',
-      isExpanded: true,
-      items: []
-    };
-    
-    const newGroups = [...groups, newGroup];
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', newGroup.id, 'INSERT', null, { month_name: monthName });
-    
-    return newGroup.id;
+    try {
+      const newGroup: ContentGroup = {
+        id: monthName.toLowerCase().replace(/\s+/g, '-') + '-conteudo',
+        name: monthName.toUpperCase() + ' - CONTEÚDO',
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: []
+      };
+      
+      const newGroups = [...groups, newGroup];
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      // Registrar na auditoria
+      await logAudit('content', newGroup.id, 'INSERT', null, { month_name: monthName });
+      
+      return newGroup.id;
+    } catch (error) {
+      console.error('Erro ao criar mês:', error);
+      throw error;
+    }
   };
 
   const updateMonth = async (groupId: string, newName: string) => {
@@ -277,62 +351,182 @@ export const useContentData = () => {
     await logAudit('content', groupId, 'DELETE', { name: groupToDelete?.name }, null);
   };
 
-  const addStatus = (status: ServiceStatus) => {
-    setStatuses(prev => [...prev, status]);
+  const addStatus = async (status: ServiceStatus) => {
+    try {
+      setStatuses(prev => [...prev, status]);
+      
+      // Salvar no Supabase
+      const { error } = await supabase
+        .from('status_config')
+        .insert({
+          status_id: status.id,
+          status_name: status.name,
+          status_color: status.color,
+          module: 'content',
+          user_id: user?.id
+        });
+
+      if (error) {
+        console.error('Erro ao salvar status:', error);
+        // Reverter mudança local se falhar
+        setStatuses(prev => prev.filter(s => s.id !== status.id));
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar status:', error);
+    }
   };
 
-  const updateStatus = (statusId: string, updates: Partial<ServiceStatus>) => {
-    setStatuses(prev => prev.map(status => 
-      status.id === statusId ? { ...status, ...updates } : status
-    ));
+  const updateStatus = async (statusId: string, updates: Partial<ServiceStatus>) => {
+    try {
+      setStatuses(prev => prev.map(status => 
+        status.id === statusId ? { ...status, ...updates } : status
+      ));
+
+      // Atualizar no Supabase
+      const { error } = await supabase
+        .from('status_config')
+        .update({
+          status_name: updates.name,
+          status_color: updates.color
+        })
+        .eq('status_id', statusId)
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao atualizar status:', error);
+        // Recarregar do banco se falhar
+        loadStatuses();
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+    }
   };
 
-  const deleteStatus = (statusId: string) => {
-    setStatuses(prev => prev.filter(status => status.id !== statusId));
+  const deleteStatus = async (statusId: string) => {
+    try {
+      setStatuses(prev => prev.filter(status => status.id !== statusId));
+
+      // Deletar do Supabase
+      const { error } = await supabase
+        .from('status_config')
+        .delete()
+        .eq('status_id', statusId)
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao deletar status:', error);
+        // Recarregar do banco se falhar
+        loadStatuses();
+      }
+    } catch (error) {
+      console.error('Erro ao deletar status:', error);
+    }
   };
 
-  const addColumn = (name: string, type: 'status' | 'text') => {
-    const newColumn: ContentColumn = {
-      id: name.toLowerCase().replace(/\s+/g, '_'),
-      name,
-      type,
-      isDefault: false
-    };
-    setColumns(prev => [...prev, newColumn]);
-    
-    // Adicionar a nova coluna a todos os itens existentes
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => ({
-        ...item,
-        [newColumn.id]: type === 'status' ? '' : ''
-      }))
-    }));
-    
-    setGroups(newGroups);
-    saveContentToDatabase(newGroups);
+  const addColumn = async (name: string, type: 'status' | 'text') => {
+    try {
+      const newColumn: ContentColumn = {
+        id: name.toLowerCase().replace(/\s+/g, '_'),
+        name,
+        type,
+        isDefault: false
+      };
+      
+      setColumns(prev => [...prev, newColumn]);
+      
+      // Salvar no Supabase
+      const { error } = await supabase
+        .from('column_config')
+        .insert({
+          column_id: newColumn.id,
+          column_name: newColumn.name,
+          column_type: newColumn.type,
+          module: 'content',
+          is_default: false,
+          user_id: user?.id
+        });
+
+      if (error) {
+        console.error('Erro ao salvar coluna:', error);
+        // Reverter mudança local se falhar
+        setColumns(prev => prev.filter(col => col.id !== newColumn.id));
+        return;
+      }
+      
+      // Adicionar a nova coluna a todos os itens existentes
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => ({
+          ...item,
+          [newColumn.id]: type === 'status' ? '' : ''
+        }))
+      }));
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+    } catch (error) {
+      console.error('Erro ao adicionar coluna:', error);
+    }
   };
 
-  const updateColumn = (id: string, updates: Partial<ContentColumn>) => {
-    setColumns(prev => prev.map(col => 
-      col.id === id ? { ...col, ...updates } : col
-    ));
+  const updateColumn = async (id: string, updates: Partial<ContentColumn>) => {
+    try {
+      setColumns(prev => prev.map(col => 
+        col.id === id ? { ...col, ...updates } : col
+      ));
+
+      // Atualizar no Supabase
+      const { error } = await supabase
+        .from('column_config')
+        .update({
+          column_name: updates.name,
+          column_type: updates.type
+        })
+        .eq('column_id', id)
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao atualizar coluna:', error);
+        // Recarregar do banco se falhar
+        loadColumns();
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar coluna:', error);
+    }
   };
 
-  const deleteColumn = (id: string) => {
-    setColumns(prev => prev.filter(col => col.id !== id));
-    
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => {
-        const updatedItem = { ...item };
-        delete updatedItem[id];
-        return updatedItem;
-      })
-    }));
-    
-    setGroups(newGroups);
-    saveContentToDatabase(newGroups);
+  const deleteColumn = async (id: string) => {
+    try {
+      setColumns(prev => prev.filter(col => col.id !== id));
+      
+      // Deletar do Supabase
+      const { error } = await supabase
+        .from('column_config')
+        .delete()
+        .eq('column_id', id)
+        .eq('module', 'content');
+
+      if (error) {
+        console.error('Erro ao deletar coluna:', error);
+        // Recarregar do banco se falhar
+        loadColumns();
+        return;
+      }
+      
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => {
+          const updatedItem = { ...item };
+          delete updatedItem[id];
+          return updatedItem;
+        })
+      }));
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+    } catch (error) {
+      console.error('Erro ao deletar coluna:', error);
+    }
   };
 
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
