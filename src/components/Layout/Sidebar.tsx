@@ -7,7 +7,8 @@ import {
   CheckSquare, 
   TrendingUp,
   Users,
-  Lock
+  Lock,
+  History
 } from 'lucide-react';
 
 const menuItems = [
@@ -40,6 +41,11 @@ const menuItems = [
     name: 'Senhas Clientes',
     icon: Lock,
     path: '/client-passwords'
+  },
+  {
+    name: 'Auditoria',
+    icon: History,
+    path: '/audit'
   }
 ];
 

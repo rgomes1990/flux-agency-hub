@@ -1,21 +1,19 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
-interface TrafficItem {
+interface TrafficData {
   id: string;
-  elemento: string;
-  servicos: string;
-  configuracao_campanha: string;
-  criacao_anuncios: string;
-  aprovacao_cliente: string;
-  ativacao: string;
-  monitoramento: string;
-  otimizacao: string;
-  relatorio: string;
-  informacoes: string;
-  observacoes?: string;
-  attachments?: { name: string; data: string; type: string }[];
-  [key: string]: any;
+  cliente: string;
+  mes: string;
+  status: string;
+  plataforma: string;
+  campanha: string;
+  investimento: string;
+  retorno: string;
+  observacoes: string;
+  attachments?: File[];
 }
 
 interface TrafficGroup {
@@ -23,202 +21,263 @@ interface TrafficGroup {
   name: string;
   color: string;
   isExpanded: boolean;
-  items: TrafficItem[];
+  items: TrafficData[];
 }
 
-interface TrafficColumn {
-  id: string;
-  name: string;
-  type: 'status' | 'text';
-  isDefault?: boolean;
-}
-
-interface ServiceStatus {
+interface Status {
   id: string;
   name: string;
   color: string;
 }
 
+interface Column {
+  id: string;
+  name: string;
+  type: 'status' | 'text';
+  isDefault: boolean;
+}
+
 export const useTrafficData = () => {
-  const [groups, setGroups] = useState<TrafficGroup[]>([
-    {
-      id: 'janeiro-trafego',
-      name: 'JANEIRO - TRÁFEGO',
-      color: 'bg-red-500',
-      isExpanded: true,
-      items: []
-    }
+  const [groups, setGroups] = useState<TrafficGroup[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([
+    { id: 'active', name: 'Ativo', color: 'bg-green-500' },
+    { id: 'paused', name: 'Pausado', color: 'bg-yellow-500' },
+    { id: 'completed', name: 'Finalizado', color: 'bg-blue-500' }
+  ]);
+  const [columns, setColumns] = useState<Column[]>([
+    { id: 'cliente', name: 'Cliente', type: 'text', isDefault: true },
+    { id: 'mes', name: 'Mês', type: 'text', isDefault: true },
+    { id: 'status', name: 'Status', type: 'status', isDefault: true },
+    { id: 'plataforma', name: 'Plataforma', type: 'text', isDefault: true },
+    { id: 'campanha', name: 'Campanha', type: 'text', isDefault: true },
+    { id: 'investimento', name: 'Investimento', type: 'text', isDefault: true },
+    { id: 'retorno', name: 'Retorno', type: 'text', isDefault: true },
+    { id: 'observacoes', name: 'Observações', type: 'text', isDefault: true }
   ]);
 
-  const [columns, setColumns] = useState<TrafficColumn[]>([
-    { id: 'configuracao_campanha', name: 'Configuração Campanha', type: 'status', isDefault: true },
-    { id: 'criacao_anuncios', name: 'Criação Anúncios', type: 'status', isDefault: true },
-    { id: 'aprovacao_cliente', name: 'Aprovação Cliente', type: 'status', isDefault: true },
-    { id: 'ativacao', name: 'Ativação', type: 'status', isDefault: true },
-    { id: 'monitoramento', name: 'Monitoramento', type: 'status', isDefault: true },
-    { id: 'otimizacao', name: 'Otimização', type: 'status', isDefault: true },
-    { id: 'relatorio', name: 'Relatório', type: 'status', isDefault: true },
-    { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
-  ]);
+  const { user } = useAuth();
 
-  const [statuses, setStatuses] = useState<ServiceStatus[]>([
-    { id: 'aprovados', name: 'Aprovados', color: 'bg-green-500' },
-    { id: 'feito', name: 'Feito', color: 'bg-blue-500' },
-    { id: 'parado', name: 'Parado', color: 'bg-red-500' },
-    { id: 'em-andamento', name: 'Em Andamento', color: 'bg-yellow-500' },
-    { id: 'revisao', name: 'Em Revisão', color: 'bg-purple-500' }
-  ]);
+  const loadTrafficData = async () => {
+    if (!user) return;
 
-  const { logAudit } = useAuth();
-
-  useEffect(() => {
-    const savedData = localStorage.getItem('trafficData');
-    const savedColumns = localStorage.getItem('trafficColumns');
-    const savedStatuses = localStorage.getItem('trafficStatuses');
-    
-    if (savedData) {
-      try {
-        setGroups(JSON.parse(savedData));
-      } catch (error) {
-        console.error('Erro ao carregar dados do tráfego:', error);
-      }
-    }
-    
-    if (savedColumns) {
-      try {
-        setColumns(JSON.parse(savedColumns));
-      } catch (error) {
-        console.error('Erro ao carregar colunas do tráfego:', error);
-      }
-    }
-    
-    if (savedStatuses) {
-      try {
-        setStatuses(JSON.parse(savedStatuses));
-      } catch (error) {
-        console.error('Erro ao carregar status do tráfego:', error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('trafficData', JSON.stringify(groups));
-  }, [groups]);
-
-  useEffect(() => {
-    localStorage.setItem('trafficColumns', JSON.stringify(columns));
-  }, [columns]);
-
-  useEffect(() => {
-    localStorage.setItem('trafficStatuses', JSON.stringify(statuses));
-  }, [statuses]);
-
-  const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
     try {
-      console.log('Iniciando duplicação de mês de tráfego:', { sourceGroupId, newMonthName });
-      
-      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-      if (!groupToDuplicate) {
-        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
-        return null;
+      const { data, error } = await supabase
+        .from('traffic_data')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao carregar dados de tráfego:', error);
+        return;
       }
-      
-      const timestamp = Date.now();
-      const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`;
-      
-      const newGroup: TrafficGroup = {
-        id: newGroupId,
-        name: newMonthName.toUpperCase() + ' - TRÁFEGO',
-        color: groupToDuplicate.color,
-        isExpanded: true,
-        items: groupToDuplicate.items.map((item, index) => {
-          const duplicatedItem = {
-            ...item,
-            id: `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
-            configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
-            ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
-            informacoes: '', observacoes: '', attachments: []
-          };
+
+      if (data && data.length > 0) {
+        const groupsMap = new Map<string, TrafficGroup>();
+
+        data.forEach(item => {
+          const itemData = typeof item.item_data === 'string' ? JSON.parse(item.item_data) : item.item_data;
           
-          // Reset all additional columns
-          columns.forEach(column => {
-            if (!column.isDefault) {
-              duplicatedItem[column.id] = column.type === 'status' ? '' : '';
-            }
-          });
-          
-          return duplicatedItem;
-        })
-      };
-      
-      console.log('Novo grupo criado:', newGroup);
-      
-      setGroups(prev => {
-        const updated = [...prev, newGroup];
-        console.log('Grupos atualizados:', updated.length);
-        return updated;
-      });
-      
-      await logAudit('traffic', newGroupId, 'INSERT', null, { 
-        month_name: newMonthName,
-        duplicated_from: sourceGroupId 
-      });
-      
-      return newGroupId;
+          if (!groupsMap.has(item.group_id)) {
+            groupsMap.set(item.group_id, {
+              id: item.group_id,
+              name: item.group_name,
+              color: item.group_color,
+              isExpanded: item.is_expanded,
+              items: []
+            });
+          }
+
+          const group = groupsMap.get(item.group_id)!;
+          group.items.push(itemData);
+        });
+
+        setGroups(Array.from(groupsMap.values()));
+      }
     } catch (error) {
-      console.error('Erro ao duplicar mês de tráfego:', error);
-      return null;
+      console.error('Erro ao carregar dados de tráfego:', error);
     }
+  };
+
+  useEffect(() => {
+    loadTrafficData();
+  }, [user]);
+
+  const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
+    if (!user) return;
+
+    try {
+      // Limpar dados existentes
+      await supabase
+        .from('traffic_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      // Inserir novos dados
+      const insertData = [];
+      for (const group of newGroups) {
+        for (const item of group.items) {
+          insertData.push({
+            user_id: user.id,
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
+            is_expanded: group.isExpanded,
+            item_data: JSON.stringify(item)
+          });
+        }
+      }
+
+      if (insertData.length > 0) {
+        const { error } = await supabase
+          .from('traffic_data')
+          .insert(insertData);
+
+        if (error) {
+          console.error('Erro ao salvar dados de tráfego:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao salvar dados de tráfego:', error);
+    }
+  };
+
+  const addData = (newData: Omit<TrafficData, 'id'>) => {
+    const data: TrafficData = {
+      id: `traffic-${Date.now()}`,
+      ...newData
+    };
+
+    // Encontrar grupo do mês ou criar novo
+    let targetGroup = groups.find(g => g.name === newData.mes);
+    
+    if (!targetGroup) {
+      targetGroup = {
+        id: `group-${Date.now()}`,
+        name: newData.mes,
+        color: 'bg-red-500',
+        isExpanded: true,
+        items: []
+      };
+      const newGroups = [...groups, targetGroup];
+      targetGroup.items.push(data);
+      setGroups(newGroups);
+      saveTrafficToDatabase(newGroups);
+    } else {
+      const newGroups = groups.map(group => 
+        group.id === targetGroup!.id 
+          ? { ...group, items: [...group.items, data] }
+          : group
+      );
+      setGroups(newGroups);
+      saveTrafficToDatabase(newGroups);
+    }
+
+    return data.id;
+  };
+
+  const updateData = (id: string, updates: Partial<TrafficData>) => {
+    const newGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === id ? { ...item, ...updates } : item
+      )
+    }));
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
+  };
+
+  const deleteData = (id: string) => {
+    const newGroups = groups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== id)
+    }));
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
+  };
+
+  const duplicateMonth = async (mes: string) => {
+    const sourceGroup = groups.find(g => g.name === mes);
+    if (!sourceGroup || sourceGroup.items.length === 0) return;
+
+    // Criar novo nome para o mês duplicado
+    const newMonthName = `${mes} - Cópia`;
+    
+    // Verificar se já existe
+    if (groups.some(g => g.name === newMonthName)) {
+      console.warn('Já existe uma cópia deste mês');
+      return;
+    }
+
+    const newGroup: TrafficGroup = {
+      id: `group-${Date.now()}`,
+      name: newMonthName,
+      color: sourceGroup.color,
+      isExpanded: true,
+      items: sourceGroup.items.map(item => ({
+        ...item,
+        id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        mes: newMonthName
+      }))
+    };
+
+    const newGroups = [...groups, newGroup];
+    setGroups(newGroups);
+    await saveTrafficToDatabase(newGroups);
+  };
+
+  const getClients = () => {
+    const clients = new Set<string>();
+    groups.forEach(group => {
+      group.items.forEach(item => {
+        if (item.cliente) clients.add(item.cliente);
+      });
+    });
+    return Array.from(clients);
+  };
+
+  const getMonths = () => {
+    return groups.map(group => group.name);
   };
 
   const updateGroups = (newGroups: TrafficGroup[]) => {
     setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
   };
 
-  const createMonth = async (monthName: string) => {
+  const createMonth = (monthName: string) => {
     const newGroup: TrafficGroup = {
-      id: monthName.toLowerCase().replace(/\s+/g, '-') + '-trafego',
-      name: monthName.toUpperCase() + ' - TRÁFEGO',
+      id: `group-${Date.now()}`,
+      name: monthName,
       color: 'bg-red-500',
       isExpanded: true,
       items: []
     };
-    
-    setGroups(prev => [...prev, newGroup]);
-    
-    await logAudit('traffic', newGroup.id, 'INSERT', null, { month_name: monthName });
-    
-    return newGroup.id;
+    const newGroups = [...groups, newGroup];
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
   };
 
-  const updateMonth = async (groupId: string, newName: string) => {
-    const oldGroup = groups.find(g => g.id === groupId);
-    
-    setGroups(prev => prev.map(group => 
-      group.id === groupId 
-        ? { ...group, name: newName.toUpperCase() + ' - TRÁFEGO' }
+  const updateMonth = (monthId: string, newName: string) => {
+    const newGroups = groups.map(group => 
+      group.id === monthId 
+        ? { ...group, name: newName, items: group.items.map(item => ({ ...item, mes: newName })) }
         : group
-    ));
-    
-    await logAudit('traffic', groupId, 'UPDATE', 
-      { name: oldGroup?.name }, 
-      { name: newName.toUpperCase() + ' - TRÁFEGO' }
     );
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
   };
 
-  const deleteMonth = async (groupId: string) => {
-    const groupToDelete = groups.find(g => g.id === groupId);
-    
-    setGroups(prev => prev.filter(group => group.id !== groupId));
-    
-    await logAudit('traffic', groupId, 'DELETE', { name: groupToDelete?.name }, null);
+  const deleteMonth = (monthId: string) => {
+    const newGroups = groups.filter(group => group.id !== monthId);
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
   };
 
-  const addStatus = (status: ServiceStatus) => {
+  const addStatus = (status: Status) => {
     setStatuses(prev => [...prev, status]);
   };
 
-  const updateStatus = (statusId: string, updates: Partial<ServiceStatus>) => {
+  const updateStatus = (statusId: string, updates: Partial<Status>) => {
     setStatuses(prev => prev.map(status => 
       status.id === statusId ? { ...status, ...updates } : status
     ));
@@ -228,173 +287,63 @@ export const useTrafficData = () => {
     setStatuses(prev => prev.filter(status => status.id !== statusId));
   };
 
-  const addColumn = (name: string, type: 'status' | 'text') => {
-    const newColumn: TrafficColumn = {
-      id: name.toLowerCase().replace(/\s+/g, '_'),
-      name,
-      type,
-      isDefault: false
-    };
-    setColumns(prev => [...prev, newColumn]);
-    
-    setGroups(prev => prev.map(group => ({
-      ...group,
-      items: group.items.map(item => ({
-        ...item,
-        [newColumn.id]: type === 'status' ? '' : ''
-      }))
-    })));
+  const addColumn = (column: Column) => {
+    setColumns(prev => [...prev, column]);
   };
 
-  const updateColumn = (id: string, updates: Partial<TrafficColumn>) => {
-    setColumns(prev => prev.map(col => 
-      col.id === id ? { ...col, ...updates } : col
+  const updateColumn = (columnId: string, updates: Partial<Column>) => {
+    setColumns(prev => prev.map(column => 
+      column.id === columnId ? { ...column, ...updates } : column
     ));
   };
 
-  const deleteColumn = (id: string) => {
-    setColumns(prev => prev.filter(col => col.id !== id));
-    
-    setGroups(prev => prev.map(group => ({
-      ...group,
-      items: group.items.map(item => {
-        const updatedItem = { ...item };
-        delete updatedItem[id];
-        return updatedItem;
-      })
-    })));
+  const deleteColumn = (columnId: string) => {
+    setColumns(prev => prev.filter(column => column.id !== columnId));
   };
 
-  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
-    const oldItem = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    setGroups(prev => prev.map(group => ({
-      ...group,
-      items: group.items.map(item => 
-        item.id === itemId 
-          ? { ...item, [field]: statusId }
-          : item
-      )
-    })));
-    
-    await logAudit('traffic', itemId, 'UPDATE', 
-      { [field]: oldItem?.[field] }, 
-      { [field]: statusId }
-    );
+  const updateItemStatus = (itemId: string, newStatus: string) => {
+    updateData(itemId, { status: newStatus });
   };
 
-  const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
-    const newClient: TrafficItem = {
-      id: `traffic-client-${Date.now()}`,
-      elemento: clientData.elemento || 'Novo Cliente',
-      servicos: clientData.servicos || '',
-      configuracao_campanha: '', criacao_anuncios: '', aprovacao_cliente: '',
-      ativacao: '', monitoramento: '', otimizacao: '', relatorio: '',
-      informacoes: '', attachments: []
-    };
-
-    columns.forEach(column => {
-      if (!column.isDefault) {
-        newClient[column.id] = column.type === 'status' ? '' : '';
-      }
-    });
-
-    setGroups(prev => prev.map(group => 
-      group.id === groupId 
-        ? { ...group, items: [...group.items, newClient] }
-        : group
-    ));
-    
-    await logAudit('traffic', newClient.id, 'INSERT', null, {
-      elemento: clientData.elemento,
-      group_id: groupId
-    });
-
-    return newClient.id;
+  const addClient = (clientName: string) => {
+    // Implementar se necessário
   };
 
-  const deleteClient = async (itemId: string) => {
-    const clientToDelete = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    setGroups(prev => prev.map(group => ({
-      ...group,
-      items: group.items.filter(item => item.id !== itemId)
-    })));
-    
-    await logAudit('traffic', itemId, 'DELETE', { elemento: clientToDelete?.elemento }, null);
+  const deleteClient = (clientName: string) => {
+    // Implementar se necessário
   };
 
-  const updateClient = async (itemId: string, updates: Partial<TrafficItem>) => {
-    const oldClient = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    if (updates.attachments && updates.attachments.length > 0) {
-      const firstAttachment = updates.attachments[0];
-      if (firstAttachment instanceof File) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const serializedFile = {
-            name: firstAttachment.name,
-            data: reader.result as string,
-            type: firstAttachment.type
-          };
-          updates.attachments = [serializedFile as any];
-          
-          setGroups(prev => prev.map(group => ({
-            ...group,
-            items: group.items.map(item => 
-              item.id === itemId 
-                ? { ...item, ...updates }
-                : item
-            )
-          })));
-        };
-        reader.readAsDataURL(firstAttachment);
-        return;
-      }
-    }
-
-    setGroups(prev => prev.map(group => ({
+  const updateClient = (oldName: string, newName: string) => {
+    const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => 
-        item.id === itemId 
-          ? { ...item, ...updates }
-          : item
+        item.cliente === oldName ? { ...item, cliente: newName } : item
       )
-    })));
-    
-    await logAudit('traffic', itemId, 'UPDATE', 
-      { elemento: oldClient?.elemento }, 
-      { elemento: updates.elemento }
-    );
+    }));
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
   };
 
-  const getClientFiles = (clientId: string): File[] => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    if (!client?.attachments) return [];
-    
-    return client.attachments.map(attachment => {
-      if ('data' in attachment && 'name' in attachment && 'type' in attachment) {
-        const byteCharacters = atob(attachment.data.split(',')[1]);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new File([byteArray], attachment.name, { type: attachment.type });
-      }
-      return attachment as File;
-    });
+  const getClientFiles = (clientName: string) => {
+    // Implementar se necessário
+    return [];
   };
 
   return {
+    data: groups.flatMap(group => group.items),
     groups,
     columns,
     statuses,
+    addData,
+    updateData,
+    deleteData,
+    duplicateMonth,
+    getClients,
+    getMonths,
     updateGroups,
     createMonth,
     updateMonth,
     deleteMonth,
-    duplicateMonth,
     addStatus,
     updateStatus,
     deleteStatus,

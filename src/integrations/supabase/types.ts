@@ -162,6 +162,47 @@ export type Database = {
           },
         ]
       }
+      client_passwords: {
+        Row: {
+          attachments: Json | null
+          cliente: string
+          created_at: string
+          id: string
+          observacoes: string | null
+          plataforma: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          cliente: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          plataforma: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          cliente?: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          plataforma?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_passwords_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           company: string | null
@@ -203,6 +244,47 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      column_config: {
+        Row: {
+          column_id: string
+          column_name: string
+          column_type: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          module: string
+          user_id: string | null
+        }
+        Insert: {
+          column_id: string
+          column_name: string
+          column_type: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          module: string
+          user_id?: string | null
+        }
+        Update: {
+          column_id?: string
+          column_name?: string
+          column_type?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          module?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "column_config_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content: {
         Row: {
@@ -269,6 +351,50 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_data: {
+        Row: {
+          created_at: string
+          group_color: string | null
+          group_id: string
+          group_name: string
+          id: string
+          is_expanded: boolean | null
+          item_data: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          group_color?: string | null
+          group_id: string
+          group_name: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          group_color?: string | null
+          group_id?: string
+          group_name?: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_data_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
             referencedColumns: ["id"]
           },
         ]
@@ -479,6 +605,44 @@ export type Database = {
           },
         ]
       }
+      status_config: {
+        Row: {
+          created_at: string
+          id: string
+          module: string
+          status_color: string
+          status_id: string
+          status_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          module: string
+          status_color: string
+          status_id: string
+          status_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          module?: string
+          status_color?: string
+          status_id?: string
+          status_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "status_config_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_hours: number | null
@@ -550,6 +714,91 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks_data: {
+        Row: {
+          column_color: string | null
+          column_id: string
+          column_title: string
+          created_at: string
+          id: string
+          task_data: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          column_color?: string | null
+          column_id: string
+          column_title: string
+          created_at?: string
+          id?: string
+          task_data: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          column_color?: string | null
+          column_id?: string
+          column_title?: string
+          created_at?: string
+          id?: string
+          task_data?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_data_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      traffic_data: {
+        Row: {
+          created_at: string
+          group_color: string | null
+          group_id: string
+          group_name: string
+          id: string
+          is_expanded: boolean | null
+          item_data: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          group_color?: string | null
+          group_id: string
+          group_name: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          group_color?: string | null
+          group_id?: string
+          group_name?: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traffic_data_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
             referencedColumns: ["id"]
           },
         ]

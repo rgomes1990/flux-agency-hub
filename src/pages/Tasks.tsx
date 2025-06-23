@@ -9,7 +9,7 @@ import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye } from 'lucide-re
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { FilePreview } from '@/components/FilePreview';
+import { AttachmentViewer } from '@/components/AttachmentViewer';
 
 const colorOptions = [
   { name: 'Cinza', value: 'bg-gray-100' },
@@ -51,8 +51,8 @@ export default function Tasks() {
   const [editingColumnName, setEditingColumnName] = useState('');
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'column', id: string } | null>(null);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{name: string, size: number, type: string, data: string} | null>(null);
+  const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -158,9 +158,9 @@ export default function Tasks() {
     return null;
   };
 
-  const openFilePreview = (file: File) => {
-    setPreviewFile(file);
-    setShowFilePreview(true);
+  const openAttachmentPreview = (attachment: {name: string, size: number, type: string, data: string}) => {
+    setPreviewAttachment(attachment);
+    setShowAttachmentViewer(true);
   };
 
   return (
@@ -434,7 +434,7 @@ export default function Tasks() {
         ))}
       </div>
 
-      {/* Task Details Dialog - Simplified */}
+      {/* Task Details Dialog */}
       <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -464,17 +464,17 @@ export default function Tasks() {
                       <div>
                         <label className="font-medium">Anexos:</label>
                         <div className="mt-2 grid grid-cols-2 gap-2">
-                          {task.attachments.map((file, index) => (
+                          {task.attachments.map((attachment, index) => (
                             <div key={index} className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
                               <button
-                                onClick={() => openFilePreview(file)}
+                                onClick={() => openAttachmentPreview(attachment)}
                                 className="flex items-center space-x-2 text-sm text-blue-600 w-full text-left"
                               >
                                 <Paperclip className="h-4 w-4" />
-                                <span className="truncate">{file.name}</span>
+                                <span className="truncate">{attachment.name}</span>
                               </button>
                               <p className="text-xs text-gray-500 mt-1">
-                                {(file.size / 1024).toFixed(1)} KB
+                                {(attachment.size / 1024).toFixed(1)} KB
                               </p>
                             </div>
                           ))}
@@ -489,10 +489,10 @@ export default function Tasks() {
         </DialogContent>
       </Dialog>
 
-      <FilePreview
-        file={previewFile}
-        open={showFilePreview}
-        onOpenChange={setShowFilePreview}
+      <AttachmentViewer
+        attachment={previewAttachment}
+        open={showAttachmentViewer}
+        onOpenChange={setShowAttachmentViewer}
       />
 
       <ConfirmationDialog
