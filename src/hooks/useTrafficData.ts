@@ -3,17 +3,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-interface TrafficData {
+interface TrafficItem {
   id: string;
-  cliente: string;
-  mes: string;
-  status: string;
-  plataforma: string;
-  campanha: string;
-  investimento: string;
-  retorno: string;
-  observacoes: string;
+  elemento: string;
+  servicos: string;
+  observacoes?: string;
   attachments?: File[];
+  [key: string]: any;
 }
 
 interface TrafficGroup {
@@ -21,7 +17,7 @@ interface TrafficGroup {
   name: string;
   color: string;
   isExpanded: boolean;
-  items: TrafficData[];
+  items: TrafficItem[];
 }
 
 interface Status {
@@ -45,14 +41,11 @@ export const useTrafficData = () => {
     { id: 'completed', name: 'Finalizado', color: 'bg-blue-500' }
   ]);
   const [columns, setColumns] = useState<Column[]>([
-    { id: 'cliente', name: 'Cliente', type: 'text', isDefault: true },
-    { id: 'mes', name: 'Mês', type: 'text', isDefault: true },
     { id: 'status', name: 'Status', type: 'status', isDefault: true },
     { id: 'plataforma', name: 'Plataforma', type: 'text', isDefault: true },
     { id: 'campanha', name: 'Campanha', type: 'text', isDefault: true },
     { id: 'investimento', name: 'Investimento', type: 'text', isDefault: true },
-    { id: 'retorno', name: 'Retorno', type: 'text', isDefault: true },
-    { id: 'observacoes', name: 'Observações', type: 'text', isDefault: true }
+    { id: 'retorno', name: 'Retorno', type: 'text', isDefault: true }
   ]);
 
   const { user } = useAuth();
@@ -141,104 +134,6 @@ export const useTrafficData = () => {
     }
   };
 
-  const addData = (newData: Omit<TrafficData, 'id'>) => {
-    const data: TrafficData = {
-      id: `traffic-${Date.now()}`,
-      ...newData
-    };
-
-    // Encontrar grupo do mês ou criar novo
-    let targetGroup = groups.find(g => g.name === newData.mes);
-    
-    if (!targetGroup) {
-      targetGroup = {
-        id: `group-${Date.now()}`,
-        name: newData.mes,
-        color: 'bg-red-500',
-        isExpanded: true,
-        items: []
-      };
-      const newGroups = [...groups, targetGroup];
-      targetGroup.items.push(data);
-      setGroups(newGroups);
-      saveTrafficToDatabase(newGroups);
-    } else {
-      const newGroups = groups.map(group => 
-        group.id === targetGroup!.id 
-          ? { ...group, items: [...group.items, data] }
-          : group
-      );
-      setGroups(newGroups);
-      saveTrafficToDatabase(newGroups);
-    }
-
-    return data.id;
-  };
-
-  const updateData = (id: string, updates: Partial<TrafficData>) => {
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => 
-        item.id === id ? { ...item, ...updates } : item
-      )
-    }));
-    setGroups(newGroups);
-    saveTrafficToDatabase(newGroups);
-  };
-
-  const deleteData = (id: string) => {
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.filter(item => item.id !== id)
-    }));
-    setGroups(newGroups);
-    saveTrafficToDatabase(newGroups);
-  };
-
-  const duplicateMonth = async (mes: string) => {
-    const sourceGroup = groups.find(g => g.name === mes);
-    if (!sourceGroup || sourceGroup.items.length === 0) return;
-
-    // Criar novo nome para o mês duplicado
-    const newMonthName = `${mes} - Cópia`;
-    
-    // Verificar se já existe
-    if (groups.some(g => g.name === newMonthName)) {
-      console.warn('Já existe uma cópia deste mês');
-      return;
-    }
-
-    const newGroup: TrafficGroup = {
-      id: `group-${Date.now()}`,
-      name: newMonthName,
-      color: sourceGroup.color,
-      isExpanded: true,
-      items: sourceGroup.items.map(item => ({
-        ...item,
-        id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        mes: newMonthName
-      }))
-    };
-
-    const newGroups = [...groups, newGroup];
-    setGroups(newGroups);
-    await saveTrafficToDatabase(newGroups);
-  };
-
-  const getClients = () => {
-    const clients = new Set<string>();
-    groups.forEach(group => {
-      group.items.forEach(item => {
-        if (item.cliente) clients.add(item.cliente);
-      });
-    });
-    return Array.from(clients);
-  };
-
-  const getMonths = () => {
-    return groups.map(group => group.name);
-  };
-
   const updateGroups = (newGroups: TrafficGroup[]) => {
     setGroups(newGroups);
     saveTrafficToDatabase(newGroups);
@@ -247,8 +142,8 @@ export const useTrafficData = () => {
   const createMonth = (monthName: string) => {
     const newGroup: TrafficGroup = {
       id: `group-${Date.now()}`,
-      name: monthName,
-      color: 'bg-red-500',
+      name: `${monthName} - TRÁFEGO`,
+      color: 'bg-orange-500',
       isExpanded: true,
       items: []
     };
@@ -260,7 +155,7 @@ export const useTrafficData = () => {
   const updateMonth = (monthId: string, newName: string) => {
     const newGroups = groups.map(group => 
       group.id === monthId 
-        ? { ...group, name: newName, items: group.items.map(item => ({ ...item, mes: newName })) }
+        ? { ...group, name: `${newName} - TRÁFEGO` }
         : group
     );
     setGroups(newGroups);
@@ -271,6 +166,26 @@ export const useTrafficData = () => {
     const newGroups = groups.filter(group => group.id !== monthId);
     setGroups(newGroups);
     saveTrafficToDatabase(newGroups);
+  };
+
+  const duplicateMonth = async (sourceGroupId: string, newName: string) => {
+    const sourceGroup = groups.find(g => g.id === sourceGroupId);
+    if (!sourceGroup) return;
+
+    const newGroup: TrafficGroup = {
+      id: `group-${Date.now()}`,
+      name: `${newName} - TRÁFEGO`,
+      color: sourceGroup.color,
+      isExpanded: true,
+      items: sourceGroup.items.map(item => ({
+        ...item,
+        id: `traffic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }))
+    };
+
+    const newGroups = [...groups, newGroup];
+    setGroups(newGroups);
+    await saveTrafficToDatabase(newGroups);
   };
 
   const addStatus = (status: Status) => {
@@ -287,8 +202,14 @@ export const useTrafficData = () => {
     setStatuses(prev => prev.filter(status => status.id !== statusId));
   };
 
-  const addColumn = (column: Column) => {
-    setColumns(prev => [...prev, column]);
+  const addColumn = (columnName: string, columnType: 'status' | 'text') => {
+    const newColumn: Column = {
+      id: `column-${Date.now()}`,
+      name: columnName,
+      type: columnType,
+      isDefault: false
+    };
+    setColumns(prev => [...prev, newColumn]);
   };
 
   const updateColumn = (columnId: string, updates: Partial<Column>) => {
@@ -301,49 +222,74 @@ export const useTrafficData = () => {
     setColumns(prev => prev.filter(column => column.id !== columnId));
   };
 
-  const updateItemStatus = (itemId: string, newStatus: string) => {
-    updateData(itemId, { status: newStatus });
-  };
-
-  const addClient = (clientName: string) => {
-    // Implementar se necessário
-  };
-
-  const deleteClient = (clientName: string) => {
-    // Implementar se necessário
-  };
-
-  const updateClient = (oldName: string, newName: string) => {
+  const updateItemStatus = (itemId: string, columnId: string, statusId: string) => {
     const newGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => 
-        item.cliente === oldName ? { ...item, cliente: newName } : item
+        item.id === itemId ? { ...item, [columnId]: statusId } : item
       )
     }));
     setGroups(newGroups);
     saveTrafficToDatabase(newGroups);
   };
 
-  const getClientFiles = (clientName: string) => {
-    // Implementar se necessário
+  const addClient = (groupId: string, clientData: { elemento: string; servicos: string }) => {
+    const newItem: TrafficItem = {
+      id: `traffic-${Date.now()}`,
+      elemento: clientData.elemento,
+      servicos: clientData.servicos,
+      observacoes: '',
+      attachments: []
+    };
+
+    const newGroups = groups.map(group => 
+      group.id === groupId 
+        ? { ...group, items: [...group.items, newItem] }
+        : group
+    );
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
+  };
+
+  const deleteClient = (clientId: string) => {
+    const newGroups = groups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== clientId)
+    }));
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
+  };
+
+  const updateClient = (clientId: string, updates: any) => {
+    const newGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === clientId ? { ...item, ...updates } : item
+      )
+    }));
+    setGroups(newGroups);
+    saveTrafficToDatabase(newGroups);
+  };
+
+  const getClientFiles = (clientId: string) => {
+    for (const group of groups) {
+      const client = group.items.find(item => item.id === clientId);
+      if (client && client.attachments) {
+        return client.attachments;
+      }
+    }
     return [];
   };
 
   return {
-    data: groups.flatMap(group => group.items),
     groups,
     columns,
     statuses,
-    addData,
-    updateData,
-    deleteData,
-    duplicateMonth,
-    getClients,
-    getMonths,
     updateGroups,
     createMonth,
     updateMonth,
     deleteMonth,
+    duplicateMonth,
     addStatus,
     updateStatus,
     deleteStatus,

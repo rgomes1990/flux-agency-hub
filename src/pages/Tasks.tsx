@@ -49,7 +49,7 @@ export default function Tasks() {
   const [newColumnColor, setNewColumnColor] = useState('bg-gray-100');
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnName, setEditingColumnName] = useState('');
-  const [taskFiles, setTaskFiles] = useState<File[]>([]);
+  const [taskFiles, setTaskFiles] = useState<{name: string; size: number; type: string; data: string}[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'column', id: string } | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{name: string, size: number, type: string, data: string} | null>(null);
   const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
@@ -136,7 +136,27 @@ export default function Tasks() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setTaskFiles(Array.from(e.target.files));
+      const files = Array.from(e.target.files);
+      const processFiles = async () => {
+        const processedFiles = await Promise.all(
+          files.map(file => {
+            return new Promise<{name: string; size: number; type: string; data: string}>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  data: reader.result as string
+                });
+              };
+              reader.readAsDataURL(file);
+            });
+          })
+        );
+        setTaskFiles(processedFiles);
+      };
+      processFiles();
     }
   };
 

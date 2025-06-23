@@ -34,8 +34,8 @@ export const useClientPasswordsData = () => {
         id: item.id,
         cliente: item.cliente,
         plataforma: item.plataforma,
-        observacoes: item.observacoes,
-        attachments: item.attachments ? JSON.parse(item.attachments) : [],
+        observacoes: item.observacoes || undefined,
+        attachments: item.attachments ? JSON.parse(item.attachments as string) : [],
         createdAt: item.created_at
       }));
 
@@ -74,8 +74,8 @@ export const useClientPasswordsData = () => {
         id: data.id,
         cliente: data.cliente,
         plataforma: data.plataforma,
-        observacoes: data.observacoes,
-        attachments: data.attachments ? JSON.parse(data.attachments) : [],
+        observacoes: data.observacoes || undefined,
+        attachments: data.attachments ? JSON.parse(data.attachments as string) : [],
         createdAt: data.created_at
       };
 
