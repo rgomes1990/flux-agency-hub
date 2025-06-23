@@ -17,8 +17,6 @@ export const useClientPasswordsData = () => {
   const { user, logAudit } = useAuth();
 
   const loadPasswords = async () => {
-    if (!user) return;
-
     try {
       const { data, error } = await supabase
         .from('client_passwords')
@@ -47,16 +45,16 @@ export const useClientPasswordsData = () => {
 
   useEffect(() => {
     loadPasswords();
-  }, [user]);
+  }, []);
 
   const addPassword = async (passwordData: Omit<ClientPassword, 'id' | 'createdAt'>) => {
-    if (!user) return;
-
     try {
+      console.log('Tentando adicionar senha:', passwordData);
+      
       const { data, error } = await supabase
         .from('client_passwords')
         .insert({
-          user_id: user.id,
+          user_id: user?.id || null,
           cliente: passwordData.cliente,
           plataforma: passwordData.plataforma,
           observacoes: passwordData.observacoes,
@@ -67,8 +65,10 @@ export const useClientPasswordsData = () => {
 
       if (error) {
         console.error('Erro ao adicionar senha:', error);
-        return;
+        throw error;
       }
+
+      console.log('Senha adicionada com sucesso:', data);
 
       const newPassword: ClientPassword = {
         id: data.id,
@@ -81,24 +81,27 @@ export const useClientPasswordsData = () => {
 
       setPasswords(prev => [newPassword, ...prev]);
 
-      // Registrar na auditoria
-      await logAudit('client_passwords', data.id, 'INSERT', null, {
-        cliente: passwordData.cliente,
-        plataforma: passwordData.plataforma
-      });
+      // Registrar na auditoria se o usuário estiver logado
+      if (user && logAudit) {
+        await logAudit('client_passwords', data.id, 'INSERT', null, {
+          cliente: passwordData.cliente,
+          plataforma: passwordData.plataforma
+        });
+      }
 
       return data.id;
     } catch (error) {
       console.error('Erro ao adicionar senha:', error);
+      throw error;
     }
   };
 
   const updatePassword = async (id: string, updates: Partial<ClientPassword>) => {
-    if (!user) return;
-
     const oldPassword = passwords.find(p => p.id === id);
     
     try {
+      console.log('Tentando atualizar senha:', id, updates);
+      
       const { error } = await supabase
         .from('client_passwords')
         .update({
@@ -112,29 +115,34 @@ export const useClientPasswordsData = () => {
 
       if (error) {
         console.error('Erro ao atualizar senha:', error);
-        return;
+        throw error;
       }
+
+      console.log('Senha atualizada com sucesso');
 
       setPasswords(prev => prev.map(password => 
         password.id === id ? { ...password, ...updates } : password
       ));
 
-      // Registrar na auditoria
-      await logAudit('client_passwords', id, 'UPDATE', 
-        { cliente: oldPassword?.cliente, plataforma: oldPassword?.plataforma },
-        { cliente: updates.cliente, plataforma: updates.plataforma }
-      );
+      // Registrar na auditoria se o usuário estiver logado
+      if (user && logAudit) {
+        await logAudit('client_passwords', id, 'UPDATE', 
+          { cliente: oldPassword?.cliente, plataforma: oldPassword?.plataforma },
+          { cliente: updates.cliente, plataforma: updates.plataforma }
+        );
+      }
     } catch (error) {
       console.error('Erro ao atualizar senha:', error);
+      throw error;
     }
   };
 
   const deletePassword = async (id: string) => {
-    if (!user) return;
-
     const passwordToDelete = passwords.find(p => p.id === id);
     
     try {
+      console.log('Tentando deletar senha:', id);
+      
       const { error } = await supabase
         .from('client_passwords')
         .delete()
@@ -142,18 +150,23 @@ export const useClientPasswordsData = () => {
 
       if (error) {
         console.error('Erro ao deletar senha:', error);
-        return;
+        throw error;
       }
+
+      console.log('Senha deletada com sucesso');
 
       setPasswords(prev => prev.filter(password => password.id !== id));
 
-      // Registrar na auditoria
-      await logAudit('client_passwords', id, 'DELETE', 
-        { cliente: passwordToDelete?.cliente, plataforma: passwordToDelete?.plataforma }, 
-        null
-      );
+      // Registrar na auditoria se o usuário estiver logado
+      if (user && logAudit) {
+        await logAudit('client_passwords', id, 'DELETE', 
+          { cliente: passwordToDelete?.cliente, plataforma: passwordToDelete?.plataforma }, 
+          null
+        );
+      }
     } catch (error) {
       console.error('Erro ao deletar senha:', error);
+      throw error;
     }
   };
 
@@ -161,6 +174,7 @@ export const useClientPasswordsData = () => {
     passwords,
     addPassword,
     updatePassword,
-    deletePassword
+    deletePassword,
+    refreshPasswords: loadPasswords
   };
 };

@@ -51,9 +51,9 @@ export const useTrafficData = () => {
   const { user } = useAuth();
 
   const loadTrafficData = async () => {
-    if (!user) return;
-
     try {
+      console.log('Carregando dados de tráfego...');
+      
       const { data, error } = await supabase
         .from('traffic_data')
         .select('*')
@@ -63,6 +63,8 @@ export const useTrafficData = () => {
         console.error('Erro ao carregar dados de tráfego:', error);
         return;
       }
+
+      console.log('Dados carregados:', data);
 
       if (data && data.length > 0) {
         const groupsMap = new Map<string, TrafficGroup>();
@@ -93,12 +95,12 @@ export const useTrafficData = () => {
 
   useEffect(() => {
     loadTrafficData();
-  }, [user]);
+  }, []);
 
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
-    if (!user) return;
-
     try {
+      console.log('Salvando dados de tráfego...', newGroups);
+      
       // Limpar dados existentes
       await supabase
         .from('traffic_data')
@@ -110,7 +112,7 @@ export const useTrafficData = () => {
       for (const group of newGroups) {
         for (const item of group.items) {
           insertData.push({
-            user_id: user.id,
+            user_id: user?.id || null,
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
@@ -127,10 +129,14 @@ export const useTrafficData = () => {
 
         if (error) {
           console.error('Erro ao salvar dados de tráfego:', error);
+          throw error;
         }
+        
+        console.log('Dados salvos com sucesso');
       }
     } catch (error) {
       console.error('Erro ao salvar dados de tráfego:', error);
+      throw error;
     }
   };
 
