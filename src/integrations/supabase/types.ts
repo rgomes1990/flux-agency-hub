@@ -643,6 +643,39 @@ export type Database = {
           },
         ]
       }
+      task_columns: {
+        Row: {
+          column_color: string
+          column_id: string
+          column_order: number
+          column_title: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          column_color?: string
+          column_id: string
+          column_order?: number
+          column_title: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          column_color?: string
+          column_id?: string
+          column_order?: number
+          column_title?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           actual_hours: number | null

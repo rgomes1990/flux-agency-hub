@@ -6,306 +6,292 @@ import { supabase } from '@/integrations/supabase/client';
 interface Task {
   id: string;
   title: string;
-  description: string;
-  type: string;
-  priority: 'urgent' | 'high' | 'medium' | 'low';
-  assignedTo: string;
-  client: string;
-  project: string;
-  dueDate: string;
-  estimatedHours: number;
-  actualHours: number;
-  attachments?: Array<{
-    name: string;
-    size: number;
-    type: string;
-    data: string;
-  }>;
+  description?: string;
+  priority: 'low' | 'medium' | 'high';
+  assignee?: string;
+  dueDate?: string;
+  tags?: string[];
+  attachments?: File[];
 }
 
-interface Column {
+interface TaskColumn {
   id: string;
   title: string;
   color: string;
   tasks: Task[];
+  order: number;
 }
 
 export const useTasksData = () => {
-  const [columns, setColumns] = useState<Column[]>([
-    {
-      id: 'todo',
-      title: 'A Fazer',
-      color: 'bg-gray-100',
-      tasks: []
-    },
-    {
-      id: 'in_progress',
-      title: 'Em Andamento',
-      color: 'bg-blue-100',
-      tasks: []
-    },
-    {
-      id: 'review',
-      title: 'Em Revisão',
-      color: 'bg-yellow-100',
-      tasks: []
-    },
-    {
-      id: 'done',
-      title: 'Concluído',
-      color: 'bg-green-100',
-      tasks: []
-    }
-  ]);
+  const [columns, setColumns] = useState<TaskColumn[]>([]);
+  const { user } = useAuth();
 
-  const { user, logAudit } = useAuth();
-
+  // Carregar colunas e tarefas do Supabase
   const loadTasksData = async () => {
-    if (!user) return;
+    if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
+      console.log('Carregando dados de tarefas...');
+
+      // Carregar configurações de colunas
+      const { data: columnData, error: columnError } = await supabase
+        .from('task_columns')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('column_order', { ascending: true });
+
+      if (columnError) {
+        console.error('Erro ao carregar colunas:', columnError);
+      }
+
+      // Carregar dados de tarefas
+      const { data: taskData, error: taskError } = await supabase
         .from('tasks_data')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Erro ao carregar tarefas:', error);
+      if (taskError) {
+        console.error('Erro ao carregar tarefas:', taskError);
+      }
+
+      // Se não há configurações de colunas, criar padrões
+      if (!columnData || columnData.length === 0) {
+        const defaultColumns: TaskColumn[] = [
+          { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
+          { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
+          { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
+        ];
+        setColumns(defaultColumns);
+        await saveColumnsToDatabase(defaultColumns);
         return;
       }
 
-      if (data && data.length > 0) {
-        const columnsMap = new Map<string, Column>();
-        
-        // Inicializar colunas padrão
-        columns.forEach(col => {
-          columnsMap.set(col.id, { ...col, tasks: [] });
+      // Organizar colunas e tarefas
+      const columnsMap = new Map<string, TaskColumn>();
+      
+      // Criar colunas
+      columnData.forEach(col => {
+        columnsMap.set(col.column_id, {
+          id: col.column_id,
+          title: col.column_title,
+          color: col.column_color,
+          tasks: [],
+          order: col.column_order
         });
+      });
 
-        // Adicionar tarefas às colunas
-        data.forEach(item => {
-          const taskData = typeof item.task_data === 'string' ? JSON.parse(item.task_data) : item.task_data;
+      // Adicionar tarefas às colunas
+      if (taskData) {
+        taskData.forEach(taskRow => {
+          const taskInfo = typeof taskRow.task_data === 'string' 
+            ? JSON.parse(taskRow.task_data) 
+            : taskRow.task_data;
           
-          if (!columnsMap.has(item.column_id)) {
-            columnsMap.set(item.column_id, {
-              id: item.column_id,
-              title: item.column_title,
-              color: item.column_color,
-              tasks: []
-            });
+          const column = columnsMap.get(taskRow.column_id);
+          if (column) {
+            column.tasks.push(taskInfo);
           }
-
-          const column = columnsMap.get(item.column_id)!;
-          column.tasks.push(taskData);
         });
-
-        setColumns(Array.from(columnsMap.values()));
       }
+
+      setColumns(Array.from(columnsMap.values()).sort((a, b) => a.order - b.order));
     } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
+      console.error('Erro ao carregar dados de tarefas:', error);
     }
   };
 
-  useEffect(() => {
-    loadTasksData();
-  }, [user]);
-
-  const saveTasksToDatabase = async (newColumns: Column[]) => {
-    if (!user) return;
+  // Salvar configurações de colunas no Supabase
+  const saveColumnsToDatabase = async (newColumns: TaskColumn[]) => {
+    if (!user?.id) return;
 
     try {
-      // Limpar dados existentes
-      await supabase
+      // Deletar configurações antigas
+      const { error: deleteError } = await supabase
+        .from('task_columns')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        console.error('Erro ao deletar colunas antigas:', deleteError);
+      }
+
+      // Inserir novas configurações
+      const columnInserts = newColumns.map(col => ({
+        user_id: user.id,
+        column_id: col.id,
+        column_title: col.title,
+        column_color: col.color,
+        column_order: col.order
+      }));
+
+      const { error: insertError } = await supabase
+        .from('task_columns')
+        .insert(columnInserts);
+
+      if (insertError) {
+        console.error('Erro ao salvar colunas:', insertError);
+        throw insertError;
+      }
+    } catch (error) {
+      console.error('Erro ao salvar configurações de colunas:', error);
+      throw error;
+    }
+  };
+
+  // Salvar tarefas no Supabase
+  const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
+    if (!user?.id) return;
+
+    try {
+      // Deletar tarefas antigas
+      const { error: deleteError } = await supabase
         .from('tasks_data')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('user_id', user.id);
 
-      // Inserir novos dados
-      const insertData = [];
-      for (const column of newColumns) {
-        for (const task of column.tasks) {
-          insertData.push({
+      if (deleteError) {
+        console.error('Erro ao deletar tarefas antigas:', deleteError);
+      }
+
+      // Inserir novas tarefas
+      const taskInserts: any[] = [];
+      newColumns.forEach(column => {
+        column.tasks.forEach(task => {
+          taskInserts.push({
             user_id: user.id,
             column_id: column.id,
             column_title: column.title,
             column_color: column.color,
             task_data: JSON.stringify(task)
           });
-        }
-      }
+        });
+      });
 
-      if (insertData.length > 0) {
-        const { error } = await supabase
+      if (taskInserts.length > 0) {
+        const { error: insertError } = await supabase
           .from('tasks_data')
-          .insert(insertData);
+          .insert(taskInserts);
 
-        if (error) {
-          console.error('Erro ao salvar tarefas:', error);
+        if (insertError) {
+          console.error('Erro ao salvar tarefas:', insertError);
+          throw insertError;
         }
       }
+
+      console.log('Tarefas salvas com sucesso');
     } catch (error) {
       console.error('Erro ao salvar tarefas:', error);
+      throw error;
     }
   };
 
-  const updateColumns = (newColumns: Column[]) => {
+  useEffect(() => {
+    if (user?.id) {
+      loadTasksData();
+    }
+  }, [user?.id]);
+
+  const updateColumns = async (newColumns: TaskColumn[]) => {
     setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
+    await saveColumnsToDatabase(newColumns);
+    await saveTasksToDatabase(newColumns);
   };
 
-  const updateTaskTitle = (taskId: string, newTitle: string) => {
+  const addColumn = async (title: string, color: string = 'bg-gray-100') => {
+    const newColumn: TaskColumn = {
+      id: `column-${Date.now()}`,
+      title,
+      color,
+      tasks: [],
+      order: columns.length
+    };
+
+    const newColumns = [...columns, newColumn];
+    await updateColumns(newColumns);
+  };
+
+  const updateColumn = async (columnId: string, updates: Partial<TaskColumn>) => {
+    const newColumns = columns.map(col => 
+      col.id === columnId ? { ...col, ...updates } : col
+    );
+    await updateColumns(newColumns);
+  };
+
+  const deleteColumn = async (columnId: string) => {
+    const newColumns = columns.filter(col => col.id !== columnId);
+    await updateColumns(newColumns);
+  };
+
+  const addTask = async (columnId: string, task: Omit<Task, 'id'>) => {
+    const newTask: Task = {
+      ...task,
+      id: `task-${Date.now()}`
+    };
+
+    const newColumns = columns.map(col => 
+      col.id === columnId 
+        ? { ...col, tasks: [...col.tasks, newTask] }
+        : col
+    );
+
+    await updateColumns(newColumns);
+  };
+
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
     const newColumns = columns.map(col => ({
       ...col,
       tasks: col.tasks.map(task => 
-        task.id === taskId ? { ...task, title: newTitle } : task
+        task.id === taskId ? { ...task, ...updates } : task
       )
     }));
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
+
+    await updateColumns(newColumns);
   };
 
-  const createTask = (columnId: string, taskData: Partial<Task>, position?: number) => {
-    // Converter File[] para formato serializable
-    const processedAttachments = taskData.attachments?.map(file => {
-      if (file instanceof File) {
-        return new Promise<{name: string, size: number, type: string, data: string}>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve({
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              data: reader.result as string
-            });
-          };
-          reader.readAsDataURL(file);
-        });
-      }
-      return Promise.resolve(file);
-    });
-
-    if (processedAttachments) {
-      Promise.all(processedAttachments).then(attachments => {
-        const newTask: Task = {
-          id: `task-${Date.now()}`,
-          title: taskData.title || 'Nova Tarefa',
-          description: taskData.description || 'Descrição da tarefa',
-          type: taskData.type || 'general',
-          priority: taskData.priority || 'medium',
-          assignedTo: taskData.assignedTo || 'Usuário',
-          client: taskData.client || 'Cliente',
-          project: taskData.project || 'Projeto',
-          dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
-          estimatedHours: taskData.estimatedHours || 4,
-          actualHours: taskData.actualHours || 0,
-          attachments: attachments
-        };
-
-        const newColumns = columns.map(col => {
-          if (col.id === columnId) {
-            const newTasks = [...col.tasks];
-            if (position !== undefined && position >= 0 && position <= newTasks.length) {
-              newTasks.splice(position, 0, newTask);
-            } else {
-              newTasks.push(newTask);
-            }
-            return { ...col, tasks: newTasks };
-          }
-          return col;
-        });
-
-        setColumns(newColumns);
-        saveTasksToDatabase(newColumns);
-      });
-    } else {
-      const newTask: Task = {
-        id: `task-${Date.now()}`,
-        title: taskData.title || 'Nova Tarefa',
-        description: taskData.description || 'Descrição da tarefa',
-        type: taskData.type || 'general',
-        priority: taskData.priority || 'medium',
-        assignedTo: taskData.assignedTo || 'Usuário',
-        client: taskData.client || 'Cliente',
-        project: taskData.project || 'Projeto',
-        dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
-        estimatedHours: taskData.estimatedHours || 4,
-        actualHours: taskData.actualHours || 0,
-        attachments: []
-      };
-
-      const newColumns = columns.map(col => {
-        if (col.id === columnId) {
-          const newTasks = [...col.tasks];
-          if (position !== undefined && position >= 0 && position <= newTasks.length) {
-            newTasks.splice(position, 0, newTask);
-          } else {
-            newTasks.push(newTask);
-          }
-          return { ...col, tasks: newTasks };
-        }
-        return col;
-      });
-
-      setColumns(newColumns);
-      saveTasksToDatabase(newColumns);
-    }
-
-    return `task-${Date.now()}`;
-  };
-
-  const deleteTask = (taskId: string) => {
+  const deleteTask = async (taskId: string) => {
     const newColumns = columns.map(col => ({
       ...col,
       tasks: col.tasks.filter(task => task.id !== taskId)
     }));
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
+
+    await updateColumns(newColumns);
   };
 
-  const addColumn = (columnName: string, color: string = 'bg-gray-100') => {
-    const newColumn: Column = {
-      id: `column-${Date.now()}`,
-      title: columnName,
-      color: color,
-      tasks: []
-    };
+  const moveTask = async (taskId: string, fromColumnId: string, toColumnId: string, newIndex: number) => {
+    const newColumns = [...columns];
     
-    const newColumns = [...columns, newColumn];
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
-  };
+    // Encontrar a tarefa e removê-la da coluna atual
+    let taskToMove: Task | null = null;
+    const fromColumn = newColumns.find(col => col.id === fromColumnId);
+    if (fromColumn) {
+      const taskIndex = fromColumn.tasks.findIndex(task => task.id === taskId);
+      if (taskIndex !== -1) {
+        taskToMove = fromColumn.tasks.splice(taskIndex, 1)[0];
+      }
+    }
 
-  const deleteColumn = (columnId: string) => {
-    const newColumns = columns.filter(col => col.id !== columnId);
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
-  };
+    // Adicionar a tarefa na nova coluna
+    if (taskToMove) {
+      const toColumn = newColumns.find(col => col.id === toColumnId);
+      if (toColumn) {
+        toColumn.tasks.splice(newIndex, 0, taskToMove);
+      }
+    }
 
-  const editColumn = (columnId: string, newTitle: string) => {
-    const newColumns = columns.map(col => 
-      col.id === columnId ? { ...col, title: newTitle } : col
-    );
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
-  };
-
-  const updateColumnColor = (columnId: string, color: string) => {
-    const newColumns = columns.map(col => 
-      col.id === columnId ? { ...col, color: color } : col
-    );
-    setColumns(newColumns);
-    saveTasksToDatabase(newColumns);
+    await updateColumns(newColumns);
   };
 
   return {
     columns,
     updateColumns,
-    updateTaskTitle,
-    createTask,
-    deleteTask,
     addColumn,
+    updateColumn,
     deleteColumn,
-    editColumn,
-    updateColumnColor
+    addTask,
+    updateTask,
+    deleteTask,
+    moveTask,
+    refreshData: loadTasksData
   };
 };

@@ -75,11 +75,14 @@ export const useContentData = () => {
 
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao carregar colunas:', error);
@@ -94,7 +97,6 @@ export const useContentData = () => {
           isDefault: col.is_default || false
         }));
 
-        // Combinar colunas padrão com personalizadas
         const defaultColumns = columns.filter(col => col.isDefault);
         setColumns([...defaultColumns, ...customColumns.filter(col => !col.isDefault)]);
       }
@@ -105,11 +107,14 @@ export const useContentData = () => {
 
   // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao carregar status:', error);
@@ -124,7 +129,7 @@ export const useContentData = () => {
         }));
 
         setStatuses(prev => {
-          const defaultStatuses = prev.slice(0, 5); // Manter os 5 primeiros padrões
+          const defaultStatuses = prev.slice(0, 5);
           return [...defaultStatuses, ...customStatuses];
         });
       }
@@ -135,12 +140,15 @@ export const useContentData = () => {
 
   // Carregar dados do Supabase
   const loadContentData = async () => {
+    if (!user?.id) return;
+    
     try {
       console.log('Carregando dados de conteúdo...');
       
       const { data, error } = await supabase
         .from('content_data')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -171,59 +179,42 @@ export const useContentData = () => {
         });
 
         setGroups(Array.from(groupsMap.values()));
-      } else {
-        // Se não há dados, criar grupo padrão
-        setGroups([{
-          id: 'janeiro-conteudo',
-          name: 'JANEIRO - CONTEÚDO',
-          color: 'bg-blue-500',
-          isExpanded: true,
-          items: []
-        }]);
       }
     } catch (error) {
       console.error('Erro ao carregar dados de conteúdo:', error);
     }
   };
 
-  // Salvar dados no Supabase - CORRIGIDO: não deletar todos os dados
+  // Salvar dados no Supabase
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
+    if (!user?.id) return;
+    
     try {
       console.log('Salvando dados de conteúdo...', newGroups);
       
-      // Primeiro, buscar dados existentes para comparar
-      const { data: existingData } = await supabase
-        .from('content_data')
-        .select('group_id, item_data');
-
-      const existingGroupIds = new Set(existingData?.map(item => item.group_id) || []);
-      
-      // Inserir apenas grupos novos ou atualizados
       for (const group of newGroups) {
-        // Deletar apenas dados deste grupo específico
+        // Deletar dados existentes do grupo
         const { error: deleteError } = await supabase
           .from('content_data')
           .delete()
-          .eq('group_id', group.id);
+          .eq('group_id', group.id)
+          .eq('user_id', user.id);
 
         if (deleteError) {
           console.error('Erro ao limpar dados do grupo:', deleteError);
         }
 
         // Inserir dados atualizados do grupo
-        const insertData = [];
-        for (const item of group.items) {
-          insertData.push({
-            user_id: user?.id || null,
+        if (group.items.length > 0) {
+          const insertData = group.items.map(item => ({
+            user_id: user.id,
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
             is_expanded: group.isExpanded,
             item_data: JSON.stringify(item)
-          });
-        }
+          }));
 
-        if (insertData.length > 0) {
           const { error } = await supabase
             .from('content_data')
             .insert(insertData);
@@ -243,10 +234,12 @@ export const useContentData = () => {
   };
 
   useEffect(() => {
-    loadContentData();
-    loadColumns();
-    loadStatuses();
-  }, []);
+    if (user?.id) {
+      loadContentData();
+      loadColumns();
+      loadStatuses();
+    }
+  }, [user?.id]);
 
   const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
     try {
@@ -299,8 +292,9 @@ export const useContentData = () => {
 
   const createMonth = async (monthName: string) => {
     try {
+      const timestamp = Date.now();
       const newGroup: ContentGroup = {
-        id: monthName.toLowerCase().replace(/\s+/g, '-') + '-conteudo',
+        id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-conteudo-${timestamp}`,
         name: monthName.toUpperCase() + ' - CONTEÚDO',
         color: 'bg-blue-500',
         isExpanded: true,
@@ -368,11 +362,12 @@ export const useContentData = () => {
 
       if (error) {
         console.error('Erro ao salvar status:', error);
-        // Reverter mudança local se falhar
         setStatuses(prev => prev.filter(s => s.id !== status.id));
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao adicionar status:', error);
+      throw error;
     }
   };
 
@@ -390,15 +385,17 @@ export const useContentData = () => {
           status_color: updates.color
         })
         .eq('status_id', statusId)
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
-        // Recarregar do banco se falhar
         loadStatuses();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
+      throw error;
     }
   };
 
@@ -411,15 +408,17 @@ export const useContentData = () => {
         .from('status_config')
         .delete()
         .eq('status_id', statusId)
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao deletar status:', error);
-        // Recarregar do banco se falhar
         loadStatuses();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao deletar status:', error);
+      throw error;
     }
   };
 
@@ -448,9 +447,8 @@ export const useContentData = () => {
 
       if (error) {
         console.error('Erro ao salvar coluna:', error);
-        // Reverter mudança local se falhar
         setColumns(prev => prev.filter(col => col.id !== newColumn.id));
-        return;
+        throw error;
       }
       
       // Adicionar a nova coluna a todos os itens existentes
@@ -466,6 +464,7 @@ export const useContentData = () => {
       await saveContentToDatabase(newGroups);
     } catch (error) {
       console.error('Erro ao adicionar coluna:', error);
+      throw error;
     }
   };
 
@@ -483,15 +482,17 @@ export const useContentData = () => {
           column_type: updates.type
         })
         .eq('column_id', id)
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
-        // Recarregar do banco se falhar
         loadColumns();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao atualizar coluna:', error);
+      throw error;
     }
   };
 
@@ -504,13 +505,13 @@ export const useContentData = () => {
         .from('column_config')
         .delete()
         .eq('column_id', id)
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
-        // Recarregar do banco se falhar
         loadColumns();
-        return;
+        throw error;
       }
       
       const newGroups = groups.map(group => ({
@@ -526,6 +527,7 @@ export const useContentData = () => {
       await saveContentToDatabase(newGroups);
     } catch (error) {
       console.error('Erro ao deletar coluna:', error);
+      throw error;
     }
   };
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,11 +51,14 @@ export const useTrafficData = () => {
 
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao carregar colunas de tráfego:', error);
@@ -71,7 +73,6 @@ export const useTrafficData = () => {
           isDefault: col.is_default || false
         }));
 
-        // Combinar colunas padrão com personalizadas
         const defaultColumns = columns.filter(col => col.isDefault);
         setColumns([...defaultColumns, ...customColumns.filter(col => !col.isDefault)]);
       }
@@ -82,11 +83,14 @@ export const useTrafficData = () => {
 
   // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao carregar status de tráfego:', error);
@@ -101,7 +105,7 @@ export const useTrafficData = () => {
         }));
 
         setStatuses(prev => {
-          const defaultStatuses = prev.slice(0, 3); // Manter os 3 primeiros padrões
+          const defaultStatuses = prev.slice(0, 3);
           return [...defaultStatuses, ...customStatuses];
         });
       }
@@ -111,12 +115,15 @@ export const useTrafficData = () => {
   };
 
   const loadTrafficData = async () => {
+    if (!user?.id) return;
+    
     try {
       console.log('Carregando dados de tráfego...');
       
       const { data, error } = await supabase
         .from('traffic_data')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -154,42 +161,43 @@ export const useTrafficData = () => {
   };
 
   useEffect(() => {
-    loadTrafficData();
-    loadColumns();
-    loadStatuses();
-  }, []);
+    if (user?.id) {
+      loadTrafficData();
+      loadColumns();
+      loadStatuses();
+    }
+  }, [user?.id]);
 
-  // Corrigir método de salvamento - não deletar todos os dados
+  // Salvar dados no Supabase
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
+    if (!user?.id) return;
+    
     try {
       console.log('Salvando dados de tráfego...', newGroups);
       
-      // Inserir dados por grupo
       for (const group of newGroups) {
         // Deletar apenas dados deste grupo específico
         const { error: deleteError } = await supabase
           .from('traffic_data')
           .delete()
-          .eq('group_id', group.id);
+          .eq('group_id', group.id)
+          .eq('user_id', user.id);
 
         if (deleteError) {
           console.error('Erro ao limpar dados do grupo:', deleteError);
         }
 
         // Inserir dados atualizados do grupo
-        const insertData = [];
-        for (const item of group.items) {
-          insertData.push({
-            user_id: user?.id || null,
+        if (group.items.length > 0) {
+          const insertData = group.items.map(item => ({
+            user_id: user.id,
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
             is_expanded: group.isExpanded,
             item_data: JSON.stringify(item)
-          });
-        }
+          }));
 
-        if (insertData.length > 0) {
           const { error } = await supabase
             .from('traffic_data')
             .insert(insertData);
@@ -215,8 +223,9 @@ export const useTrafficData = () => {
 
   const createMonth = async (monthName: string) => {
     try {
+      const timestamp = Date.now();
       const newGroup: TrafficGroup = {
-        id: `group-${Date.now()}`,
+        id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`,
         name: `${monthName} - TRÁFEGO`,
         color: 'bg-orange-500',
         isExpanded: true,
@@ -268,14 +277,13 @@ export const useTrafficData = () => {
 
       const timestamp = Date.now();
       const newGroup: TrafficGroup = {
-        id: `group-${timestamp}`,
+        id: `${newName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`,
         name: `${newName} - TRÁFEGO`,
         color: sourceGroup.color,
         isExpanded: true,
         items: sourceGroup.items.map(item => ({
           ...item,
           id: `traffic-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-          // Limpar campos específicos na duplicação
           observacoes: '',
           attachments: []
         }))
@@ -311,9 +319,11 @@ export const useTrafficData = () => {
       if (error) {
         console.error('Erro ao salvar status:', error);
         setStatuses(prev => prev.filter(s => s.id !== status.id));
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao adicionar status:', error);
+      throw error;
     }
   };
 
@@ -331,14 +341,17 @@ export const useTrafficData = () => {
           status_color: updates.color
         })
         .eq('status_id', statusId)
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
         loadStatuses();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
+      throw error;
     }
   };
 
@@ -351,14 +364,17 @@ export const useTrafficData = () => {
         .from('status_config')
         .delete()
         .eq('status_id', statusId)
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao deletar status:', error);
         loadStatuses();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao deletar status:', error);
+      throw error;
     }
   };
 
@@ -388,9 +404,11 @@ export const useTrafficData = () => {
       if (error) {
         console.error('Erro ao salvar coluna:', error);
         setColumns(prev => prev.filter(col => col.id !== newColumn.id));
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao adicionar coluna:', error);
+      throw error;
     }
   };
 
@@ -408,14 +426,17 @@ export const useTrafficData = () => {
           column_type: updates.type
         })
         .eq('column_id', columnId)
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
         loadColumns();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao atualizar coluna:', error);
+      throw error;
     }
   };
 
@@ -428,14 +449,17 @@ export const useTrafficData = () => {
         .from('column_config')
         .delete()
         .eq('column_id', columnId)
-        .eq('module', 'traffic');
+        .eq('module', 'traffic')
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
         loadColumns();
+        throw error;
       }
     } catch (error) {
       console.error('Erro ao deletar coluna:', error);
+      throw error;
     }
   };
 
