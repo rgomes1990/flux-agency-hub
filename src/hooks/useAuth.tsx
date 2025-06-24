@@ -34,6 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('Configurando autenticação...');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -57,7 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logAudit = async (tableName: string, recordId: string, action: string, oldValues?: any, newValues?: any) => {
     try {
-      if (!user) return;
+      if (!user) {
+        console.log('Usuário não logado - não é possível registrar auditoria');
+        return;
+      }
+
+      console.log('Registrando auditoria:', { tableName, recordId, action, userId: user.id });
 
       const { error } = await supabase
         .from('audit_logs')
@@ -69,11 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           new_values: newValues,
           user_id: user.id,
           user_username: user.email,
-          user_agent: navigator.userAgent
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
         });
 
       if (error) {
         console.error('Erro ao registrar auditoria:', error);
+      } else {
+        console.log('Auditoria registrada com sucesso');
       }
     } catch (error) {
       console.error('Erro ao registrar auditoria:', error);
@@ -82,6 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Tentando fazer login:', email);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -92,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error };
       }
 
+      console.log('Login realizado com sucesso');
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
@@ -100,10 +112,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (user) {
-      await logAudit('auth', user.id, 'LOGOUT');
+    try {
+      if (user) {
+        await logAudit('auth', user.id, 'LOGOUT');
+      }
+      await supabase.auth.signOut();
+      console.log('Logout realizado com sucesso');
+    } catch (error) {
+      console.error('Erro no logout:', error);
     }
-    await supabase.auth.signOut();
   };
 
   const value = {

@@ -25,12 +25,18 @@ interface TaskColumn {
 export const useTasksData = () => {
   const [columns, setColumns] = useState<TaskColumn[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, logAudit } = useAuth();
 
   // Carregar colunas e tarefas do Supabase
   const loadTasksData = async () => {
     if (!user?.id) {
       console.log('Usuário não logado, definindo colunas padrão');
+      const defaultColumns: TaskColumn[] = [
+        { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
+        { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
+        { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
+      ];
+      setColumns(defaultColumns);
       setLoading(false);
       return;
     }
@@ -168,6 +174,7 @@ export const useTasksData = () => {
       }
 
       console.log('Configurações de colunas salvas com sucesso');
+      await logAudit('task_columns', user.id, 'UPDATE', null, columnInserts);
     } catch (error) {
       console.error('Erro ao salvar configurações de colunas:', error);
       throw error;
@@ -220,6 +227,7 @@ export const useTasksData = () => {
       }
 
       console.log('Tarefas salvas com sucesso:', taskInserts.length, 'itens');
+      await logAudit('tasks_data', user.id, 'UPDATE', null, taskInserts);
     } catch (error) {
       console.error('Erro ao salvar tarefas:', error);
       throw error;
@@ -227,14 +235,7 @@ export const useTasksData = () => {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      console.log('Usuário logado, carregando dados:', user.id);
-      loadTasksData();
-    } else {
-      console.log('Usuário não logado, limpando dados');
-      setColumns([]);
-      setLoading(false);
-    }
+    loadTasksData();
   }, [user?.id]);
 
   const updateColumns = async (newColumns: TaskColumn[]) => {
