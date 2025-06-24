@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,14 +24,19 @@ interface TaskColumn {
 
 export const useTasksData = () => {
   const [columns, setColumns] = useState<TaskColumn[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   // Carregar colunas e tarefas do Supabase
   const loadTasksData = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
     try {
-      console.log('Carregando dados de tarefas...');
+      console.log('Carregando dados de tarefas para usuário:', user.id);
+      setLoading(true);
 
       // Carregar configurações de colunas
       const { data: columnData, error: columnError } = await supabase
@@ -41,6 +47,7 @@ export const useTasksData = () => {
 
       if (columnError) {
         console.error('Erro ao carregar colunas:', columnError);
+        throw columnError;
       }
 
       // Carregar dados de tarefas
@@ -52,17 +59,23 @@ export const useTasksData = () => {
 
       if (taskError) {
         console.error('Erro ao carregar tarefas:', taskError);
+        throw taskError;
       }
+
+      console.log('Dados carregados - Colunas:', columnData?.length || 0, 'Tarefas:', taskData?.length || 0);
 
       // Se não há configurações de colunas, criar padrões
       if (!columnData || columnData.length === 0) {
+        console.log('Criando colunas padrão...');
         const defaultColumns: TaskColumn[] = [
           { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
           { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
           { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
         ];
-        setColumns(defaultColumns);
+        
         await saveColumnsToDatabase(defaultColumns);
+        setColumns(defaultColumns);
+        setLoading(false);
         return;
       }
 
@@ -81,30 +94,50 @@ export const useTasksData = () => {
       });
 
       // Adicionar tarefas às colunas
-      if (taskData) {
+      if (taskData && taskData.length > 0) {
         taskData.forEach(taskRow => {
-          const taskInfo = typeof taskRow.task_data === 'string' 
-            ? JSON.parse(taskRow.task_data) 
-            : taskRow.task_data;
-          
-          const column = columnsMap.get(taskRow.column_id);
-          if (column) {
-            column.tasks.push(taskInfo);
+          try {
+            const taskInfo = typeof taskRow.task_data === 'string' 
+              ? JSON.parse(taskRow.task_data) 
+              : taskRow.task_data;
+            
+            const column = columnsMap.get(taskRow.column_id);
+            if (column && taskInfo) {
+              column.tasks.push(taskInfo);
+            }
+          } catch (error) {
+            console.error('Erro ao processar tarefa:', taskRow, error);
           }
         });
       }
 
-      setColumns(Array.from(columnsMap.values()).sort((a, b) => a.order - b.order));
+      const finalColumns = Array.from(columnsMap.values()).sort((a, b) => a.order - b.order);
+      console.log('Colunas finais:', finalColumns);
+      setColumns(finalColumns);
     } catch (error) {
       console.error('Erro ao carregar dados de tarefas:', error);
+      // Em caso de erro, definir colunas padrão
+      const defaultColumns: TaskColumn[] = [
+        { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
+        { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
+        { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
+      ];
+      setColumns(defaultColumns);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Salvar configurações de colunas no Supabase
   const saveColumnsToDatabase = async (newColumns: TaskColumn[]) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('Usuário não logado - não é possível salvar colunas');
+      return;
+    }
 
     try {
+      console.log('Salvando configurações de colunas...', newColumns);
+
       // Deletar configurações antigas
       const { error: deleteError } = await supabase
         .from('task_columns')
@@ -132,6 +165,8 @@ export const useTasksData = () => {
         console.error('Erro ao salvar colunas:', insertError);
         throw insertError;
       }
+
+      console.log('Configurações de colunas salvas com sucesso');
     } catch (error) {
       console.error('Erro ao salvar configurações de colunas:', error);
       throw error;
@@ -140,9 +175,14 @@ export const useTasksData = () => {
 
   // Salvar tarefas no Supabase
   const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('Usuário não logado - não é possível salvar tarefas');
+      return;
+    }
 
     try {
+      console.log('Salvando tarefas no banco...', newColumns);
+
       // Deletar tarefas antigas
       const { error: deleteError } = await supabase
         .from('tasks_data')
@@ -178,7 +218,7 @@ export const useTasksData = () => {
         }
       }
 
-      console.log('Tarefas salvas com sucesso');
+      console.log('Tarefas salvas com sucesso:', taskInserts.length, 'itens');
     } catch (error) {
       console.error('Erro ao salvar tarefas:', error);
       throw error;
@@ -187,17 +227,36 @@ export const useTasksData = () => {
 
   useEffect(() => {
     if (user?.id) {
+      console.log('Usuário logado, carregando dados:', user.id);
       loadTasksData();
+    } else {
+      console.log('Usuário não logado, limpando dados');
+      setColumns([]);
+      setLoading(false);
     }
   }, [user?.id]);
 
   const updateColumns = async (newColumns: TaskColumn[]) => {
+    console.log('Atualizando colunas:', newColumns);
     setColumns(newColumns);
-    await saveColumnsToDatabase(newColumns);
-    await saveTasksToDatabase(newColumns);
+    
+    try {
+      await saveColumnsToDatabase(newColumns);
+      await saveTasksToDatabase(newColumns);
+      console.log('Dados atualizados com sucesso');
+    } catch (error) {
+      console.error('Erro ao atualizar dados:', error);
+      // Reverter mudanças em caso de erro
+      await loadTasksData();
+    }
   };
 
   const addColumn = async (title: string, color: string = 'bg-gray-100') => {
+    if (!user?.id) {
+      console.error('Usuário não logado');
+      return;
+    }
+
     const newColumn: TaskColumn = {
       id: `column-${Date.now()}`,
       title,
@@ -223,10 +282,17 @@ export const useTasksData = () => {
   };
 
   const addTask = async (columnId: string, task: Omit<Task, 'id'>) => {
+    if (!user?.id) {
+      console.error('Usuário não logado');
+      return;
+    }
+
     const newTask: Task = {
       ...task,
-      id: `task-${Date.now()}`
+      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
+
+    console.log('Adicionando nova tarefa:', newTask);
 
     const newColumns = columns.map(col => 
       col.id === columnId 
@@ -238,6 +304,8 @@ export const useTasksData = () => {
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    console.log('Atualizando tarefa:', taskId, updates);
+    
     const newColumns = columns.map(col => ({
       ...col,
       tasks: col.tasks.map(task => 
@@ -249,6 +317,8 @@ export const useTasksData = () => {
   };
 
   const deleteTask = async (taskId: string) => {
+    console.log('Deletando tarefa:', taskId);
+    
     const newColumns = columns.map(col => ({
       ...col,
       tasks: col.tasks.filter(task => task.id !== taskId)
@@ -258,6 +328,8 @@ export const useTasksData = () => {
   };
 
   const moveTask = async (taskId: string, fromColumnId: string, toColumnId: string, newIndex: number) => {
+    console.log('Movendo tarefa:', taskId, 'de', fromColumnId, 'para', toColumnId);
+    
     const newColumns = [...columns];
     
     // Encontrar a tarefa e removê-la da coluna atual
@@ -283,6 +355,7 @@ export const useTasksData = () => {
 
   return {
     columns,
+    loading,
     updateColumns,
     addColumn,
     updateColumn,

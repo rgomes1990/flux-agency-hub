@@ -14,19 +14,31 @@ interface ClientPassword {
 
 export const useClientPasswordsData = () => {
   const [passwords, setPasswords] = useState<ClientPassword[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user, logAudit } = useAuth();
 
   const loadPasswords = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('Carregando senhas para usuário:', user.id);
+      setLoading(true);
+
       const { data, error } = await supabase
         .from('client_passwords')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Erro ao carregar senhas:', error);
-        return;
+        throw error;
       }
+
+      console.log('Senhas carregadas:', data?.length || 0);
 
       const formattedPasswords: ClientPassword[] = (data || []).map(item => ({
         id: item.id,
@@ -40,21 +52,34 @@ export const useClientPasswordsData = () => {
       setPasswords(formattedPasswords);
     } catch (error) {
       console.error('Erro ao carregar senhas:', error);
+      setPasswords([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPasswords();
-  }, []);
+    if (user?.id) {
+      loadPasswords();
+    } else {
+      setPasswords([]);
+      setLoading(false);
+    }
+  }, [user?.id]);
 
   const addPassword = async (passwordData: Omit<ClientPassword, 'id' | 'createdAt'>) => {
+    if (!user?.id) {
+      console.error('Usuário não logado');
+      throw new Error('Usuário não logado');
+    }
+
     try {
-      console.log('Tentando adicionar senha:', passwordData);
+      console.log('Adicionando senha:', passwordData);
       
       const { data, error } = await supabase
         .from('client_passwords')
         .insert({
-          user_id: user?.id || null,
+          user_id: user.id,
           cliente: passwordData.cliente,
           plataforma: passwordData.plataforma,
           observacoes: passwordData.observacoes,
@@ -97,10 +122,15 @@ export const useClientPasswordsData = () => {
   };
 
   const updatePassword = async (id: string, updates: Partial<ClientPassword>) => {
+    if (!user?.id) {
+      console.error('Usuário não logado');
+      throw new Error('Usuário não logado');
+    }
+
     const oldPassword = passwords.find(p => p.id === id);
     
     try {
-      console.log('Tentando atualizar senha:', id, updates);
+      console.log('Atualizando senha:', id, updates);
       
       const { error } = await supabase
         .from('client_passwords')
@@ -111,7 +141,8 @@ export const useClientPasswordsData = () => {
           attachments: updates.attachments ? JSON.stringify(updates.attachments) : null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao atualizar senha:', error);
@@ -138,15 +169,21 @@ export const useClientPasswordsData = () => {
   };
 
   const deletePassword = async (id: string) => {
+    if (!user?.id) {
+      console.error('Usuário não logado');
+      throw new Error('Usuário não logado');
+    }
+
     const passwordToDelete = passwords.find(p => p.id === id);
     
     try {
-      console.log('Tentando deletar senha:', id);
+      console.log('Deletando senha:', id);
       
       const { error } = await supabase
         .from('client_passwords')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao deletar senha:', error);
@@ -172,6 +209,7 @@ export const useClientPasswordsData = () => {
 
   return {
     passwords,
+    loading,
     addPassword,
     updatePassword,
     deletePassword,
