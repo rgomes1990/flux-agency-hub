@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,11 +6,11 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
   assignee?: string;
   dueDate?: string;
   tags?: string[];
-  attachments?: File[];
+  attachments?: {name: string; size: number; type: string; data: string}[];
 }
 
 interface TaskColumn {
