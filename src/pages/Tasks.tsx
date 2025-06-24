@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,13 +27,12 @@ export default function Tasks() {
   const { 
     columns, 
     updateColumns, 
-    updateTaskTitle, 
-    createTask, 
+    updateTask, 
+    addTask, 
     deleteTask,
     addColumn,
     deleteColumn,
-    editColumn,
-    updateColumnColor
+    updateColumn
   } = useTasksData();
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -74,15 +74,15 @@ export default function Tasks() {
     }
   };
 
-  const createNewTask = () => {
+  const createNewTask = async () => {
     if (!newTaskTitle.trim() || !selectedColumn) return;
 
-    createTask(selectedColumn, { 
+    await addTask(selectedColumn, { 
       title: newTaskTitle,
       description: newTaskDescription,
       priority: newTaskPriority,
       attachments: taskFiles
-    }, selectedPosition);
+    });
 
     setNewTaskTitle('');
     setNewTaskDescription('');
@@ -98,9 +98,9 @@ export default function Tasks() {
     setEditingTitle(currentTitle);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingTaskId && editingTitle.trim()) {
-      updateTaskTitle(editingTaskId, editingTitle);
+      await updateTask(editingTaskId, { title: editingTitle });
     }
     setEditingTaskId(null);
     setEditingTitle('');
@@ -111,10 +111,10 @@ export default function Tasks() {
     setEditingTitle('');
   };
 
-  const createNewColumn = () => {
+  const createNewColumn = async () => {
     if (!newColumnName.trim()) return;
     
-    addColumn(newColumnName, newColumnColor);
+    await addColumn(newColumnName, newColumnColor);
     
     setNewColumnName('');
     setNewColumnColor('bg-gray-100');
@@ -126,9 +126,9 @@ export default function Tasks() {
     setEditingColumnName(currentName);
   };
 
-  const saveColumnEdit = () => {
+  const saveColumnEdit = async () => {
     if (editingColumnId && editingColumnName.trim()) {
-      editColumn(editingColumnId, editingColumnName);
+      await updateColumn(editingColumnId, { title: editingColumnName });
     }
     setEditingColumnId(null);
     setEditingColumnName('');
@@ -160,13 +160,13 @@ export default function Tasks() {
     }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    deleteTask(taskId);
+  const handleDeleteTask = async (taskId: string) => {
+    await deleteTask(taskId);
     setConfirmDelete(null);
   };
 
-  const handleDeleteColumn = (columnId: string) => {
-    deleteColumn(columnId);
+  const handleDeleteColumn = async (columnId: string) => {
+    await deleteColumn(columnId);
     setConfirmDelete(null);
   };
 
