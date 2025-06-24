@@ -17,9 +17,9 @@ export function Header() {
     await signOut();
   };
 
-  // Usar username em vez de email
+  // Use email from Supabase User instead of username
   const getDisplayName = () => {
-    return user?.username || '';
+    return user?.email || '';
   };
 
   return (
