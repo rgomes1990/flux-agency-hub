@@ -30,6 +30,7 @@ export const useTasksData = () => {
   // Carregar colunas e tarefas do Supabase
   const loadTasksData = async () => {
     if (!user?.id) {
+      console.log('Usuário não logado, definindo colunas padrão');
       setLoading(false);
       return;
     }
