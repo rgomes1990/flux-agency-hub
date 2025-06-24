@@ -7,57 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
 
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
+      console.log('Usuário já logado, redirecionando para dashboard');
       navigate('/dashboard');
     }
   }, [user, navigate]);
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-
-      if (error) {
-        setError(error.message);
-      } else {
-        setMessage('Verifique seu email para confirmar a conta!');
-      }
-    } catch (error) {
-      setError('Erro ao criar conta');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,9 +30,11 @@ export default function Auth() {
     setError('');
 
     try {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(username, password);
       if (error) {
         setError(error.message || 'Erro ao fazer login');
+      } else {
+        navigate('/dashboard');
       }
     } catch (error) {
       setError('Erro ao fazer login');
@@ -81,23 +48,27 @@ export default function Auth() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isLogin ? 'Entrar na sua conta' : 'Criar nova conta'}
+            Entrar no Sistema
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Use suas credenciais para acessar
+          </p>
         </div>
         
         <Card>
           <CardHeader>
-            <CardTitle>{isLogin ? 'Login' : 'Cadastro'}</CardTitle>
+            <CardTitle>Login</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={isLogin ? handleSignIn : handleSignUp} className="space-y-4">
+            <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="username">Usuário</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Digite seu usuário"
                   required
                 />
               </div>
@@ -109,22 +80,10 @@ export default function Auth() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Digite sua senha"
                   required
                 />
               </div>
-
-              {!isLogin && (
-                <div>
-                  <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
 
               {error && (
                 <Alert variant="destructive">
@@ -132,29 +91,13 @@ export default function Auth() {
                 </Alert>
               )}
 
-              {message && (
-                <Alert>
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              )}
-
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Aguarde...' : (isLogin ? 'Entrar' : 'Cadastrar')}
+                {loading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
 
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
-                  setMessage('');
-                }}
-                className="text-blue-600 hover:text-blue-500"
-              >
-                {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
-              </button>
+            <div className="mt-4 text-center text-sm text-gray-500">
+              Entre em contato com o administrador para criar uma conta
             </div>
           </CardContent>
         </Card>

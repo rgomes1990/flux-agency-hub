@@ -1,7 +1,13 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
+
+interface AppUser {
+  id: string;
+  username: string;
+  created_at: string;
+  is_active: boolean;
+}
 
 interface AuditLog {
   id: string;
@@ -18,43 +24,46 @@ interface AuditLog {
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (username: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   logAudit: (tableName: string, recordId: string, action: string, oldValues?: any, newValues?: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Função para hash de senha
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('Configurando autenticação...');
+    console.log('Configurando autenticação personalizada...');
     
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+    // Verificar se há usuário salvo no localStorage
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
+        console.log('Usuário encontrado no localStorage:', userData.username);
+        setUser(userData);
+      } catch (error) {
+        console.error('Erro ao carregar usuário do localStorage:', error);
+        localStorage.removeItem('currentUser');
       }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.id);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    
+    setLoading(false);
   }, []);
 
   const logAudit = async (tableName: string, recordId: string, action: string, oldValues?: any, newValues?: any) => {
@@ -75,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           old_values: oldValues,
           new_values: newValues,
           user_id: user.id,
-          user_username: user.email,
+          user_username: user.username,
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
         });
 
@@ -89,21 +98,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
     try {
-      console.log('Tentando fazer login:', email);
+      console.log('Tentando fazer login com usuário:', username);
       
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      // Hash da senha fornecida
+      const hashedPassword = await hashPassword(password);
+      
+      // Buscar usuário na tabela app_users
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('*')
+        .eq('username', username)
+        .eq('password_hash', hashedPassword)
+        .eq('is_active', true)
+        .single();
 
-      if (error) {
-        console.error('Erro no login:', error);
-        return { error };
+      if (error || !data) {
+        console.error('Erro no login - credenciais inválidas:', error);
+        return { error: { message: 'Usuário ou senha inválidos' } };
       }
 
-      console.log('Login realizado com sucesso');
+      const userData: AppUser = {
+        id: data.id,
+        username: data.username,
+        created_at: data.created_at,
+        is_active: data.is_active
+      };
+
+      setUser(userData);
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+      
+      // Registrar login na auditoria
+      await logAudit('auth', userData.id, 'LOGIN');
+      
+      console.log('Login realizado com sucesso para:', username);
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
@@ -116,7 +145,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         await logAudit('auth', user.id, 'LOGOUT');
       }
-      await supabase.auth.signOut();
+      
+      setUser(null);
+      localStorage.removeItem('currentUser');
       console.log('Logout realizado com sucesso');
     } catch (error) {
       console.error('Erro no logout:', error);
@@ -125,7 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    session,
     loading,
     signIn,
     signOut,
