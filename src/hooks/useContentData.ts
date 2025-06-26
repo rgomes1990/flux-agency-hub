@@ -76,19 +76,22 @@ export const useContentData = () => {
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
     if (!user?.id) {
-      console.log('Usuário não encontrado para carregar colunas');
+      console.log('❌ CONTENT: Usuário não encontrado para carregar colunas');
       return;
     }
     
     try {
+      console.log('🔄 CONTENT: Carregando colunas para usuário:', user.id);
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
         .eq('module', 'content')
         .eq('user_id', user.id);
 
+      console.log('📊 CONTENT: Resposta colunas:', { data, error });
+
       if (error) {
-        console.error('Erro ao carregar colunas:', error);
+        console.error('❌ CONTENT: Erro ao carregar colunas:', error);
         return;
       }
 
@@ -101,29 +104,34 @@ export const useContentData = () => {
         }));
 
         const defaultColumns = columns.filter(col => col.isDefault);
-        setColumns([...defaultColumns, ...customColumns.filter(col => !col.isDefault)]);
+        const newColumns = [...defaultColumns, ...customColumns.filter(col => !col.isDefault)];
+        console.log('✅ CONTENT: Colunas atualizadas:', newColumns.length);
+        setColumns(newColumns);
       }
     } catch (error) {
-      console.error('Erro ao carregar colunas:', error);
+      console.error('❌ CONTENT: Erro crítico ao carregar colunas:', error);
     }
   };
 
   // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
     if (!user?.id) {
-      console.log('Usuário não encontrado para carregar status');
+      console.log('❌ CONTENT: Usuário não encontrado para carregar status');
       return;
     }
     
     try {
+      console.log('🔄 CONTENT: Carregando status para usuário:', user.id);
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
         .eq('module', 'content')
         .eq('user_id', user.id);
 
+      console.log('📊 CONTENT: Resposta status:', { data, error });
+
       if (error) {
-        console.error('Erro ao carregar status:', error);
+        console.error('❌ CONTENT: Erro ao carregar status:', error);
         return;
       }
 
@@ -136,23 +144,25 @@ export const useContentData = () => {
 
         setStatuses(prev => {
           const defaultStatuses = prev.slice(0, 5);
-          return [...defaultStatuses, ...customStatuses];
+          const newStatuses = [...defaultStatuses, ...customStatuses];
+          console.log('✅ CONTENT: Status atualizados:', newStatuses.length);
+          return newStatuses;
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar status:', error);
+      console.error('❌ CONTENT: Erro crítico ao carregar status:', error);
     }
   };
 
   // Carregar dados do Supabase
   const loadContentData = async () => {
     if (!user?.id) {
-      console.log('❌ Usuário não encontrado para carregar dados');
+      console.log('❌ CONTENT: Usuário não encontrado para carregar dados');
       return;
     }
     
     try {
-      console.log('🔄 Carregando dados de conteúdo para usuário:', user.id);
+      console.log('🔄 CONTENT: Carregando dados para usuário:', user.id);
       
       const { data, error } = await supabase
         .from('content_data')
@@ -160,35 +170,36 @@ export const useContentData = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
+      console.log('📊 CONTENT: Resposta dados:', { 
+        dataLength: data?.length || 0, 
+        error,
+        sampleData: data?.[0] 
+      });
+
       if (error) {
-        console.error('❌ Erro ao carregar dados de conteúdo:', error);
+        console.error('❌ CONTENT: Erro ao carregar dados:', error);
         return;
       }
-
-      console.log('✅ Dados de conteúdo carregados:', data?.length || 0, 'registros');
 
       if (data && data.length > 0) {
         const groupsMap = new Map<string, ContentGroup>();
 
         data.forEach((item, index) => {
-          console.log(`🔍 Processando item ${index + 1}:`, {
+          console.log(`🔍 CONTENT: Processando item ${index + 1}:`, {
             group_id: item.group_id,
             item_data_type: typeof item.item_data,
-            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
+            item_data_keys: typeof item.item_data === 'object' ? Object.keys(item.item_data || {}) : 'not-object'
           });
 
           let itemData;
           try {
             if (typeof item.item_data === 'string') {
               itemData = JSON.parse(item.item_data);
-              if (typeof itemData === 'string') {
-                itemData = JSON.parse(itemData);
-              }
             } else {
               itemData = item.item_data;
             }
           } catch (parseError) {
-            console.error('❌ Erro ao fazer parse do item_data:', parseError, item.item_data);
+            console.error('❌ CONTENT: Erro ao fazer parse do item_data:', parseError);
             return;
           }
           
@@ -207,30 +218,38 @@ export const useContentData = () => {
         });
 
         const loadedGroups = Array.from(groupsMap.values());
-        console.log('✅ Grupos carregados:', loadedGroups.length);
+        console.log('✅ CONTENT: Grupos carregados:', {
+          totalGroups: loadedGroups.length,
+          groupDetails: loadedGroups.map(g => ({ name: g.name, itemCount: g.items.length }))
+        });
         setGroups(loadedGroups);
+      } else {
+        console.log('ℹ️ CONTENT: Nenhum dado encontrado');
+        setGroups([]);
       }
     } catch (error) {
-      console.error('❌ Erro geral ao carregar dados de conteúdo:', error);
+      console.error('❌ CONTENT: Erro crítico ao carregar dados:', error);
     }
   };
 
-  // Salvar dados no Supabase - VERSÃO MELHORADA
+  // Salvar dados no Supabase
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
     if (!user?.id) {
-      console.error('❌ Usuário não encontrado para salvar dados');
+      console.error('❌ CONTENT: Usuário não encontrado para salvar');
       return;
     }
     
     try {
-      console.log('🔄 Iniciando salvamento para usuário:', user.id);
-      console.log('📊 Grupos para salvar:', newGroups.length);
+      console.log('🔄 CONTENT: Iniciando salvamento:', {
+        userId: user.id,
+        groupCount: newGroups.length,
+        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
+      });
       
       for (const group of newGroups) {
-        console.log(`🔄 Processando grupo: ${group.name} (${group.items.length} itens)`);
+        console.log(`🔄 CONTENT: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
         // Deletar dados existentes do grupo
-        console.log(`🗑️ Limpando dados existentes do grupo: ${group.id}`);
         const { error: deleteError } = await supabase
           .from('content_data')
           .delete()
@@ -238,18 +257,17 @@ export const useContentData = () => {
           .eq('user_id', user.id);
 
         if (deleteError) {
-          console.error('❌ Erro ao limpar dados do grupo:', deleteError);
+          console.error('❌ CONTENT: Erro ao deletar:', deleteError);
           throw deleteError;
         }
-        console.log('✅ Dados antigos removidos com sucesso');
 
         // Inserir dados atualizados do grupo
         if (group.items.length > 0) {
           const insertData = group.items.map((item, index) => {
-            console.log(`📝 Preparando item ${index + 1} para inserção:`, {
+            console.log(`📝 CONTENT: Preparando item ${index + 1}:`, {
               id: item.id,
               elemento: item.elemento,
-              item_keys: Object.keys(item)
+              hasAttachments: !!item.attachments?.length
             });
 
             return {
@@ -258,14 +276,8 @@ export const useContentData = () => {
               group_name: group.name,
               group_color: group.color,
               is_expanded: group.isExpanded,
-              item_data: item // Supabase fará a serialização JSON automaticamente
+              item_data: item
             };
-          });
-
-          console.log('📤 Dados preparados para inserção:', {
-            grupo: group.name,
-            total_items: insertData.length,
-            sample_data: insertData[0]
           });
 
           const { data: insertResult, error: insertError } = await supabase
@@ -274,20 +286,17 @@ export const useContentData = () => {
             .select('id');
 
           if (insertError) {
-            console.error('❌ Erro ao inserir dados:', insertError);
-            console.error('📋 Dados que causaram erro:', insertData);
+            console.error('❌ CONTENT: Erro ao inserir:', insertError);
             throw insertError;
           }
 
-          console.log('✅ Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
-        } else {
-          console.log('ℹ️ Grupo vazio, pulando inserção');
+          console.log('✅ CONTENT: Dados inseridos:', insertResult?.length || 0);
         }
       }
       
-      console.log('🎉 Salvamento completo realizado com sucesso!');
+      console.log('🎉 CONTENT: Salvamento completo!');
     } catch (error) {
-      console.error('❌ Erro crítico no salvamento:', error);
+      console.error('❌ CONTENT: Erro crítico no salvamento:', error);
       throw error;
     }
   };
@@ -301,70 +310,14 @@ export const useContentData = () => {
     }
   }, [user?.id]);
 
-  const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para duplicar mês');
-      return;
-    }
-
-    try {
-      console.log('Iniciando duplicação de mês de conteúdo:', { sourceGroupId, newMonthName, userId: user.id });
-      
-      const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-      if (!groupToDuplicate) {
-        console.error('Grupo não encontrado para duplicação:', sourceGroupId);
-        throw new Error('Grupo não encontrado');
-      }
-      
-      const timestamp = Date.now();
-      const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-conteudo-${timestamp}`;
-      
-      const newGroup: ContentGroup = {
-        id: newGroupId,
-        name: newMonthName.toUpperCase() + ' - CONTEÚDO',
-        color: groupToDuplicate.color,
-        isExpanded: true,
-        items: groupToDuplicate.items.map((item, index) => ({
-          ...item,
-          id: `content-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
-          janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-          julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-          informacoes: '', observacoes: '', attachments: []
-        }))
-      };
-      
-      const newGroups = [...groups, newGroup];
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
-      
-      console.log('Mês de conteúdo duplicado com sucesso');
-      return newGroupId;
-    } catch (error) {
-      console.error('Erro ao duplicar mês de conteúdo:', error);
-      throw error;
-    }
-  };
-
-  const updateGroups = async (newGroups: ContentGroup[]) => {
-    console.log('🔄 Atualizando grupos de conteúdo...', newGroups.length);
-    try {
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
-      console.log('✅ Grupos atualizados com sucesso');
-    } catch (error) {
-      console.error('❌ Erro ao atualizar grupos:', error);
-      throw error;
-    }
-  };
-
   const createMonth = async (monthName: string) => {
     if (!user?.id) {
-      console.error('❌ Usuário não encontrado para criar mês');
+      console.error('❌ CONTENT: Usuário não encontrado para criar mês');
       return;
     }
 
     try {
-      console.log('🆕 Criando novo mês:', monthName);
+      console.log('🆕 CONTENT: Criando mês:', monthName);
       
       const timestamp = Date.now();
       const newGroup: ContentGroup = {
@@ -376,77 +329,142 @@ export const useContentData = () => {
       };
       
       const newGroups = [...groups, newGroup];
-      await updateGroups(newGroups);
-      
-      console.log('✅ Mês criado e salvo:', newGroup.id);
-      return newGroup.id;
-    } catch (error) {
-      console.error('❌ Erro ao criar mês:', error);
-      throw error;
-    }
-  };
-
-  const updateMonth = async (groupId: string, newName: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para atualizar mês');
-      return;
-    }
-
-    try {
-      const newGroups = groups.map(group => 
-        group.id === groupId 
-          ? { ...group, name: newName.toUpperCase() + ' - CONTEÚDO' }
-          : group
-      );
+      console.log('📊 CONTENT: Salvando novo grupo:', {
+        groupId: newGroup.id,
+        totalGroups: newGroups.length
+      });
       
       setGroups(newGroups);
       await saveContentToDatabase(newGroups);
+      
+      console.log('✅ CONTENT: Mês criado com sucesso');
+      return newGroup.id;
     } catch (error) {
-      console.error('Erro ao atualizar mês:', error);
+      console.error('❌ CONTENT: Erro ao criar mês:', error);
       throw error;
     }
   };
 
-  const deleteMonth = async (groupId: string) => {
+  const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
     if (!user?.id) {
-      console.error('Usuário não encontrado para deletar mês');
+      console.error('❌ CONTENT: Usuário não encontrado para adicionar cliente');
       return;
     }
 
     try {
-      // Deletar do banco de dados
-      const { error } = await supabase
-        .from('content_data')
-        .delete()
-        .eq('group_id', groupId)
-        .eq('user_id', user.id);
+      console.log('👤 CONTENT: Adicionando cliente:', {
+        groupId,
+        elemento: clientData.elemento,
+        servicos: clientData.servicos
+      });
+      
+      const newClient: ContentItem = {
+        id: `content-client-${Date.now()}`,
+        elemento: clientData.elemento || 'Novo Cliente',
+        servicos: clientData.servicos || '',
+        janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
+        julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
+        informacoes: '', attachments: []
+      };
+
+      // Adicionar colunas customizadas
+      columns.forEach(column => {
+        if (!column.isDefault) {
+          newClient[column.id] = column.type === 'status' ? '' : '';
+        }
+      });
+
+      const newGroups = groups.map(group => 
+        group.id === groupId 
+          ? { ...group, items: [...group.items, newClient] }
+          : group
+      );
+      
+      console.log('📊 CONTENT: Salvando cliente no grupo:', {
+        clientId: newClient.id,
+        groupId,
+        totalItemsInGroup: newGroups.find(g => g.id === groupId)?.items.length
+      });
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      console.log('✅ CONTENT: Cliente adicionado com sucesso');
+      return newClient.id;
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao adicionar cliente:', error);
+      throw error;
+    }
+  };
+
+  const addColumn = async (name: string, type: 'status' | 'text') => {
+    if (!user?.id) {
+      console.error('❌ CONTENT: Usuário não encontrado para adicionar coluna');
+      return;
+    }
+
+    try {
+      console.log('🆕 CONTENT: Adicionando coluna:', { name, type });
+      
+      const newColumn: ContentColumn = {
+        id: name.toLowerCase().replace(/\s+/g, '_'),
+        name,
+        type,
+        isDefault: false
+      };
+      
+      // Salvar no banco
+      const { data, error } = await supabase
+        .from('column_config')
+        .insert({
+          column_id: newColumn.id,
+          column_name: newColumn.name,
+          column_type: newColumn.type,
+          module: 'content',
+          is_default: false,
+          user_id: user.id
+        })
+        .select();
+
+      console.log('📊 CONTENT: Resultado inserção coluna:', { data, error });
 
       if (error) {
-        console.error('Erro ao deletar mês do banco:', error);
+        console.error('❌ CONTENT: Erro ao salvar coluna:', error);
         throw error;
       }
-
-      const newGroups = groups.filter(group => group.id !== groupId);
+      
+      setColumns(prev => [...prev, newColumn]);
+      
+      // Adicionar a nova coluna a todos os itens existentes
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => ({
+          ...item,
+          [newColumn.id]: type === 'status' ? '' : ''
+        }))
+      }));
+      
       setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      console.log('✅ CONTENT: Coluna adicionada com sucesso');
     } catch (error) {
-      console.error('Erro ao deletar mês:', error);
+      console.error('❌ CONTENT: Erro ao adicionar coluna:', error);
       throw error;
     }
   };
 
   const addStatus = async (status: ServiceStatus) => {
     if (!user?.id) {
-      console.error('Usuário não encontrado para adicionar status');
+      console.error('❌ CONTENT: Usuário não encontrado para adicionar status');
       return;
     }
 
     try {
-      console.log('Adicionando status de conteúdo:', { status, userId: user.id });
+      console.log('🆕 CONTENT: Adicionando status:', status);
       
-      setStatuses(prev => [...prev, status]);
-      
-      // Salvar no Supabase
-      const { error } = await supabase
+      // Salvar no banco
+      const { data, error } = await supabase
         .from('status_config')
         .insert({
           status_id: status.id,
@@ -454,17 +472,20 @@ export const useContentData = () => {
           status_color: status.color,
           module: 'content',
           user_id: user.id
-        });
+        })
+        .select();
+
+      console.log('📊 CONTENT: Resultado inserção status:', { data, error });
 
       if (error) {
-        console.error('Erro ao salvar status:', error);
-        setStatuses(prev => prev.filter(s => s.id !== status.id));
+        console.error('❌ CONTENT: Erro ao salvar status:', error);
         throw error;
       }
       
-      console.log('Status adicionado com sucesso');
+      setStatuses(prev => [...prev, status]);
+      console.log('✅ CONTENT: Status adicionado com sucesso');
     } catch (error) {
-      console.error('Erro ao adicionar status:', error);
+      console.error('❌ CONTENT: Erro ao adicionar status:', error);
       throw error;
     }
   };
@@ -534,61 +555,6 @@ export const useContentData = () => {
       console.log('Status deletado com sucesso');
     } catch (error) {
       console.error('Erro ao deletar status:', error);
-      throw error;
-    }
-  };
-
-  const addColumn = async (name: string, type: 'status' | 'text') => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para adicionar coluna');
-      return;
-    }
-
-    try {
-      console.log('Adicionando coluna de conteúdo:', { name, type, userId: user.id });
-      
-      const newColumn: ContentColumn = {
-        id: name.toLowerCase().replace(/\s+/g, '_'),
-        name,
-        type,
-        isDefault: false
-      };
-      
-      setColumns(prev => [...prev, newColumn]);
-      
-      // Salvar no Supabase
-      const { error } = await supabase
-        .from('column_config')
-        .insert({
-          column_id: newColumn.id,
-          column_name: newColumn.name,
-          column_type: newColumn.type,
-          module: 'content',
-          is_default: false,
-          user_id: user.id
-        });
-
-      if (error) {
-        console.error('Erro ao salvar coluna:', error);
-        setColumns(prev => prev.filter(col => col.id !== newColumn.id));
-        throw error;
-      }
-      
-      // Adicionar a nova coluna a todos os itens existentes
-      const newGroups = groups.map(group => ({
-        ...group,
-        items: group.items.map(item => ({
-          ...item,
-          [newColumn.id]: type === 'status' ? '' : ''
-        }))
-      }));
-      
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
-      
-      console.log('Coluna adicionada com sucesso');
-    } catch (error) {
-      console.error('Erro ao adicionar coluna:', error);
       throw error;
     }
   };
@@ -696,46 +662,6 @@ export const useContentData = () => {
     }
   };
 
-  const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
-    if (!user?.id) {
-      console.error('❌ Usuário não encontrado para adicionar cliente');
-      return;
-    }
-
-    try {
-      console.log('👤 Adicionando cliente:', clientData.elemento, 'ao grupo:', groupId);
-      
-      const newClient: ContentItem = {
-        id: `content-client-${Date.now()}`,
-        elemento: clientData.elemento || 'Novo Cliente',
-        servicos: clientData.servicos || '',
-        janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-        julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-        informacoes: '', attachments: []
-      };
-
-      // Adicionar colunas customizadas
-      columns.forEach(column => {
-        if (!column.isDefault) {
-          newClient[column.id] = column.type === 'status' ? '' : '';
-        }
-      });
-
-      const newGroups = groups.map(group => 
-        group.id === groupId 
-          ? { ...group, items: [...group.items, newClient] }
-          : group
-      );
-      
-      await updateGroups(newGroups);
-      console.log('✅ Cliente adicionado e salvo:', newClient.id);
-      return newClient.id;
-    } catch (error) {
-      console.error('❌ Erro ao adicionar cliente:', error);
-      throw error;
-    }
-  };
-
   const deleteClient = async (itemId: string) => {
     try {
       console.log('Deletando cliente:', itemId);
@@ -779,7 +705,8 @@ export const useContentData = () => {
               )
             }));
             
-            await updateGroups(newGroups);
+            setGroups(newGroups);
+            await saveContentToDatabase(newGroups);
           };
           reader.readAsDataURL(firstAttachment);
           return;
@@ -795,7 +722,8 @@ export const useContentData = () => {
         )
       }));
       
-      await updateGroups(newGroups);
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
       console.log('✅ Cliente atualizado com sucesso');
     } catch (error) {
       console.error('❌ Erro ao atualizar cliente:', error);
@@ -822,21 +750,80 @@ export const useContentData = () => {
     groups,
     columns,
     statuses,
-    updateGroups,
+    updateGroups: async (newGroups: ContentGroup[]) => {
+      console.log('🔄 CONTENT: Atualizando grupos:', newGroups.length);
+      try {
+        setGroups(newGroups);
+        await saveContentToDatabase(newGroups);
+        console.log('✅ CONTENT: Grupos atualizados');
+      } catch (error) {
+        console.error('❌ CONTENT: Erro ao atualizar grupos:', error);
+        throw error;
+      }
+    },
     createMonth,
-    updateMonth,
-    deleteMonth,
-    duplicateMonth,
-    addStatus,
-    updateStatus,
-    deleteStatus,
-    addColumn,
-    updateColumn,
-    deleteColumn,
-    updateItemStatus,
-    addClient,
-    deleteClient,
-    updateClient,
-    getClientFiles
+    updateMonth: async (groupId: string, newName: string) => {
+      if (!user?.id) return;
+      try {
+        const newGroups = groups.map(group => 
+          group.id === groupId 
+            ? { ...group, name: newName.toUpperCase() + ' - CONTEÚDO' }
+            : group
+        );
+        setGroups(newGroups);
+        await saveContentToDatabase(newGroups);
+      } catch (error) {
+        console.error('❌ CONTENT: Erro ao atualizar mês:', error);
+        throw error;
+      }
+    },
+    deleteMonth: async (groupId: string) => {
+      if (!user?.id) return;
+      try {
+        const { error } = await supabase
+          .from('content_data')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        setGroups(groups.filter(group => group.id !== groupId));
+      } catch (error) {
+        console.error('❌ CONTENT: Erro ao deletar mês:', error);
+        throw error;
+      }
+    },
+    duplicateMonth: async (sourceGroupId: string, newMonthName: string) => {
+      if (!user?.id) return;
+      try {
+        const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
+        if (!groupToDuplicate) throw new Error('Grupo não encontrado');
+        
+        const timestamp = Date.now();
+        const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-conteudo-${timestamp}`;
+        
+        const newGroup: ContentGroup = {
+          id: newGroupId,
+          name: newMonthName.toUpperCase() + ' - CONTEÚDO',
+          color: groupToDuplicate.color,
+          isExpanded: true,
+          items: groupToDuplicate.items.map((item, index) => ({
+            ...item,
+            id: `content-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
+            janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
+            julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
+            informacoes: '', observacoes: '', attachments: []
+          }))
+        };
+        
+        const newGroups = [...groups, newGroup];
+        setGroups(newGroups);
+        await saveContentToDatabase(newGroups);
+        return newGroupId;
+      } catch (error) {
+        console.error('❌ CONTENT: Erro ao duplicar mês:', error);
+        throw error;
+      }
+    }
   };
 };
