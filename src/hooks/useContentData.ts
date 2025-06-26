@@ -147,12 +147,12 @@ export const useContentData = () => {
   // Carregar dados do Supabase
   const loadContentData = async () => {
     if (!user?.id) {
-      console.log('Usuário não encontrado para carregar dados');
+      console.log('❌ Usuário não encontrado para carregar dados');
       return;
     }
     
     try {
-      console.log('Carregando dados de conteúdo para usuário:', user.id);
+      console.log('🔄 Carregando dados de conteúdo para usuário:', user.id);
       
       const { data, error } = await supabase
         .from('content_data')
@@ -161,33 +161,35 @@ export const useContentData = () => {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Erro ao carregar dados de conteúdo:', error);
+        console.error('❌ Erro ao carregar dados de conteúdo:', error);
         return;
       }
 
-      console.log('Dados de conteúdo carregados:', data);
+      console.log('✅ Dados de conteúdo carregados:', data?.length || 0, 'registros');
 
       if (data && data.length > 0) {
         const groupsMap = new Map<string, ContentGroup>();
 
-        data.forEach(item => {
-          // Corrigir parsing do item_data
+        data.forEach((item, index) => {
+          console.log(`🔍 Processando item ${index + 1}:`, {
+            group_id: item.group_id,
+            item_data_type: typeof item.item_data,
+            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
+          });
+
           let itemData;
           try {
             if (typeof item.item_data === 'string') {
-              // Se é uma string, fazer parse uma vez
               itemData = JSON.parse(item.item_data);
-              // Se ainda for string após o primeiro parse, fazer parse novamente
               if (typeof itemData === 'string') {
                 itemData = JSON.parse(itemData);
               }
             } else {
-              // Se já é objeto, usar diretamente
               itemData = item.item_data;
             }
           } catch (parseError) {
-            console.error('Erro ao fazer parse do item_data:', parseError, item.item_data);
-            return; // Pular este item se não conseguir fazer parse
+            console.error('❌ Erro ao fazer parse do item_data:', parseError, item.item_data);
+            return;
           }
           
           if (!groupsMap.has(item.group_id)) {
@@ -204,25 +206,31 @@ export const useContentData = () => {
           group.items.push(itemData);
         });
 
-        setGroups(Array.from(groupsMap.values()));
+        const loadedGroups = Array.from(groupsMap.values());
+        console.log('✅ Grupos carregados:', loadedGroups.length);
+        setGroups(loadedGroups);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados de conteúdo:', error);
+      console.error('❌ Erro geral ao carregar dados de conteúdo:', error);
     }
   };
 
-  // Salvar dados no Supabase - CORRIGIDO
+  // Salvar dados no Supabase - VERSÃO MELHORADA
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
     if (!user?.id) {
-      console.error('Usuário não encontrado para salvar dados');
+      console.error('❌ Usuário não encontrado para salvar dados');
       return;
     }
     
     try {
-      console.log('Salvando dados de conteúdo para usuário:', user.id);
+      console.log('🔄 Iniciando salvamento para usuário:', user.id);
+      console.log('📊 Grupos para salvar:', newGroups.length);
       
       for (const group of newGroups) {
+        console.log(`🔄 Processando grupo: ${group.name} (${group.items.length} itens)`);
+        
         // Deletar dados existentes do grupo
+        console.log(`🗑️ Limpando dados existentes do grupo: ${group.id}`);
         const { error: deleteError } = await supabase
           .from('content_data')
           .delete()
@@ -230,37 +238,56 @@ export const useContentData = () => {
           .eq('user_id', user.id);
 
         if (deleteError) {
-          console.error('Erro ao limpar dados do grupo:', deleteError);
+          console.error('❌ Erro ao limpar dados do grupo:', deleteError);
+          throw deleteError;
         }
+        console.log('✅ Dados antigos removidos com sucesso');
 
         // Inserir dados atualizados do grupo
         if (group.items.length > 0) {
-          const insertData = group.items.map(item => ({
-            user_id: user.id,
-            group_id: group.id,
-            group_name: group.name,
-            group_color: group.color,
-            is_expanded: group.isExpanded,
-            // CORREÇÃO: Garantir que item_data seja um objeto válido, não string dupla
-            item_data: item // Passar diretamente o objeto, o Supabase fará o JSON automaticamente
-          }));
+          const insertData = group.items.map((item, index) => {
+            console.log(`📝 Preparando item ${index + 1} para inserção:`, {
+              id: item.id,
+              elemento: item.elemento,
+              item_keys: Object.keys(item)
+            });
 
-          console.log('Dados para inserir:', insertData);
+            return {
+              user_id: user.id,
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: item // Supabase fará a serialização JSON automaticamente
+            };
+          });
 
-          const { error } = await supabase
+          console.log('📤 Dados preparados para inserção:', {
+            grupo: group.name,
+            total_items: insertData.length,
+            sample_data: insertData[0]
+          });
+
+          const { data: insertResult, error: insertError } = await supabase
             .from('content_data')
-            .insert(insertData);
+            .insert(insertData)
+            .select('id');
 
-          if (error) {
-            console.error('Erro ao salvar dados do grupo:', error);
-            throw error;
+          if (insertError) {
+            console.error('❌ Erro ao inserir dados:', insertError);
+            console.error('📋 Dados que causaram erro:', insertData);
+            throw insertError;
           }
+
+          console.log('✅ Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
+        } else {
+          console.log('ℹ️ Grupo vazio, pulando inserção');
         }
       }
       
-      console.log('Dados de conteúdo salvos com sucesso');
+      console.log('🎉 Salvamento completo realizado com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar dados de conteúdo:', error);
+      console.error('❌ Erro crítico no salvamento:', error);
       throw error;
     }
   };
@@ -319,19 +346,25 @@ export const useContentData = () => {
   };
 
   const updateGroups = async (newGroups: ContentGroup[]) => {
-    console.log('Atualizando grupos de conteúdo:', newGroups);
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
+    console.log('🔄 Atualizando grupos de conteúdo...', newGroups.length);
+    try {
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      console.log('✅ Grupos atualizados com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao atualizar grupos:', error);
+      throw error;
+    }
   };
 
   const createMonth = async (monthName: string) => {
     if (!user?.id) {
-      console.error('Usuário não encontrado para criar mês');
+      console.error('❌ Usuário não encontrado para criar mês');
       return;
     }
 
     try {
-      console.log('Criando novo mês de conteúdo:', { monthName, userId: user.id });
+      console.log('🆕 Criando novo mês:', monthName);
       
       const timestamp = Date.now();
       const newGroup: ContentGroup = {
@@ -343,13 +376,12 @@ export const useContentData = () => {
       };
       
       const newGroups = [...groups, newGroup];
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
+      await updateGroups(newGroups);
       
-      console.log('Mês criado com sucesso:', newGroup.id);
+      console.log('✅ Mês criado e salvo:', newGroup.id);
       return newGroup.id;
     } catch (error) {
-      console.error('Erro ao criar mês:', error);
+      console.error('❌ Erro ao criar mês:', error);
       throw error;
     }
   };
@@ -666,12 +698,12 @@ export const useContentData = () => {
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
     if (!user?.id) {
-      console.error('Usuário não encontrado para adicionar cliente');
+      console.error('❌ Usuário não encontrado para adicionar cliente');
       return;
     }
 
     try {
-      console.log('Adicionando cliente de conteúdo:', { groupId, clientData, userId: user.id });
+      console.log('👤 Adicionando cliente:', clientData.elemento, 'ao grupo:', groupId);
       
       const newClient: ContentItem = {
         id: `content-client-${Date.now()}`,
@@ -682,6 +714,7 @@ export const useContentData = () => {
         informacoes: '', attachments: []
       };
 
+      // Adicionar colunas customizadas
       columns.forEach(column => {
         if (!column.isDefault) {
           newClient[column.id] = column.type === 'status' ? '' : '';
@@ -694,13 +727,11 @@ export const useContentData = () => {
           : group
       );
       
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
-
-      console.log('Cliente adicionado com sucesso:', newClient.id);
+      await updateGroups(newGroups);
+      console.log('✅ Cliente adicionado e salvo:', newClient.id);
       return newClient.id;
     } catch (error) {
-      console.error('Erro ao adicionar cliente:', error);
+      console.error('❌ Erro ao adicionar cliente:', error);
       throw error;
     }
   };
@@ -725,7 +756,7 @@ export const useContentData = () => {
 
   const updateClient = async (itemId: string, updates: Partial<ContentItem>) => {
     try {
-      console.log('Atualizando cliente:', { itemId, updates });
+      console.log('📝 Atualizando cliente:', itemId, 'com:', Object.keys(updates));
       
       if (updates.attachments && updates.attachments.length > 0) {
         const firstAttachment = updates.attachments[0];
@@ -748,8 +779,7 @@ export const useContentData = () => {
               )
             }));
             
-            setGroups(newGroups);
-            await saveContentToDatabase(newGroups);
+            await updateGroups(newGroups);
           };
           reader.readAsDataURL(firstAttachment);
           return;
@@ -765,12 +795,11 @@ export const useContentData = () => {
         )
       }));
       
-      setGroups(newGroups);
-      await saveContentToDatabase(newGroups);
-      
-      console.log('Cliente atualizado com sucesso');
+      await updateGroups(newGroups);
+      console.log('✅ Cliente atualizado com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar cliente:', error);
+      console.error('❌ Erro ao atualizar cliente:', error);
+      throw error;
     }
   };
 
