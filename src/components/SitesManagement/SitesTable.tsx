@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -32,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AttachmentViewer } from '@/components/AttachmentViewer';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 interface SiteItem {
   id: string;
@@ -125,9 +125,12 @@ export function SitesTable({
   const [showDuplicateMonthDialog, setShowDuplicateMonthDialog] = useState(false);
   const [showEditColumnDialog, setShowEditColumnDialog] = useState(false);
   const [showEditStatusDialog, setShowEditStatusDialog] = useState(false);
+  const [showDeleteMonthDialog, setShowDeleteMonthDialog] = useState(false);
+  const [showDeleteClientDialog, setShowDeleteClientDialog] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
   const [selectedStatusId, setSelectedStatusId] = useState<string>('');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [sourceGroupId, setSourceGroupId] = useState<string>('');
   const [newMonthName, setNewMonthName] = useState('');
   const [newClientData, setNewClientData] = useState({ elemento: '', servicos: '' });
@@ -146,11 +149,13 @@ export function SitesTable({
     if (!newMonthName.trim()) return;
     
     try {
-      await createMonth(newMonthName);
+      console.log('🆕 Criando mês:', newMonthName);
+      const result = await createMonth(newMonthName);
+      console.log('✅ Mês criado:', result);
       setNewMonthName('');
       setShowCreateMonthDialog(false);
     } catch (error) {
-      console.error('Erro ao criar mês:', error);
+      console.error('❌ Erro ao criar mês:', error);
     }
   };
 
@@ -158,12 +163,13 @@ export function SitesTable({
     if (!selectedGroupId || !newClientData.elemento.trim()) return;
     
     try {
+      console.log('👤 Adicionando cliente:', newClientData, 'ao grupo:', selectedGroupId);
       await addClient(selectedGroupId, newClientData);
       setNewClientData({ elemento: '', servicos: '' });
       setShowAddClientDialog(false);
       setSelectedGroupId('');
     } catch (error) {
-      console.error('Erro ao adicionar cliente:', error);
+      console.error('❌ Erro ao adicionar cliente:', error);
     }
   };
 
@@ -248,11 +254,25 @@ export function SitesTable({
     }
   };
 
-  const handleDeleteMonth = async (groupId: string) => {
+  const handleDeleteMonth = async () => {
+    if (!selectedGroupId) return;
     try {
-      await deleteMonth(groupId);
+      await deleteMonth(selectedGroupId);
+      setShowDeleteMonthDialog(false);
+      setSelectedGroupId('');
     } catch (error) {
       console.error('Erro ao deletar mês:', error);
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!selectedClientId) return;
+    try {
+      await deleteClient(selectedClientId);
+      setShowDeleteClientDialog(false);
+      setSelectedClientId('');
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
     }
   };
 
@@ -676,7 +696,7 @@ export function SitesTable({
                   <DialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
                       <Plus className="h-4 w-4 mr-1" />
-                      {addClientButtonText}
+                      Novo Cliente
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="bg-white">
@@ -735,6 +755,7 @@ export function SitesTable({
                     <DropdownMenuItem 
                       onClick={() => {
                         setSourceGroupId(group.id);
+                        setDuplicateMonthName('');
                         setShowDuplicateMonthDialog(true);
                       }}
                       className="cursor-pointer hover:bg-gray-100"
@@ -744,7 +765,10 @@ export function SitesTable({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => handleDeleteMonth(group.id)}
+                      onClick={() => {
+                        setSelectedGroupId(group.id);
+                        setShowDeleteMonthDialog(true);
+                      }}
                       className="cursor-pointer hover:bg-gray-100 text-red-600"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -878,7 +902,13 @@ export function SitesTable({
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent className="bg-white border shadow-lg z-50">
-                                <DropdownMenuItem onClick={() => deleteClient(item.id)} className="cursor-pointer hover:bg-gray-100 text-red-600">
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    setSelectedClientId(item.id);
+                                    setShowDeleteClientDialog(true);
+                                  }} 
+                                  className="cursor-pointer hover:bg-gray-100 text-red-600"
+                                >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Deletar
                                 </DropdownMenuItem>
@@ -950,6 +980,28 @@ export function SitesTable({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Month Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteMonthDialog}
+        onOpenChange={setShowDeleteMonthDialog}
+        onConfirm={handleDeleteMonth}
+        title="Deletar Mês"
+        message="Tem certeza que deseja deletar este mês? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+      />
+
+      {/* Delete Client Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteClientDialog}
+        onOpenChange={setShowDeleteClientDialog}
+        onConfirm={handleDeleteClient}
+        title="Deletar Cliente"
+        message="Tem certeza que deseja deletar este cliente? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+      />
 
       {/* Edit Column Dialog */}
       <Dialog open={showEditColumnDialog} onOpenChange={setShowEditColumnDialog}>
