@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,9 +52,14 @@ export const useTrafficData = () => {
 
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar colunas');
+      return;
+    }
     
     try {
+      console.log('Carregando colunas de tráfego para usuário:', user.id);
+      
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
@@ -64,6 +70,8 @@ export const useTrafficData = () => {
         console.error('Erro ao carregar colunas de tráfego:', error);
         return;
       }
+
+      console.log('Colunas carregadas:', data);
 
       if (data && data.length > 0) {
         const customColumns = data.map(col => ({
@@ -83,9 +91,14 @@ export const useTrafficData = () => {
 
   // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar status');
+      return;
+    }
     
     try {
+      console.log('Carregando status de tráfego para usuário:', user.id);
+      
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -96,6 +109,8 @@ export const useTrafficData = () => {
         console.error('Erro ao carregar status de tráfego:', error);
         return;
       }
+
+      console.log('Status carregados:', data);
 
       if (data && data.length > 0) {
         const customStatuses = data.map(status => ({
@@ -115,10 +130,13 @@ export const useTrafficData = () => {
   };
 
   const loadTrafficData = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar dados');
+      return;
+    }
     
     try {
-      console.log('Carregando dados de tráfego...');
+      console.log('Carregando dados de tráfego para usuário:', user.id);
       
       const { data, error } = await supabase
         .from('traffic_data')
@@ -131,7 +149,7 @@ export const useTrafficData = () => {
         return;
       }
 
-      console.log('Dados carregados:', data);
+      console.log('Dados de tráfego carregados:', data);
 
       if (data && data.length > 0) {
         const groupsMap = new Map<string, TrafficGroup>();
@@ -170,10 +188,13 @@ export const useTrafficData = () => {
 
   // Salvar dados no Supabase
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('Usuário não encontrado para salvar dados');
+      return;
+    }
     
     try {
-      console.log('Salvando dados de tráfego...', newGroups);
+      console.log('Salvando dados de tráfego para usuário:', user.id, newGroups);
       
       for (const group of newGroups) {
         // Deletar apenas dados deste grupo específico
@@ -209,7 +230,7 @@ export const useTrafficData = () => {
         }
       }
       
-      console.log('Dados salvos com sucesso');
+      console.log('Dados de tráfego salvos com sucesso');
     } catch (error) {
       console.error('Erro ao salvar dados de tráfego:', error);
       throw error;
@@ -222,7 +243,14 @@ export const useTrafficData = () => {
   };
 
   const createMonth = async (monthName: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para criar mês');
+      return;
+    }
+
     try {
+      console.log('Criando mês de tráfego:', monthName);
+      
       const timestamp = Date.now();
       const newGroup: TrafficGroup = {
         id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`,
@@ -231,17 +259,27 @@ export const useTrafficData = () => {
         isExpanded: true,
         items: []
       };
+      
       const newGroups = [...groups, newGroup];
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Mês de tráfego criado com sucesso');
     } catch (error) {
-      console.error('Erro ao criar mês:', error);
+      console.error('Erro ao criar mês de tráfego:', error);
       throw error;
     }
   };
 
   const updateMonth = async (monthId: string, newName: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar mês');
+      return;
+    }
+
     try {
+      console.log('Atualizando mês de tráfego:', { monthId, newName });
+      
       const newGroups = groups.map(group => 
         group.id === monthId 
           ? { ...group, name: `${newName} - TRÁFEGO` }
@@ -249,26 +287,53 @@ export const useTrafficData = () => {
       );
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Mês de tráfego atualizado com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar mês:', error);
+      console.error('Erro ao atualizar mês de tráfego:', error);
       throw error;
     }
   };
 
   const deleteMonth = async (monthId: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar mês');
+      return;
+    }
+
     try {
+      console.log('Deletando mês de tráfego:', monthId);
+      
+      // Deletar do banco de dados
+      const { error } = await supabase
+        .from('traffic_data')
+        .delete()
+        .eq('group_id', monthId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Erro ao deletar mês do banco:', error);
+        throw error;
+      }
+
       const newGroups = groups.filter(group => group.id !== monthId);
       setGroups(newGroups);
-      await saveTrafficToDatabase(newGroups);
+      
+      console.log('Mês de tráfego deletado com sucesso');
     } catch (error) {
-      console.error('Erro ao deletar mês:', error);
+      console.error('Erro ao deletar mês de tráfego:', error);
       throw error;
     }
   };
 
   const duplicateMonth = async (sourceGroupId: string, newName: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para duplicar mês');
+      return;
+    }
+
     try {
-      console.log('Iniciando duplicação de mês de tráfego:', { sourceGroupId, newName });
+      console.log('Duplicando mês de tráfego:', { sourceGroupId, newName });
       
       const sourceGroup = groups.find(g => g.id === sourceGroupId);
       if (!sourceGroup) {
@@ -293,7 +358,7 @@ export const useTrafficData = () => {
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
       
-      console.log('Mês duplicado com sucesso');
+      console.log('Mês de tráfego duplicado com sucesso');
       return newGroup.id;
     } catch (error) {
       console.error('Erro ao duplicar mês de tráfego:', error);
@@ -302,7 +367,14 @@ export const useTrafficData = () => {
   };
 
   const addStatus = async (status: Status) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para adicionar status');
+      return;
+    }
+
     try {
+      console.log('Adicionando status de tráfego:', status);
+      
       setStatuses(prev => [...prev, status]);
       
       // Salvar no Supabase
@@ -313,7 +385,7 @@ export const useTrafficData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'traffic',
-          user_id: user?.id
+          user_id: user.id
         });
 
       if (error) {
@@ -321,14 +393,23 @@ export const useTrafficData = () => {
         setStatuses(prev => prev.filter(s => s.id !== status.id));
         throw error;
       }
+      
+      console.log('Status de tráfego adicionado com sucesso');
     } catch (error) {
-      console.error('Erro ao adicionar status:', error);
+      console.error('Erro ao adicionar status de tráfego:', error);
       throw error;
     }
   };
 
   const updateStatus = async (statusId: string, updates: Partial<Status>) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar status');
+      return;
+    }
+
     try {
+      console.log('Atualizando status de tráfego:', { statusId, updates });
+      
       setStatuses(prev => prev.map(status => 
         status.id === statusId ? { ...status, ...updates } : status
       ));
@@ -342,21 +423,30 @@ export const useTrafficData = () => {
         })
         .eq('status_id', statusId)
         .eq('module', 'traffic')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
         loadStatuses();
         throw error;
       }
+      
+      console.log('Status de tráfego atualizado com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar status:', error);
+      console.error('Erro ao atualizar status de tráfego:', error);
       throw error;
     }
   };
 
   const deleteStatus = async (statusId: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar status');
+      return;
+    }
+
     try {
+      console.log('Deletando status de tráfego:', statusId);
+      
       setStatuses(prev => prev.filter(status => status.id !== statusId));
 
       // Deletar do Supabase
@@ -365,21 +455,30 @@ export const useTrafficData = () => {
         .delete()
         .eq('status_id', statusId)
         .eq('module', 'traffic')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao deletar status:', error);
         loadStatuses();
         throw error;
       }
+      
+      console.log('Status de tráfego deletado com sucesso');
     } catch (error) {
-      console.error('Erro ao deletar status:', error);
+      console.error('Erro ao deletar status de tráfego:', error);
       throw error;
     }
   };
 
   const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para adicionar coluna');
+      return;
+    }
+
     try {
+      console.log('Adicionando coluna de tráfego:', { columnName, columnType });
+      
       const newColumn: Column = {
         id: columnName.toLowerCase().replace(/\s+/g, '_'),
         name: columnName,
@@ -398,7 +497,7 @@ export const useTrafficData = () => {
           column_type: newColumn.type,
           module: 'traffic',
           is_default: false,
-          user_id: user?.id
+          user_id: user.id
         });
 
       if (error) {
@@ -406,14 +505,23 @@ export const useTrafficData = () => {
         setColumns(prev => prev.filter(col => col.id !== newColumn.id));
         throw error;
       }
+      
+      console.log('Coluna de tráfego adicionada com sucesso');
     } catch (error) {
-      console.error('Erro ao adicionar coluna:', error);
+      console.error('Erro ao adicionar coluna de tráfego:', error);
       throw error;
     }
   };
 
   const updateColumn = async (columnId: string, updates: Partial<Column>) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar coluna');
+      return;
+    }
+
     try {
+      console.log('Atualizando coluna de tráfego:', { columnId, updates });
+      
       setColumns(prev => prev.map(column => 
         column.id === columnId ? { ...column, ...updates } : column
       ));
@@ -427,21 +535,30 @@ export const useTrafficData = () => {
         })
         .eq('column_id', columnId)
         .eq('module', 'traffic')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
         loadColumns();
         throw error;
       }
+      
+      console.log('Coluna de tráfego atualizada com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar coluna:', error);
+      console.error('Erro ao atualizar coluna de tráfego:', error);
       throw error;
     }
   };
 
   const deleteColumn = async (columnId: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar coluna');
+      return;
+    }
+
     try {
+      console.log('Deletando coluna de tráfego:', columnId);
+      
       setColumns(prev => prev.filter(column => column.id !== columnId));
 
       // Deletar do Supabase
@@ -450,21 +567,25 @@ export const useTrafficData = () => {
         .delete()
         .eq('column_id', columnId)
         .eq('module', 'traffic')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
         loadColumns();
         throw error;
       }
+      
+      console.log('Coluna de tráfego deletada com sucesso');
     } catch (error) {
-      console.error('Erro ao deletar coluna:', error);
+      console.error('Erro ao deletar coluna de tráfego:', error);
       throw error;
     }
   };
 
   const updateItemStatus = async (itemId: string, columnId: string, statusId: string) => {
     try {
+      console.log('Atualizando status do item:', { itemId, columnId, statusId });
+      
       const newGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => 
@@ -473,6 +594,8 @@ export const useTrafficData = () => {
       }));
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Status do item atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao atualizar status do item:', error);
     }
@@ -480,6 +603,8 @@ export const useTrafficData = () => {
 
   const addClient = async (groupId: string, clientData: { elemento: string; servicos: string }) => {
     try {
+      console.log('Adicionando cliente ao grupo:', { groupId, clientData });
+      
       const newItem: TrafficItem = {
         id: `traffic-${Date.now()}`,
         elemento: clientData.elemento,
@@ -495,6 +620,8 @@ export const useTrafficData = () => {
       );
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Cliente adicionado com sucesso');
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
     }
@@ -502,12 +629,16 @@ export const useTrafficData = () => {
 
   const deleteClient = async (clientId: string) => {
     try {
+      console.log('Deletando cliente:', clientId);
+      
       const newGroups = groups.map(group => ({
         ...group,
         items: group.items.filter(item => item.id !== clientId)
       }));
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Cliente deletado com sucesso');
     } catch (error) {
       console.error('Erro ao deletar cliente:', error);
     }
@@ -515,6 +646,8 @@ export const useTrafficData = () => {
 
   const updateClient = async (clientId: string, updates: any) => {
     try {
+      console.log('Atualizando cliente:', { clientId, updates });
+      
       // Corrigir tratamento de arquivos
       if (updates.attachments && updates.attachments.length > 0) {
         const firstAttachment = updates.attachments[0];
@@ -552,6 +685,8 @@ export const useTrafficData = () => {
       }));
       setGroups(newGroups);
       await saveTrafficToDatabase(newGroups);
+      
+      console.log('Cliente atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao atualizar cliente:', error);
     }
