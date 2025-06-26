@@ -38,7 +38,7 @@ interface SiteItem {
   servicos: string;
   informacoes: string;
   observacoes?: string;
-  attachments?: { name: string; data: string; type: string }[];
+  attachments?: { name: string; data: string; type: string; size: number }[];
   [key: string]: any;
 }
 
@@ -84,7 +84,7 @@ interface SitesTableProps {
   updateItemStatus: (itemId: string, field: string, statusId: string) => Promise<void>;
   deleteClient: (itemId: string) => Promise<void>;
   updateClient: (itemId: string, updates: Partial<SiteItem>) => Promise<void>;
-  getClientFiles: (clientId: string) => File[];
+  getClientFiles: (clientId: string) => { name: string; data: string; type: string; size: number }[];
   updateMonth: (groupId: string, newName: string) => Promise<void>;
   deleteMonth: (groupId: string) => Promise<void>;
   duplicateMonth: (sourceGroupId: string, newMonthName: string) => Promise<string | undefined>;
@@ -129,6 +129,8 @@ export function SitesTable({
   const [editingValue, setEditingValue] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [filterText, setFilterText] = useState('');
+  const [selectedAttachment, setSelectedAttachment] = useState<{ name: string; data: string; type: string; size: number } | null>(null);
+  const [showAttachmentViewer, setShowAttachmentViewer] = useState(false);
 
   const handleCreateMonth = async () => {
     if (!newMonthName.trim()) return;
@@ -282,6 +284,11 @@ export function SitesTable({
         <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-50" />
       </div>
     );
+  };
+
+  const handleAttachmentClick = (attachment: { name: string; data: string; type: string; size: number }) => {
+    setSelectedAttachment(attachment);
+    setShowAttachmentViewer(true);
   };
 
   if (groups.length === 0) {
@@ -633,20 +640,18 @@ export function SitesTable({
                                 <Plus className="h-3 w-3" />
                               </Button>
                               {item.attachments && item.attachments.length > 0 && (
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
+                                <div className="flex gap-1">
+                                  {item.attachments.map((attachment, index) => (
+                                    <Button
+                                      key={index}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleAttachmentClick(attachment)}
+                                    >
                                       <Eye className="h-3 w-3" />
-                                      {item.attachments.length}
                                     </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-4xl">
-                                    <DialogHeader>
-                                      <DialogTitle>Anexos - {item.elemento}</DialogTitle>
-                                    </DialogHeader>
-                                    <AttachmentViewer files={getClientFiles(item.id)} />
-                                  </DialogContent>
-                                </Dialog>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </TableCell>
@@ -689,6 +694,12 @@ export function SitesTable({
           )}
         </Card>
       ))}
+
+      <AttachmentViewer
+        attachment={selectedAttachment}
+        open={showAttachmentViewer}
+        onOpenChange={setShowAttachmentViewer}
+      />
     </div>
   );
 }

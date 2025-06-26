@@ -8,7 +8,7 @@ interface SiteItem {
   servicos: string;
   informacoes: string;
   observacoes?: string;
-  attachments?: { name: string; data: string; type: string }[];
+  attachments?: { name: string; data: string; type: string; size: number }[];
   [key: string]: any;
 }
 
@@ -666,7 +666,8 @@ export const useSitesData = () => {
             const serializedFile = {
               name: firstAttachment.name,
               data: reader.result as string,
-              type: firstAttachment.type
+              type: firstAttachment.type,
+              size: firstAttachment.size
             };
             updates.attachments = [serializedFile as any];
             
@@ -705,19 +706,16 @@ export const useSitesData = () => {
     }
   };
 
-  const getClientFiles = (clientId: string): File[] => {
+  const getClientFiles = (clientId: string): { name: string; data: string; type: string; size: number }[] => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (!client || !client.attachments) return [];
     
-    return client.attachments.map(attachment => {
-      const byteCharacters = atob(attachment.data.split(',')[1]);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      return new File([byteArray], attachment.name, { type: attachment.type });
-    });
+    return client.attachments.map(attachment => ({
+      name: attachment.name,
+      data: attachment.data,
+      type: attachment.type,
+      size: attachment.size || 0
+    }));
   };
 
   return {
