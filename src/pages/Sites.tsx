@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useSitesData } from '@/hooks/useSitesData';
-import { ServiceTable } from '@/components/ServiceManagement/ServiceTable';
+import { SitesTable } from '@/components/SitesManagement/SitesTable';
 
 export default function Sites() {
   const sitesData = useSitesData();
@@ -15,7 +15,7 @@ export default function Sites() {
         </div>
       </div>
 
-      <ServiceTable 
+      <SitesTable 
         {...sitesData}
         moduleType="sites"
         addClientButtonText="Adicionar Cliente"
