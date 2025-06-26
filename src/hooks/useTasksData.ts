@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +29,7 @@ export const useTasksData = () => {
   // Carregar colunas e tarefas do Supabase
   const loadTasksData = async () => {
     if (!user?.id) {
-      console.log('Usuário não logado, definindo colunas padrão');
+      console.log('DEBUG: Usuário não logado, definindo colunas padrão');
       const defaultColumns: TaskColumn[] = [
         { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
         { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
@@ -42,7 +41,7 @@ export const useTasksData = () => {
     }
 
     try {
-      console.log('Carregando dados de tarefas para usuário:', user.id);
+      console.log('DEBUG: Carregando dados para usuário:', user.id);
       setLoading(true);
 
       // Carregar configurações de colunas
@@ -52,8 +51,10 @@ export const useTasksData = () => {
         .eq('user_id', user.id)
         .order('column_order', { ascending: true });
 
+      console.log('DEBUG: Resposta colunas:', { columnData, columnError });
+
       if (columnError) {
-        console.error('Erro ao carregar colunas:', columnError);
+        console.error('DEBUG: Erro ao carregar colunas:', columnError);
         // Em caso de erro, usar colunas padrão
         const defaultColumns: TaskColumn[] = [
           { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
@@ -72,15 +73,15 @@ export const useTasksData = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
-      if (taskError) {
-        console.error('Erro ao carregar tarefas:', taskError);
-      }
+      console.log('DEBUG: Resposta tarefas:', { taskData, taskError });
 
-      console.log('Dados carregados - Colunas:', columnData?.length || 0, 'Tarefas:', taskData?.length || 0);
+      if (taskError) {
+        console.error('DEBUG: Erro ao carregar tarefas:', taskError);
+      }
 
       // Se não há configurações de colunas, criar padrões
       if (!columnData || columnData.length === 0) {
-        console.log('Criando colunas padrão...');
+        console.log('DEBUG: Criando colunas padrão no banco...');
         const defaultColumns: TaskColumn[] = [
           { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
           { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
@@ -91,7 +92,7 @@ export const useTasksData = () => {
         try {
           await saveColumnsToDatabase(defaultColumns);
         } catch (error) {
-          console.error('Erro ao salvar colunas padrão:', error);
+          console.error('DEBUG: Erro ao salvar colunas padrão:', error);
         }
         
         setColumns(defaultColumns);
@@ -126,16 +127,16 @@ export const useTasksData = () => {
               column.tasks.push(taskInfo);
             }
           } catch (error) {
-            console.error('Erro ao processar tarefa:', taskRow, error);
+            console.error('DEBUG: Erro ao processar tarefa:', taskRow, error);
           }
         });
       }
 
       const finalColumns = Array.from(columnsMap.values()).sort((a, b) => a.order - b.order);
-      console.log('Colunas finais:', finalColumns);
+      console.log('DEBUG: Colunas finais carregadas:', finalColumns);
       setColumns(finalColumns);
     } catch (error) {
-      console.error('Erro ao carregar dados de tarefas:', error);
+      console.error('DEBUG: Erro geral ao carregar dados:', error);
       // Em caso de erro, definir colunas padrão
       const defaultColumns: TaskColumn[] = [
         { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
@@ -151,12 +152,13 @@ export const useTasksData = () => {
   // Salvar configurações de colunas no Supabase
   const saveColumnsToDatabase = async (newColumns: TaskColumn[]) => {
     if (!user?.id) {
-      console.error('Usuário não logado - não é possível salvar colunas');
-      return;
+      console.error('DEBUG: Usuário não logado - não é possível salvar colunas');
+      throw new Error('Usuário não logado');
     }
 
     try {
-      console.log('Salvando configurações de colunas...', newColumns);
+      console.log('DEBUG: Iniciando salvamento de colunas para usuário:', user.id);
+      console.log('DEBUG: Colunas a salvar:', newColumns);
 
       // Deletar configurações antigas primeiro
       const { error: deleteError } = await supabase
@@ -165,7 +167,8 @@ export const useTasksData = () => {
         .eq('user_id', user.id);
 
       if (deleteError) {
-        console.error('Erro ao deletar colunas antigas:', deleteError);
+        console.error('DEBUG: Erro ao deletar colunas antigas:', deleteError);
+        throw deleteError;
       }
 
       // Inserir novas configurações
@@ -177,21 +180,26 @@ export const useTasksData = () => {
         column_order: col.order
       }));
 
+      console.log('DEBUG: Dados para inserir:', columnInserts);
+
       if (columnInserts.length > 0) {
-        const { error: insertError } = await supabase
+        const { data: insertData, error: insertError } = await supabase
           .from('task_columns')
-          .insert(columnInserts);
+          .insert(columnInserts)
+          .select();
+
+        console.log('DEBUG: Resultado da inserção:', { insertData, insertError });
 
         if (insertError) {
-          console.error('Erro ao salvar colunas:', insertError);
+          console.error('DEBUG: Erro ao inserir colunas:', insertError);
           throw insertError;
         }
 
-        console.log('Configurações de colunas salvas com sucesso');
+        console.log('DEBUG: Colunas salvas com sucesso');
         await logAudit('task_columns', user.id, 'UPDATE', null, columnInserts);
       }
     } catch (error) {
-      console.error('Erro ao salvar configurações de colunas:', error);
+      console.error('DEBUG: Erro no salvamento de colunas:', error);
       throw error;
     }
   };
@@ -199,12 +207,12 @@ export const useTasksData = () => {
   // Salvar tarefas no Supabase
   const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
     if (!user?.id) {
-      console.error('Usuário não logado - não é possível salvar tarefas');
-      return;
+      console.error('DEBUG: Usuário não logado - não é possível salvar tarefas');
+      throw new Error('Usuário não logado');
     }
 
     try {
-      console.log('Salvando tarefas no banco...', newColumns);
+      console.log('DEBUG: Iniciando salvamento de tarefas para usuário:', user.id);
 
       // Deletar tarefas antigas primeiro
       const { error: deleteError } = await supabase
@@ -213,7 +221,8 @@ export const useTasksData = () => {
         .eq('user_id', user.id);
 
       if (deleteError) {
-        console.error('Erro ao deletar tarefas antigas:', deleteError);
+        console.error('DEBUG: Erro ao deletar tarefas antigas:', deleteError);
+        throw deleteError;
       }
 
       // Inserir novas tarefas
@@ -230,21 +239,26 @@ export const useTasksData = () => {
         });
       });
 
+      console.log('DEBUG: Tarefas para inserir:', taskInserts);
+
       if (taskInserts.length > 0) {
-        const { error: insertError } = await supabase
+        const { data: insertData, error: insertError } = await supabase
           .from('tasks_data')
-          .insert(taskInserts);
+          .insert(taskInserts)
+          .select();
+
+        console.log('DEBUG: Resultado da inserção de tarefas:', { insertData, insertError });
 
         if (insertError) {
-          console.error('Erro ao salvar tarefas:', insertError);
+          console.error('DEBUG: Erro ao inserir tarefas:', insertError);
           throw insertError;
         }
       }
 
-      console.log('Tarefas salvas com sucesso:', taskInserts.length, 'itens');
+      console.log('DEBUG: Tarefas salvas com sucesso:', taskInserts.length, 'itens');
       await logAudit('tasks_data', user.id, 'UPDATE', null, taskInserts);
     } catch (error) {
-      console.error('Erro ao salvar tarefas:', error);
+      console.error('DEBUG: Erro no salvamento de tarefas:', error);
       throw error;
     }
   };
@@ -254,29 +268,45 @@ export const useTasksData = () => {
   }, [user?.id]);
 
   const updateColumns = async (newColumns: TaskColumn[]) => {
-    console.log('Atualizando colunas:', newColumns);
+    console.log('DEBUG: ====== INICIANDO ATUALIZAÇÃO DE COLUNAS ======');
+    console.log('DEBUG: Usuário logado:', !!user?.id, user?.id);
+    console.log('DEBUG: Colunas atuais:', columns.length);
+    console.log('DEBUG: Novas colunas:', newColumns.length);
     
     // Primeiro, atualizar estado local
     setColumns(newColumns);
     
-    // Depois tentar salvar no banco (só se o usuário estiver logado)
-    if (user?.id) {
-      try {
-        await saveColumnsToDatabase(newColumns);
-        await saveTasksToDatabase(newColumns);
-        console.log('Dados atualizados com sucesso no banco de dados');
-      } catch (error) {
-        console.error('Erro ao atualizar dados no banco:', error);
-        // Em caso de erro, forçar reload dos dados do banco
-        console.log('Recarregando dados do banco devido ao erro...');
-        await loadTasksData();
-      }
+    // Só tentar salvar no banco se o usuário estiver logado
+    if (!user?.id) {
+      console.warn('DEBUG: Usuário não logado - apenas atualizando estado local');
+      return;
+    }
+
+    try {
+      console.log('DEBUG: Salvando colunas no banco...');
+      await saveColumnsToDatabase(newColumns);
+      
+      console.log('DEBUG: Salvando tarefas no banco...');
+      await saveTasksToDatabase(newColumns);
+      
+      console.log('DEBUG: ====== ATUALIZAÇÃO CONCLUÍDA COM SUCESSO ======');
+    } catch (error) {
+      console.error('DEBUG: ====== ERRO NA ATUALIZAÇÃO ======');
+      console.error('DEBUG: Erro:', error);
+      
+      // Em caso de erro, recarregar dados do banco
+      console.log('DEBUG: Recarregando dados devido ao erro...');
+      await loadTasksData();
     }
   };
 
   const addColumn = async (title: string, color: string = 'bg-gray-100') => {
+    console.log('DEBUG: ====== ADICIONANDO NOVA COLUNA ======');
+    console.log('DEBUG: Título:', title, 'Cor:', color);
+    console.log('DEBUG: Usuário:', user?.id);
+    
     if (!user?.id) {
-      console.error('Usuário não logado');
+      console.error('DEBUG: Usuário não logado');
       return;
     }
 
@@ -288,13 +318,18 @@ export const useTasksData = () => {
       order: columns.length
     };
 
+    console.log('DEBUG: Nova coluna criada:', newColumn);
     const newColumns = [...columns, newColumn];
-    console.log('Adicionando nova coluna:', newColumn);
+    console.log('DEBUG: Total de colunas após adição:', newColumns.length);
+    
     await updateColumns(newColumns);
   };
 
   const updateColumn = async (columnId: string, updates: Partial<TaskColumn>) => {
-    console.log('Atualizando coluna:', columnId, updates);
+    console.log('DEBUG: ====== ATUALIZANDO COLUNA ======');
+    console.log('DEBUG: ID da coluna:', columnId);
+    console.log('DEBUG: Atualizações:', updates);
+    
     const newColumns = columns.map(col => 
       col.id === columnId ? { ...col, ...updates } : col
     );
@@ -302,14 +337,24 @@ export const useTasksData = () => {
   };
 
   const deleteColumn = async (columnId: string) => {
-    console.log('Deletando coluna:', columnId);
+    console.log('DEBUG: ====== DELETANDO COLUNA ======');
+    console.log('DEBUG: ID da coluna:', columnId);
+    console.log('DEBUG: Colunas atuais:', columns.length);
+    
     const newColumns = columns.filter(col => col.id !== columnId);
+    console.log('DEBUG: Colunas após exclusão:', newColumns.length);
+    
     await updateColumns(newColumns);
   };
 
   const addTask = async (columnId: string, task: Omit<Task, 'id'>) => {
+    console.log('DEBUG: ====== ADICIONANDO NOVA TAREFA ======');
+    console.log('DEBUG: Coluna ID:', columnId);
+    console.log('DEBUG: Tarefa:', task);
+    console.log('DEBUG: Usuário:', user?.id);
+    
     if (!user?.id) {
-      console.error('Usuário não logado');
+      console.error('DEBUG: Usuário não logado');
       return;
     }
 
@@ -318,7 +363,7 @@ export const useTasksData = () => {
       id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
 
-    console.log('Adicionando nova tarefa:', newTask);
+    console.log('DEBUG: Nova tarefa criada:', newTask);
 
     const newColumns = columns.map(col => 
       col.id === columnId 
@@ -326,11 +371,14 @@ export const useTasksData = () => {
         : col
     );
 
+    console.log('DEBUG: Colunas após adição da tarefa:', newColumns.find(c => c.id === columnId)?.tasks.length);
     await updateColumns(newColumns);
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    console.log('Atualizando tarefa:', taskId, updates);
+    console.log('DEBUG: ====== ATUALIZANDO TAREFA ======');
+    console.log('DEBUG: ID da tarefa:', taskId);
+    console.log('DEBUG: Atualizações:', updates);
     
     const newColumns = columns.map(col => ({
       ...col,
@@ -343,7 +391,8 @@ export const useTasksData = () => {
   };
 
   const deleteTask = async (taskId: string) => {
-    console.log('Deletando tarefa:', taskId);
+    console.log('DEBUG: ====== DELETANDO TAREFA ======');
+    console.log('DEBUG: ID da tarefa:', taskId);
     
     const newColumns = columns.map(col => ({
       ...col,
@@ -354,7 +403,11 @@ export const useTasksData = () => {
   };
 
   const moveTask = async (taskId: string, fromColumnId: string, toColumnId: string, newIndex: number) => {
-    console.log('Movendo tarefa:', taskId, 'de', fromColumnId, 'para', toColumnId);
+    console.log('DEBUG: ====== MOVENDO TAREFA ======');
+    console.log('DEBUG: ID da tarefa:', taskId);
+    console.log('DEBUG: Coluna de origem:', fromColumnId);
+    console.log('DEBUG: Coluna de destino:', toColumnId);
+    console.log('DEBUG: Nova posição:', newIndex);
     
     const newColumns = [...columns];
     
