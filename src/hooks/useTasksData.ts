@@ -256,21 +256,20 @@ export const useTasksData = () => {
   const updateColumns = async (newColumns: TaskColumn[]) => {
     console.log('Atualizando colunas:', newColumns);
     
-    // Atualizar estado local primeiro
+    // Primeiro, atualizar estado local
     setColumns(newColumns);
     
-    // Depois tentar salvar no banco
+    // Depois tentar salvar no banco (só se o usuário estiver logado)
     if (user?.id) {
       try {
         await saveColumnsToDatabase(newColumns);
         await saveTasksToDatabase(newColumns);
-        console.log('Dados atualizados com sucesso');
+        console.log('Dados atualizados com sucesso no banco de dados');
       } catch (error) {
-        console.error('Erro ao atualizar dados:', error);
-        // Em caso de erro, recarregar dados do banco
-        setTimeout(() => {
-          loadTasksData();
-        }, 1000);
+        console.error('Erro ao atualizar dados no banco:', error);
+        // Em caso de erro, forçar reload dos dados do banco
+        console.log('Recarregando dados do banco devido ao erro...');
+        await loadTasksData();
       }
     }
   };
@@ -290,10 +289,12 @@ export const useTasksData = () => {
     };
 
     const newColumns = [...columns, newColumn];
+    console.log('Adicionando nova coluna:', newColumn);
     await updateColumns(newColumns);
   };
 
   const updateColumn = async (columnId: string, updates: Partial<TaskColumn>) => {
+    console.log('Atualizando coluna:', columnId, updates);
     const newColumns = columns.map(col => 
       col.id === columnId ? { ...col, ...updates } : col
     );
@@ -301,6 +302,7 @@ export const useTasksData = () => {
   };
 
   const deleteColumn = async (columnId: string) => {
+    console.log('Deletando coluna:', columnId);
     const newColumns = columns.filter(col => col.id !== columnId);
     await updateColumns(newColumns);
   };
