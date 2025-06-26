@@ -17,7 +17,8 @@ import {
   ChevronRight,
   MoreHorizontal,
   FileText,
-  Eye
+  Eye,
+  Settings
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -120,13 +121,22 @@ export function SitesTable({
   const [showAddClientDialog, setShowAddClientDialog] = useState(false);
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [showAddStatusDialog, setShowAddStatusDialog] = useState(false);
+  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showDuplicateMonthDialog, setShowDuplicateMonthDialog] = useState(false);
+  const [showEditColumnDialog, setShowEditColumnDialog] = useState(false);
+  const [showEditStatusDialog, setShowEditStatusDialog] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [selectedColumnId, setSelectedColumnId] = useState<string>('');
+  const [selectedStatusId, setSelectedStatusId] = useState<string>('');
+  const [sourceGroupId, setSourceGroupId] = useState<string>('');
   const [newMonthName, setNewMonthName] = useState('');
   const [newClientData, setNewClientData] = useState({ elemento: '', servicos: '' });
   const [newColumnData, setNewColumnData] = useState({ name: '', type: 'text' as 'text' | 'status' });
   const [newStatusData, setNewStatusData] = useState({ name: '', color: 'bg-blue-500' });
-  const [editingCell, setEditingCell] = useState<{ itemId: string; field: string } | null>(null);
-  const [editingValue, setEditingValue] = useState('');
+  const [editingMonthName, setEditingMonthName] = useState('');
+  const [editingColumnData, setEditingColumnData] = useState({ name: '', type: 'text' as 'text' | 'status' });
+  const [editingStatusData, setEditingStatusData] = useState({ name: '', color: 'bg-blue-500' });
+  const [duplicateMonthName, setDuplicateMonthName] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [filterText, setFilterText] = useState('');
   const [selectedAttachment, setSelectedAttachment] = useState<{ name: string; data: string; type: string; size: number } | null>(null);
@@ -186,20 +196,79 @@ export function SitesTable({
     }
   };
 
-  const handleCellEdit = (itemId: string, field: string, currentValue: string) => {
-    setEditingCell({ itemId, field });
-    setEditingValue(currentValue);
-  };
-
-  const handleCellSave = async () => {
-    if (!editingCell) return;
+  const handleEditMonth = async () => {
+    if (!selectedGroupId || !editingMonthName.trim()) return;
     
     try {
-      await updateClient(editingCell.itemId, { [editingCell.field]: editingValue });
-      setEditingCell(null);
-      setEditingValue('');
+      await updateMonth(selectedGroupId, editingMonthName);
+      setEditingMonthName('');
+      setShowEditMonthDialog(false);
+      setSelectedGroupId('');
     } catch (error) {
-      console.error('Erro ao salvar célula:', error);
+      console.error('Erro ao editar mês:', error);
+    }
+  };
+
+  const handleDuplicateMonth = async () => {
+    if (!sourceGroupId || !duplicateMonthName.trim()) return;
+    
+    try {
+      await duplicateMonth(sourceGroupId, duplicateMonthName);
+      setDuplicateMonthName('');
+      setShowDuplicateMonthDialog(false);
+      setSourceGroupId('');
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+    }
+  };
+
+  const handleEditColumn = async () => {
+    if (!selectedColumnId || !editingColumnData.name.trim()) return;
+    
+    try {
+      await updateColumn(selectedColumnId, editingColumnData);
+      setEditingColumnData({ name: '', type: 'text' });
+      setShowEditColumnDialog(false);
+      setSelectedColumnId('');
+    } catch (error) {
+      console.error('Erro ao editar coluna:', error);
+    }
+  };
+
+  const handleEditStatus = async () => {
+    if (!selectedStatusId || !editingStatusData.name.trim()) return;
+    
+    try {
+      await updateStatus(selectedStatusId, editingStatusData);
+      setEditingStatusData({ name: '', color: 'bg-blue-500' });
+      setShowEditStatusDialog(false);
+      setSelectedStatusId('');
+    } catch (error) {
+      console.error('Erro ao editar status:', error);
+    }
+  };
+
+  const handleDeleteMonth = async (groupId: string) => {
+    try {
+      await deleteMonth(groupId);
+    } catch (error) {
+      console.error('Erro ao deletar mês:', error);
+    }
+  };
+
+  const handleDeleteColumn = async (columnId: string) => {
+    try {
+      await deleteColumn(columnId);
+    } catch (error) {
+      console.error('Erro ao deletar coluna:', error);
+    }
+  };
+
+  const handleDeleteStatus = async (statusId: string) => {
+    try {
+      await deleteStatus(statusId);
+    } catch (error) {
+      console.error('Erro ao deletar status:', error);
     }
   };
 
@@ -245,12 +314,12 @@ export function SitesTable({
             {status?.name || 'Selecionar'}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent className="bg-white border shadow-lg z-50">
           {statuses.map(statusOption => (
             <DropdownMenuItem 
               key={statusOption.id}
               onClick={() => onStatusChange(statusOption.id)}
-              className="cursor-pointer"
+              className="cursor-pointer hover:bg-gray-100"
             >
               <div className={`w-3 h-3 rounded-full ${statusOption.color} mr-2`} />
               {statusOption.name}
@@ -314,7 +383,7 @@ export function SitesTable({
               {createMonthButtonText}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="bg-white">
             <DialogHeader>
               <DialogTitle>Criar Novo Mês</DialogTitle>
             </DialogHeader>
@@ -345,8 +414,8 @@ export function SitesTable({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex gap-2 flex-wrap">
           <Dialog open={showCreateMonthDialog} onOpenChange={setShowCreateMonthDialog}>
             <DialogTrigger asChild>
               <Button>
@@ -354,7 +423,7 @@ export function SitesTable({
                 {createMonthButtonText}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="bg-white">
               <DialogHeader>
                 <DialogTitle>Criar Novo Mês</DialogTitle>
               </DialogHeader>
@@ -387,7 +456,7 @@ export function SitesTable({
                 Adicionar Coluna
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="bg-white">
               <DialogHeader>
                 <DialogTitle>Adicionar Nova Coluna</DialogTitle>
               </DialogHeader>
@@ -410,7 +479,7 @@ export function SitesTable({
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border shadow-lg z-50">
                       <SelectItem value="text">Texto</SelectItem>
                       <SelectItem value="status">Status</SelectItem>
                     </SelectContent>
@@ -435,7 +504,7 @@ export function SitesTable({
                 Adicionar Status
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="bg-white">
               <DialogHeader>
                 <DialogTitle>Adicionar Novo Status</DialogTitle>
               </DialogHeader>
@@ -458,7 +527,7 @@ export function SitesTable({
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border shadow-lg z-50">
                       <SelectItem value="bg-red-500">Vermelho</SelectItem>
                       <SelectItem value="bg-yellow-500">Amarelo</SelectItem>
                       <SelectItem value="bg-green-500">Verde</SelectItem>
@@ -479,6 +548,87 @@ export function SitesTable({
               </div>
             </DialogContent>
           </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Gerenciar Colunas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-white border shadow-lg z-50">
+              {customColumns.map(column => (
+                <div key={column.id}>
+                  <DropdownMenuItem className="flex justify-between items-center p-2">
+                    <span>{column.name}</span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedColumnId(column.id);
+                          setEditingColumnData({ name: column.name, type: column.type });
+                          setShowEditColumnDialog(true);
+                        }}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteColumn(column.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Gerenciar Status
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-white border shadow-lg z-50">
+              {statuses.map(status => (
+                <div key={status.id}>
+                  <DropdownMenuItem className="flex justify-between items-center p-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${status.color}`} />
+                      <span>{status.name}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedStatusId(status.id);
+                          setEditingStatusData({ name: status.name, color: status.color });
+                          setShowEditStatusDialog(true);
+                        }}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteStatus(status.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="flex gap-2">
@@ -529,7 +679,7 @@ export function SitesTable({
                       {addClientButtonText}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="bg-white">
                     <DialogHeader>
                       <DialogTitle>Adicionar Cliente</DialogTitle>
                     </DialogHeader>
@@ -563,6 +713,45 @@ export function SitesTable({
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-white border shadow-lg z-50">
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        setSelectedGroupId(group.id);
+                        setEditingMonthName(group.name.replace(' - SITES', ''));
+                        setShowEditMonthDialog(true);
+                      }}
+                      className="cursor-pointer hover:bg-gray-100"
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Editar Mês
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        setSourceGroupId(group.id);
+                        setShowDuplicateMonthDialog(true);
+                      }}
+                      className="cursor-pointer hover:bg-gray-100"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Duplicar Mês
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteMonth(group.id)}
+                      className="cursor-pointer hover:bg-gray-100 text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Deletar Mês
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>
@@ -688,8 +877,8 @@ export function SitesTable({
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => deleteClient(item.id)}>
+                              <DropdownMenuContent className="bg-white border shadow-lg z-50">
+                                <DropdownMenuItem onClick={() => deleteClient(item.id)} className="cursor-pointer hover:bg-gray-100 text-red-600">
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Deletar
                                 </DropdownMenuItem>
@@ -705,6 +894,152 @@ export function SitesTable({
           )}
         </Card>
       ))}
+
+      {/* Edit Month Dialog */}
+      <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Editar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-month-name">Nome do Mês</Label>
+              <Input
+                id="edit-month-name"
+                value={editingMonthName}
+                onChange={(e) => setEditingMonthName(e.target.value)}
+                placeholder="Ex: Janeiro"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditMonth}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Month Dialog */}
+      <Dialog open={showDuplicateMonthDialog} onOpenChange={setShowDuplicateMonthDialog}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Duplicar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="duplicate-month-name">Nome do Novo Mês</Label>
+              <Input
+                id="duplicate-month-name"
+                value={duplicateMonthName}
+                onChange={(e) => setDuplicateMonthName(e.target.value)}
+                placeholder="Ex: Fevereiro"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowDuplicateMonthDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleDuplicateMonth}>
+                Duplicar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Column Dialog */}
+      <Dialog open={showEditColumnDialog} onOpenChange={setShowEditColumnDialog}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Editar Coluna</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-column-name">Nome da Coluna</Label>
+              <Input
+                id="edit-column-name"
+                value={editingColumnData.name}
+                onChange={(e) => setEditingColumnData({ ...editingColumnData, name: e.target.value })}
+                placeholder="Ex: Status do Projeto"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-column-type">Tipo da Coluna</Label>
+              <Select 
+                value={editingColumnData.type} 
+                onValueChange={(value: 'text' | 'status') => setEditingColumnData({ ...editingColumnData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-lg z-50">
+                  <SelectItem value="text">Texto</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditColumnDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditColumn}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Status Dialog */}
+      <Dialog open={showEditStatusDialog} onOpenChange={setShowEditStatusDialog}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Editar Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-status-name">Nome do Status</Label>
+              <Input
+                id="edit-status-name"
+                value={editingStatusData.name}
+                onChange={(e) => setEditingStatusData({ ...editingStatusData, name: e.target.value })}
+                placeholder="Ex: Em Andamento"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-status-color">Cor do Status</Label>
+              <Select 
+                value={editingStatusData.color} 
+                onValueChange={(value) => setEditingStatusData({ ...editingStatusData, color: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-lg z-50">
+                  <SelectItem value="bg-red-500">Vermelho</SelectItem>
+                  <SelectItem value="bg-yellow-500">Amarelo</SelectItem>
+                  <SelectItem value="bg-green-500">Verde</SelectItem>
+                  <SelectItem value="bg-blue-500">Azul</SelectItem>
+                  <SelectItem value="bg-purple-500">Roxo</SelectItem>
+                  <SelectItem value="bg-gray-500">Cinza</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditStatusDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditStatus}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AttachmentViewer
         attachment={selectedAttachment}
