@@ -205,7 +205,18 @@ export function SitesTable({
 
   const handleFileUpload = async (itemId: string, file: File) => {
     try {
-      await updateClient(itemId, { attachments: [file] });
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const serializedFile = {
+          name: file.name,
+          data: reader.result as string,
+          type: file.type,
+          size: file.size
+        };
+        
+        await updateClient(itemId, { attachments: [serializedFile] });
+      };
+      reader.readAsDataURL(file);
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
     }
