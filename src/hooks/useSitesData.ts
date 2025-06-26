@@ -236,7 +236,7 @@ export const useSitesData = () => {
               });
 
               return {
-                user_id: user.id,
+                user_id: user.id, // Garantir que user_id seja sempre definido
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -245,7 +245,7 @@ export const useSitesData = () => {
               };
             })
           : [{
-              user_id: user.id,
+              user_id: user.id, // Garantir que user_id seja sempre definido
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
@@ -259,6 +259,12 @@ export const useSitesData = () => {
                 attachments: []
               }
             }];
+
+        console.log('📝 SITES: Dados para inserir:', {
+          groupId: group.id,
+          itemCount: insertData.length,
+          userId: user.id
+        });
 
         const { data: insertResult, error: insertError } = await supabase
           .from('sites_data')
@@ -296,7 +302,7 @@ export const useSitesData = () => {
     }
 
     try {
-      console.log('🆕 SITES: Criando mês:', monthName);
+      console.log('🆕 SITES: Criando mês:', monthName, 'para usuário:', user.id);
       
       const timestamp = Date.now();
       const newGroup: SiteGroup = {
@@ -310,7 +316,8 @@ export const useSitesData = () => {
       const newGroups = [...groups, newGroup];
       console.log('📊 SITES: Salvando novo grupo:', {
         groupId: newGroup.id,
-        totalGroups: newGroups.length
+        totalGroups: newGroups.length,
+        userId: user.id
       });
       
       setGroups(newGroups);
