@@ -75,11 +75,12 @@ export const useContentData = () => {
 
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar colunas');
+      return;
+    }
     
     try {
-      console.log('Carregando colunas de conteúdo para user:', user.id);
-      
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
@@ -90,8 +91,6 @@ export const useContentData = () => {
         console.error('Erro ao carregar colunas:', error);
         return;
       }
-
-      console.log('Colunas carregadas:', data);
 
       if (data && data.length > 0) {
         const customColumns = data.map(col => ({
@@ -111,11 +110,12 @@ export const useContentData = () => {
 
   // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar status');
+      return;
+    }
     
     try {
-      console.log('Carregando status de conteúdo para user:', user.id);
-      
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -126,8 +126,6 @@ export const useContentData = () => {
         console.error('Erro ao carregar status:', error);
         return;
       }
-
-      console.log('Status carregados:', data);
 
       if (data && data.length > 0) {
         const customStatuses = data.map(status => ({
@@ -148,10 +146,13 @@ export const useContentData = () => {
 
   // Carregar dados do Supabase
   const loadContentData = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('Usuário não encontrado para carregar dados');
+      return;
+    }
     
     try {
-      console.log('Carregando dados de conteúdo para user:', user.id);
+      console.log('Carregando dados de conteúdo para usuário:', user.id);
       
       const { data, error } = await supabase
         .from('content_data')
@@ -170,7 +171,24 @@ export const useContentData = () => {
         const groupsMap = new Map<string, ContentGroup>();
 
         data.forEach(item => {
-          const itemData = typeof item.item_data === 'string' ? JSON.parse(item.item_data) : item.item_data;
+          // Corrigir parsing do item_data
+          let itemData;
+          try {
+            if (typeof item.item_data === 'string') {
+              // Se é uma string, fazer parse uma vez
+              itemData = JSON.parse(item.item_data);
+              // Se ainda for string após o primeiro parse, fazer parse novamente
+              if (typeof itemData === 'string') {
+                itemData = JSON.parse(itemData);
+              }
+            } else {
+              // Se já é objeto, usar diretamente
+              itemData = item.item_data;
+            }
+          } catch (parseError) {
+            console.error('Erro ao fazer parse do item_data:', parseError, item.item_data);
+            return; // Pular este item se não conseguir fazer parse
+          }
           
           if (!groupsMap.has(item.group_id)) {
             groupsMap.set(item.group_id, {
@@ -193,12 +211,15 @@ export const useContentData = () => {
     }
   };
 
-  // Salvar dados no Supabase
+  // Salvar dados no Supabase - CORRIGIDO
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('Usuário não encontrado para salvar dados');
+      return;
+    }
     
     try {
-      console.log('Salvando dados de conteúdo para user:', user.id, newGroups);
+      console.log('Salvando dados de conteúdo para usuário:', user.id);
       
       for (const group of newGroups) {
         // Deletar dados existentes do grupo
@@ -220,8 +241,11 @@ export const useContentData = () => {
             group_name: group.name,
             group_color: group.color,
             is_expanded: group.isExpanded,
-            item_data: JSON.stringify(item)
+            // CORREÇÃO: Garantir que item_data seja um objeto válido, não string dupla
+            item_data: item // Passar diretamente o objeto, o Supabase fará o JSON automaticamente
           }));
+
+          console.log('Dados para inserir:', insertData);
 
           const { error } = await supabase
             .from('content_data')
@@ -251,8 +275,13 @@ export const useContentData = () => {
   }, [user?.id]);
 
   const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para duplicar mês');
+      return;
+    }
+
     try {
-      console.log('Iniciando duplicação de mês de conteúdo:', { sourceGroupId, newMonthName, userId: user?.id });
+      console.log('Iniciando duplicação de mês de conteúdo:', { sourceGroupId, newMonthName, userId: user.id });
       
       const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
       if (!groupToDuplicate) {
@@ -281,12 +310,7 @@ export const useContentData = () => {
       setGroups(newGroups);
       await saveContentToDatabase(newGroups);
       
-      // Registrar na auditoria
-      await logAudit('content', newGroupId, 'INSERT', null, { 
-        month_name: newMonthName,
-        duplicated_from: sourceGroupId 
-      });
-      
+      console.log('Mês de conteúdo duplicado com sucesso');
       return newGroupId;
     } catch (error) {
       console.error('Erro ao duplicar mês de conteúdo:', error);
@@ -301,8 +325,13 @@ export const useContentData = () => {
   };
 
   const createMonth = async (monthName: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para criar mês');
+      return;
+    }
+
     try {
-      console.log('Criando novo mês de conteúdo:', { monthName, userId: user?.id });
+      console.log('Criando novo mês de conteúdo:', { monthName, userId: user.id });
       
       const timestamp = Date.now();
       const newGroup: ContentGroup = {
@@ -317,9 +346,6 @@ export const useContentData = () => {
       setGroups(newGroups);
       await saveContentToDatabase(newGroups);
       
-      // Registrar na auditoria
-      await logAudit('content', newGroup.id, 'INSERT', null, { month_name: monthName });
-      
       console.log('Mês criado com sucesso:', newGroup.id);
       return newGroup.id;
     } catch (error) {
@@ -329,38 +355,61 @@ export const useContentData = () => {
   };
 
   const updateMonth = async (groupId: string, newName: string) => {
-    const oldGroup = groups.find(g => g.id === groupId);
-    
-    const newGroups = groups.map(group => 
-      group.id === groupId 
-        ? { ...group, name: newName.toUpperCase() + ' - CONTEÚDO' }
-        : group
-    );
-    
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', groupId, 'UPDATE', 
-      { name: oldGroup?.name }, 
-      { name: newName.toUpperCase() + ' - CONTEÚDO' }
-    );
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar mês');
+      return;
+    }
+
+    try {
+      const newGroups = groups.map(group => 
+        group.id === groupId 
+          ? { ...group, name: newName.toUpperCase() + ' - CONTEÚDO' }
+          : group
+      );
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+    } catch (error) {
+      console.error('Erro ao atualizar mês:', error);
+      throw error;
+    }
   };
 
   const deleteMonth = async (groupId: string) => {
-    const groupToDelete = groups.find(g => g.id === groupId);
-    
-    const newGroups = groups.filter(group => group.id !== groupId);
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', groupId, 'DELETE', { name: groupToDelete?.name }, null);
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar mês');
+      return;
+    }
+
+    try {
+      // Deletar do banco de dados
+      const { error } = await supabase
+        .from('content_data')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Erro ao deletar mês do banco:', error);
+        throw error;
+      }
+
+      const newGroups = groups.filter(group => group.id !== groupId);
+      setGroups(newGroups);
+    } catch (error) {
+      console.error('Erro ao deletar mês:', error);
+      throw error;
+    }
   };
 
   const addStatus = async (status: ServiceStatus) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para adicionar status');
+      return;
+    }
+
     try {
-      console.log('Adicionando status de conteúdo:', { status, userId: user?.id });
+      console.log('Adicionando status de conteúdo:', { status, userId: user.id });
       
       setStatuses(prev => [...prev, status]);
       
@@ -372,7 +421,7 @@ export const useContentData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'content',
-          user_id: user?.id
+          user_id: user.id
         });
 
       if (error) {
@@ -389,8 +438,13 @@ export const useContentData = () => {
   };
 
   const updateStatus = async (statusId: string, updates: Partial<ServiceStatus>) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar status');
+      return;
+    }
+
     try {
-      console.log('Atualizando status de conteúdo:', { statusId, updates, userId: user?.id });
+      console.log('Atualizando status de conteúdo:', { statusId, updates, userId: user.id });
       
       setStatuses(prev => prev.map(status => 
         status.id === statusId ? { ...status, ...updates } : status
@@ -405,7 +459,7 @@ export const useContentData = () => {
         })
         .eq('status_id', statusId)
         .eq('module', 'content')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
@@ -421,8 +475,13 @@ export const useContentData = () => {
   };
 
   const deleteStatus = async (statusId: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar status');
+      return;
+    }
+
     try {
-      console.log('Deletando status de conteúdo:', { statusId, userId: user?.id });
+      console.log('Deletando status de conteúdo:', { statusId, userId: user.id });
       
       setStatuses(prev => prev.filter(status => status.id !== statusId));
 
@@ -432,7 +491,7 @@ export const useContentData = () => {
         .delete()
         .eq('status_id', statusId)
         .eq('module', 'content')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao deletar status:', error);
@@ -448,8 +507,13 @@ export const useContentData = () => {
   };
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para adicionar coluna');
+      return;
+    }
+
     try {
-      console.log('Adicionando coluna de conteúdo:', { name, type, userId: user?.id });
+      console.log('Adicionando coluna de conteúdo:', { name, type, userId: user.id });
       
       const newColumn: ContentColumn = {
         id: name.toLowerCase().replace(/\s+/g, '_'),
@@ -469,7 +533,7 @@ export const useContentData = () => {
           column_type: newColumn.type,
           module: 'content',
           is_default: false,
-          user_id: user?.id
+          user_id: user.id
         });
 
       if (error) {
@@ -498,8 +562,13 @@ export const useContentData = () => {
   };
 
   const updateColumn = async (id: string, updates: Partial<ContentColumn>) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para atualizar coluna');
+      return;
+    }
+
     try {
-      console.log('Atualizando coluna de conteúdo:', { id, updates, userId: user?.id });
+      console.log('Atualizando coluna de conteúdo:', { id, updates, userId: user.id });
       
       setColumns(prev => prev.map(col => 
         col.id === id ? { ...col, ...updates } : col
@@ -514,7 +583,7 @@ export const useContentData = () => {
         })
         .eq('column_id', id)
         .eq('module', 'content')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
@@ -530,8 +599,13 @@ export const useContentData = () => {
   };
 
   const deleteColumn = async (id: string) => {
+    if (!user?.id) {
+      console.error('Usuário não encontrado para deletar coluna');
+      return;
+    }
+
     try {
-      console.log('Deletando coluna de conteúdo:', { id, userId: user?.id });
+      console.log('Deletando coluna de conteúdo:', { id, userId: user.id });
       
       setColumns(prev => prev.filter(col => col.id !== id));
       
@@ -541,7 +615,7 @@ export const useContentData = () => {
         .delete()
         .eq('column_id', id)
         .eq('module', 'content')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
@@ -569,128 +643,135 @@ export const useContentData = () => {
   };
 
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
-    const oldItem = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => 
-        item.id === itemId 
-          ? { ...item, [field]: statusId }
-          : item
-      )
-    }));
-    
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', itemId, 'UPDATE', 
-      { [field]: oldItem?.[field] }, 
-      { [field]: statusId }
-    );
+    try {
+      console.log('Atualizando status do item:', { itemId, field, statusId });
+      
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => 
+          item.id === itemId 
+            ? { ...item, [field]: statusId }
+            : item
+        )
+      }));
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      console.log('Status do item atualizado com sucesso');
+    } catch (error) {
+      console.error('Erro ao atualizar status do item:', error);
+    }
   };
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
-    console.log('Adicionando cliente de conteúdo:', { groupId, clientData, userId: user?.id });
-    
-    const newClient: ContentItem = {
-      id: `content-client-${Date.now()}`,
-      elemento: clientData.elemento || 'Novo Cliente',
-      servicos: clientData.servicos || '',
-      janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-      julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-      informacoes: '', attachments: []
-    };
+    if (!user?.id) {
+      console.error('Usuário não encontrado para adicionar cliente');
+      return;
+    }
 
-    columns.forEach(column => {
-      if (!column.isDefault) {
-        newClient[column.id] = column.type === 'status' ? '' : '';
-      }
-    });
+    try {
+      console.log('Adicionando cliente de conteúdo:', { groupId, clientData, userId: user.id });
+      
+      const newClient: ContentItem = {
+        id: `content-client-${Date.now()}`,
+        elemento: clientData.elemento || 'Novo Cliente',
+        servicos: clientData.servicos || '',
+        janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
+        julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
+        informacoes: '', attachments: []
+      };
 
-    const newGroups = groups.map(group => 
-      group.id === groupId 
-        ? { ...group, items: [...group.items, newClient] }
-        : group
-    );
-    
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', newClient.id, 'INSERT', null, {
-      elemento: clientData.elemento,
-      group_id: groupId
-    });
+      columns.forEach(column => {
+        if (!column.isDefault) {
+          newClient[column.id] = column.type === 'status' ? '' : '';
+        }
+      });
 
-    console.log('Cliente adicionado com sucesso:', newClient.id);
-    return newClient.id;
+      const newGroups = groups.map(group => 
+        group.id === groupId 
+          ? { ...group, items: [...group.items, newClient] }
+          : group
+      );
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+
+      console.log('Cliente adicionado com sucesso:', newClient.id);
+      return newClient.id;
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      throw error;
+    }
   };
 
   const deleteClient = async (itemId: string) => {
-    const clientToDelete = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.filter(item => item.id !== itemId)
-    }));
-    
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', itemId, 'DELETE', { elemento: clientToDelete?.elemento }, null);
+    try {
+      console.log('Deletando cliente:', itemId);
+      
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.filter(item => item.id !== itemId)
+      }));
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      console.log('Cliente deletado com sucesso');
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+    }
   };
 
   const updateClient = async (itemId: string, updates: Partial<ContentItem>) => {
-    const oldClient = groups.flatMap(g => g.items).find(item => item.id === itemId);
-    
-    if (updates.attachments && updates.attachments.length > 0) {
-      const firstAttachment = updates.attachments[0];
-      if (firstAttachment instanceof File) {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const serializedFile = {
-            name: firstAttachment.name,
-            data: reader.result as string,
-            type: firstAttachment.type
+    try {
+      console.log('Atualizando cliente:', { itemId, updates });
+      
+      if (updates.attachments && updates.attachments.length > 0) {
+        const firstAttachment = updates.attachments[0];
+        if (firstAttachment instanceof File) {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const serializedFile = {
+              name: firstAttachment.name,
+              data: reader.result as string,
+              type: firstAttachment.type
+            };
+            updates.attachments = [serializedFile as any];
+            
+            const newGroups = groups.map(group => ({
+              ...group,
+              items: group.items.map(item => 
+                item.id === itemId 
+                  ? { ...item, ...updates }
+                  : item
+              )
+            }));
+            
+            setGroups(newGroups);
+            await saveContentToDatabase(newGroups);
           };
-          updates.attachments = [serializedFile as any];
-          
-          const newGroups = groups.map(group => ({
-            ...group,
-            items: group.items.map(item => 
-              item.id === itemId 
-                ? { ...item, ...updates }
-                : item
-            )
-          }));
-          
-          setGroups(newGroups);
-          await saveContentToDatabase(newGroups);
-        };
-        reader.readAsDataURL(firstAttachment);
-        return;
+          reader.readAsDataURL(firstAttachment);
+          return;
+        }
       }
-    }
 
-    const newGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => 
-        item.id === itemId 
-          ? { ...item, ...updates }
-          : item
-      )
-    }));
-    
-    setGroups(newGroups);
-    await saveContentToDatabase(newGroups);
-    
-    // Registrar na auditoria
-    await logAudit('content', itemId, 'UPDATE', 
-      { elemento: oldClient?.elemento }, 
-      { elemento: updates.elemento }
-    );
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => 
+          item.id === itemId 
+            ? { ...item, ...updates }
+            : item
+        )
+      }));
+      
+      setGroups(newGroups);
+      await saveContentToDatabase(newGroups);
+      
+      console.log('Cliente atualizado com sucesso');
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+    }
   };
 
   const getClientFiles = (clientId: string): File[] => {
