@@ -78,6 +78,8 @@ export const useContentData = () => {
     if (!user?.id) return;
     
     try {
+      console.log('Carregando colunas de conteúdo para user:', user.id);
+      
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
@@ -88,6 +90,8 @@ export const useContentData = () => {
         console.error('Erro ao carregar colunas:', error);
         return;
       }
+
+      console.log('Colunas carregadas:', data);
 
       if (data && data.length > 0) {
         const customColumns = data.map(col => ({
@@ -110,6 +114,8 @@ export const useContentData = () => {
     if (!user?.id) return;
     
     try {
+      console.log('Carregando status de conteúdo para user:', user.id);
+      
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -120,6 +126,8 @@ export const useContentData = () => {
         console.error('Erro ao carregar status:', error);
         return;
       }
+
+      console.log('Status carregados:', data);
 
       if (data && data.length > 0) {
         const customStatuses = data.map(status => ({
@@ -143,7 +151,7 @@ export const useContentData = () => {
     if (!user?.id) return;
     
     try {
-      console.log('Carregando dados de conteúdo...');
+      console.log('Carregando dados de conteúdo para user:', user.id);
       
       const { data, error } = await supabase
         .from('content_data')
@@ -190,7 +198,7 @@ export const useContentData = () => {
     if (!user?.id) return;
     
     try {
-      console.log('Salvando dados de conteúdo...', newGroups);
+      console.log('Salvando dados de conteúdo para user:', user.id, newGroups);
       
       for (const group of newGroups) {
         // Deletar dados existentes do grupo
@@ -235,6 +243,7 @@ export const useContentData = () => {
 
   useEffect(() => {
     if (user?.id) {
+      console.log('Usuário logado, inicializando dados de conteúdo:', user.id);
       loadContentData();
       loadColumns();
       loadStatuses();
@@ -243,7 +252,7 @@ export const useContentData = () => {
 
   const duplicateMonth = async (sourceGroupId: string, newMonthName: string) => {
     try {
-      console.log('Iniciando duplicação de mês de conteúdo:', { sourceGroupId, newMonthName });
+      console.log('Iniciando duplicação de mês de conteúdo:', { sourceGroupId, newMonthName, userId: user?.id });
       
       const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
       if (!groupToDuplicate) {
@@ -286,12 +295,15 @@ export const useContentData = () => {
   };
 
   const updateGroups = async (newGroups: ContentGroup[]) => {
+    console.log('Atualizando grupos de conteúdo:', newGroups);
     setGroups(newGroups);
     await saveContentToDatabase(newGroups);
   };
 
   const createMonth = async (monthName: string) => {
     try {
+      console.log('Criando novo mês de conteúdo:', { monthName, userId: user?.id });
+      
       const timestamp = Date.now();
       const newGroup: ContentGroup = {
         id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-conteudo-${timestamp}`,
@@ -308,6 +320,7 @@ export const useContentData = () => {
       // Registrar na auditoria
       await logAudit('content', newGroup.id, 'INSERT', null, { month_name: monthName });
       
+      console.log('Mês criado com sucesso:', newGroup.id);
       return newGroup.id;
     } catch (error) {
       console.error('Erro ao criar mês:', error);
@@ -347,6 +360,8 @@ export const useContentData = () => {
 
   const addStatus = async (status: ServiceStatus) => {
     try {
+      console.log('Adicionando status de conteúdo:', { status, userId: user?.id });
+      
       setStatuses(prev => [...prev, status]);
       
       // Salvar no Supabase
@@ -365,6 +380,8 @@ export const useContentData = () => {
         setStatuses(prev => prev.filter(s => s.id !== status.id));
         throw error;
       }
+      
+      console.log('Status adicionado com sucesso');
     } catch (error) {
       console.error('Erro ao adicionar status:', error);
       throw error;
@@ -373,6 +390,8 @@ export const useContentData = () => {
 
   const updateStatus = async (statusId: string, updates: Partial<ServiceStatus>) => {
     try {
+      console.log('Atualizando status de conteúdo:', { statusId, updates, userId: user?.id });
+      
       setStatuses(prev => prev.map(status => 
         status.id === statusId ? { ...status, ...updates } : status
       ));
@@ -393,6 +412,8 @@ export const useContentData = () => {
         loadStatuses();
         throw error;
       }
+      
+      console.log('Status atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       throw error;
@@ -401,6 +422,8 @@ export const useContentData = () => {
 
   const deleteStatus = async (statusId: string) => {
     try {
+      console.log('Deletando status de conteúdo:', { statusId, userId: user?.id });
+      
       setStatuses(prev => prev.filter(status => status.id !== statusId));
 
       // Deletar do Supabase
@@ -416,6 +439,8 @@ export const useContentData = () => {
         loadStatuses();
         throw error;
       }
+      
+      console.log('Status deletado com sucesso');
     } catch (error) {
       console.error('Erro ao deletar status:', error);
       throw error;
@@ -424,6 +449,8 @@ export const useContentData = () => {
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
     try {
+      console.log('Adicionando coluna de conteúdo:', { name, type, userId: user?.id });
+      
       const newColumn: ContentColumn = {
         id: name.toLowerCase().replace(/\s+/g, '_'),
         name,
@@ -462,6 +489,8 @@ export const useContentData = () => {
       
       setGroups(newGroups);
       await saveContentToDatabase(newGroups);
+      
+      console.log('Coluna adicionada com sucesso');
     } catch (error) {
       console.error('Erro ao adicionar coluna:', error);
       throw error;
@@ -470,6 +499,8 @@ export const useContentData = () => {
 
   const updateColumn = async (id: string, updates: Partial<ContentColumn>) => {
     try {
+      console.log('Atualizando coluna de conteúdo:', { id, updates, userId: user?.id });
+      
       setColumns(prev => prev.map(col => 
         col.id === id ? { ...col, ...updates } : col
       ));
@@ -490,6 +521,8 @@ export const useContentData = () => {
         loadColumns();
         throw error;
       }
+      
+      console.log('Coluna atualizada com sucesso');
     } catch (error) {
       console.error('Erro ao atualizar coluna:', error);
       throw error;
@@ -498,6 +531,8 @@ export const useContentData = () => {
 
   const deleteColumn = async (id: string) => {
     try {
+      console.log('Deletando coluna de conteúdo:', { id, userId: user?.id });
+      
       setColumns(prev => prev.filter(col => col.id !== id));
       
       // Deletar do Supabase
@@ -525,6 +560,8 @@ export const useContentData = () => {
       
       setGroups(newGroups);
       await saveContentToDatabase(newGroups);
+      
+      console.log('Coluna deletada com sucesso');
     } catch (error) {
       console.error('Erro ao deletar coluna:', error);
       throw error;
@@ -554,6 +591,8 @@ export const useContentData = () => {
   };
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
+    console.log('Adicionando cliente de conteúdo:', { groupId, clientData, userId: user?.id });
+    
     const newClient: ContentItem = {
       id: `content-client-${Date.now()}`,
       elemento: clientData.elemento || 'Novo Cliente',
@@ -584,6 +623,7 @@ export const useContentData = () => {
       group_id: groupId
     });
 
+    console.log('Cliente adicionado com sucesso:', newClient.id);
     return newClient.id;
   };
 
