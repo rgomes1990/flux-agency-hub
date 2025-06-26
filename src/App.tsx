@@ -8,6 +8,7 @@ import Auth from './pages/Auth';
 import Index from './pages/Index';
 import Dashboard from './pages/Dashboard';
 import Content from './pages/Content';
+import Sites from './pages/Sites';
 import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
 import Users from './pages/Users';
@@ -33,6 +34,13 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Content />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/sites" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Sites />
               </MainLayout>
             </ProtectedRoute>
           } />

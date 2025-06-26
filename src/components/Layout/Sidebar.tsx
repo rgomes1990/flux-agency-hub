@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Users,
   Lock,
-  History
+  History,
+  Globe
 } from 'lucide-react';
 
 const menuItems = [
@@ -21,6 +22,11 @@ const menuItems = [
     name: 'Conteúdo',
     icon: FileText,
     path: '/content'
+  },
+  {
+    name: 'Criação de Sites',
+    icon: Globe,
+    path: '/sites'
   },
   {
     name: 'Tarefas',
