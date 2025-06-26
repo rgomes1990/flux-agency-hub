@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,13 +64,7 @@ export const useTrafficData = () => {
     { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
   ]);
 
-  const [statuses, setStatuses] = useState<ServiceStatus[]>([
-    { id: 'aprovados', name: 'Aprovados', color: 'bg-green-500' },
-    { id: 'feito', name: 'Feito', color: 'bg-blue-500' },
-    { id: 'parado', name: 'Parado', color: 'bg-red-500' },
-    { id: 'em-andamento', name: 'Em Andamento', color: 'bg-yellow-500' },
-    { id: 'revisao', name: 'Em Revisão', color: 'bg-purple-500' }
-  ]);
+  const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
 
   const { logAudit, user } = useAuth();
 
@@ -113,7 +108,7 @@ export const useTrafficData = () => {
     }
   };
 
-  // Carregar status personalizados do Supabase
+  // Carregar status personalizados do Supabase - APENAS os customizados
   const loadStatuses = async () => {
     if (!user?.id) {
       console.log('❌ TRAFFIC: Usuário não encontrado para carregar status');
@@ -142,12 +137,11 @@ export const useTrafficData = () => {
           color: status.status_color
         }));
 
-        setStatuses(prev => {
-          const defaultStatuses = prev.slice(0, 5);
-          const newStatuses = [...defaultStatuses, ...customStatuses];
-          console.log('✅ TRAFFIC: Status atualizados:', newStatuses.length);
-          return newStatuses;
-        });
+        console.log('✅ TRAFFIC: Status atualizados:', customStatuses.length);
+        setStatuses(customStatuses);
+      } else {
+        console.log('ℹ️ TRAFFIC: Nenhum status customizado encontrado');
+        setStatuses([]);
       }
     } catch (error) {
       console.error('❌ TRAFFIC: Erro crítico ao carregar status:', error);
@@ -188,7 +182,7 @@ export const useTrafficData = () => {
           console.log(`🔍 TRAFFIC: Processando item ${index + 1}:`, {
             group_id: item.group_id,
             item_data_type: typeof item.item_data,
-            item_data_keys: typeof item.item_data === 'object' ? Object.keys(item.item_data || {}) : 'not-object'
+            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
           });
 
           let itemData;
@@ -214,7 +208,9 @@ export const useTrafficData = () => {
           }
 
           const group = groupsMap.get(item.group_id)!;
-          group.items.push(itemData);
+          if (itemData) {
+            group.items.push(itemData);
+          }
         });
 
         const loadedGroups = Array.from(groupsMap.values());
@@ -261,37 +257,51 @@ export const useTrafficData = () => {
           throw deleteError;
         }
 
-        // Inserir dados atualizados do grupo
-        if (group.items.length > 0) {
-          const insertData = group.items.map((item, index) => {
-            console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
-              id: item.id,
-              elemento: item.elemento,
-              hasAttachments: !!item.attachments?.length
-            });
+        // Sempre inserir pelo menos o grupo vazio
+        const insertData = group.items.length > 0 
+          ? group.items.map((item, index) => {
+              console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
+                id: item.id,
+                elemento: item.elemento,
+                hasAttachments: !!item.attachments?.length
+              });
 
-            return {
+              return {
+                user_id: user.id,
+                group_id: group.id,
+                group_name: group.name,
+                group_color: group.color,
+                is_expanded: group.isExpanded,
+                item_data: item
+              };
+            })
+          : [{
               user_id: user.id,
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
               is_expanded: group.isExpanded,
-              item_data: item
-            };
-          });
+              item_data: {
+                id: `empty-${group.id}`,
+                elemento: '',
+                servicos: '',
+                janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
+                julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
+                informacoes: '', observacoes: '', attachments: []
+              }
+            }];
 
-          const { data: insertResult, error: insertError } = await supabase
-            .from('traffic_data')
-            .insert(insertData)
-            .select('id');
+        const { data: insertResult, error: insertError } = await supabase
+          .from('traffic_data')
+          .insert(insertData)
+          .select('id');
 
-          if (insertError) {
-            console.error('❌ TRAFFIC: Erro ao inserir:', insertError);
-            throw insertError;
-          }
-
-          console.log('✅ TRAFFIC: Dados inseridos:', insertResult?.length || 0);
+        if (insertError) {
+          console.error('❌ TRAFFIC: Erro ao inserir:', insertError);
+          throw insertError;
         }
+
+        console.log('✅ TRAFFIC: Dados inseridos:', insertResult?.length || 0);
       }
       
       console.log('🎉 TRAFFIC: Salvamento completo!');
@@ -376,7 +386,7 @@ export const useTrafficData = () => {
 
       const newGroups = groups.map(group => 
         group.id === groupId 
-          ? { ...group, items: [...group.items, newClient] }
+          ? { ...group, items: group.items.filter(item => item.id !== `empty-${groupId}`).concat(newClient) }
           : group
       );
       
@@ -506,6 +516,9 @@ export const useTrafficData = () => {
       }
     },
     createMonth,
+    addClient,
+    addColumn,
+    addStatus,
     updateMonth: async (groupId: string, newName: string) => {
       if (!user?.id) return;
       try {
