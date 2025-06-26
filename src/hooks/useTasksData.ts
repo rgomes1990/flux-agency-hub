@@ -54,7 +54,15 @@ export const useTasksData = () => {
 
       if (columnError) {
         console.error('Erro ao carregar colunas:', columnError);
-        throw columnError;
+        // Em caso de erro, usar colunas padrão
+        const defaultColumns: TaskColumn[] = [
+          { id: 'todo', title: 'A Fazer', color: 'bg-gray-100', tasks: [], order: 0 },
+          { id: 'doing', title: 'Fazendo', color: 'bg-blue-100', tasks: [], order: 1 },
+          { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
+        ];
+        setColumns(defaultColumns);
+        setLoading(false);
+        return;
       }
 
       // Carregar dados de tarefas
@@ -66,7 +74,6 @@ export const useTasksData = () => {
 
       if (taskError) {
         console.error('Erro ao carregar tarefas:', taskError);
-        throw taskError;
       }
 
       console.log('Dados carregados - Colunas:', columnData?.length || 0, 'Tarefas:', taskData?.length || 0);
@@ -80,7 +87,13 @@ export const useTasksData = () => {
           { id: 'done', title: 'Feito', color: 'bg-green-100', tasks: [], order: 2 }
         ];
         
-        await saveColumnsToDatabase(defaultColumns);
+        // Salvar colunas padrão no banco
+        try {
+          await saveColumnsToDatabase(defaultColumns);
+        } catch (error) {
+          console.error('Erro ao salvar colunas padrão:', error);
+        }
+        
         setColumns(defaultColumns);
         setLoading(false);
         return;
@@ -145,7 +158,7 @@ export const useTasksData = () => {
     try {
       console.log('Salvando configurações de colunas...', newColumns);
 
-      // Deletar configurações antigas
+      // Deletar configurações antigas primeiro
       const { error: deleteError } = await supabase
         .from('task_columns')
         .delete()
@@ -164,17 +177,19 @@ export const useTasksData = () => {
         column_order: col.order
       }));
 
-      const { error: insertError } = await supabase
-        .from('task_columns')
-        .insert(columnInserts);
+      if (columnInserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('task_columns')
+          .insert(columnInserts);
 
-      if (insertError) {
-        console.error('Erro ao salvar colunas:', insertError);
-        throw insertError;
+        if (insertError) {
+          console.error('Erro ao salvar colunas:', insertError);
+          throw insertError;
+        }
+
+        console.log('Configurações de colunas salvas com sucesso');
+        await logAudit('task_columns', user.id, 'UPDATE', null, columnInserts);
       }
-
-      console.log('Configurações de colunas salvas com sucesso');
-      await logAudit('task_columns', user.id, 'UPDATE', null, columnInserts);
     } catch (error) {
       console.error('Erro ao salvar configurações de colunas:', error);
       throw error;
@@ -191,7 +206,7 @@ export const useTasksData = () => {
     try {
       console.log('Salvando tarefas no banco...', newColumns);
 
-      // Deletar tarefas antigas
+      // Deletar tarefas antigas primeiro
       const { error: deleteError } = await supabase
         .from('tasks_data')
         .delete()
@@ -240,16 +255,23 @@ export const useTasksData = () => {
 
   const updateColumns = async (newColumns: TaskColumn[]) => {
     console.log('Atualizando colunas:', newColumns);
+    
+    // Atualizar estado local primeiro
     setColumns(newColumns);
     
-    try {
-      await saveColumnsToDatabase(newColumns);
-      await saveTasksToDatabase(newColumns);
-      console.log('Dados atualizados com sucesso');
-    } catch (error) {
-      console.error('Erro ao atualizar dados:', error);
-      // Reverter mudanças em caso de erro
-      await loadTasksData();
+    // Depois tentar salvar no banco
+    if (user?.id) {
+      try {
+        await saveColumnsToDatabase(newColumns);
+        await saveTasksToDatabase(newColumns);
+        console.log('Dados atualizados com sucesso');
+      } catch (error) {
+        console.error('Erro ao atualizar dados:', error);
+        // Em caso de erro, recarregar dados do banco
+        setTimeout(() => {
+          loadTasksData();
+        }, 1000);
+      }
     }
   };
 
