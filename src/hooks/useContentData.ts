@@ -6,18 +6,6 @@ interface ContentItem {
   id: string;
   elemento: string;
   servicos: string;
-  janeiro: string;
-  fevereiro: string;
-  marco: string;
-  abril: string;
-  maio: string;
-  junho: string;
-  julho: string;
-  agosto: string;
-  setembro: string;
-  outubro: string;
-  novembro: string;
-  dezembro: string;
   informacoes: string;
   observacoes?: string;
   attachments?: { name: string; data: string; type: string }[];
@@ -48,18 +36,6 @@ interface ServiceStatus {
 export const useContentData = () => {
   const [groups, setGroups] = useState<ContentGroup[]>([]);
   const [columns, setColumns] = useState<ContentColumn[]>([
-    { id: 'janeiro', name: 'Janeiro', type: 'status', isDefault: true },
-    { id: 'fevereiro', name: 'Fevereiro', type: 'status', isDefault: true },
-    { id: 'marco', name: 'Março', type: 'status', isDefault: true },
-    { id: 'abril', name: 'Abril', type: 'status', isDefault: true },
-    { id: 'maio', name: 'Maio', type: 'status', isDefault: true },
-    { id: 'junho', name: 'Junho', type: 'status', isDefault: true },
-    { id: 'julho', name: 'Julho', type: 'status', isDefault: true },
-    { id: 'agosto', name: 'Agosto', type: 'status', isDefault: true },
-    { id: 'setembro', name: 'Setembro', type: 'status', isDefault: true },
-    { id: 'outubro', name: 'Outubro', type: 'status', isDefault: true },
-    { id: 'novembro', name: 'Novembro', type: 'status', isDefault: true },
-    { id: 'dezembro', name: 'Dezembro', type: 'status', isDefault: true },
     { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
   ]);
 
@@ -103,13 +79,12 @@ export const useContentData = () => {
         // Set custom columns for management interface
         setCustomColumns(customColumnsFromDB);
         
-        // Combine with default columns for table display
-        const defaultColumns = columns.filter(col => col.isDefault);
-        const newColumns = [...defaultColumns, ...customColumnsFromDB];
-        console.log('✅ CONTENT: Colunas atualizadas:', newColumns.length);
-        setColumns(newColumns);
+        // Set only custom columns for table display (no default columns)
+        console.log('✅ CONTENT: Colunas atualizadas:', customColumnsFromDB.length);
+        setColumns(customColumnsFromDB);
       } else {
         setCustomColumns([]);
+        setColumns([]); // No columns if no custom columns exist
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro crítico ao carregar colunas:', error);
@@ -293,9 +268,9 @@ export const useContentData = () => {
                 id: `empty-${group.id}`,
                 elemento: '',
                 servicos: '',
-                janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-                julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-                informacoes: '', observacoes: '', attachments: []
+                informacoes: '',
+                observacoes: '',
+                attachments: []
               }
             }];
 
@@ -380,9 +355,8 @@ export const useContentData = () => {
         id: `content-client-${Date.now()}`,
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
-        janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-        julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-        informacoes: '', attachments: []
+        informacoes: '',
+        attachments: []
       };
 
       // Adicionar colunas customizadas
@@ -844,9 +818,9 @@ export const useContentData = () => {
           items: groupToDuplicate.items.map((item, index) => ({
             ...item,
             id: `content-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
-            janeiro: '', fevereiro: '', marco: '', abril: '', maio: '', junho: '',
-            julho: '', agosto: '', setembro: '', outubro: '', novembro: '', dezembro: '',
-            informacoes: '', observacoes: '', attachments: []
+            informacoes: '',
+            observacoes: '',
+            attachments: []
           }))
         };
         
