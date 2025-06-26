@@ -236,7 +236,7 @@ export const useSitesData = () => {
               });
 
               return {
-                user_id: user.id, // Garantir que user_id seja sempre definido
+                user_id: user.id,
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -245,7 +245,7 @@ export const useSitesData = () => {
               };
             })
           : [{
-              user_id: user.id, // Garantir que user_id seja sempre definido
+              user_id: user.id,
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
@@ -298,7 +298,7 @@ export const useSitesData = () => {
   const createMonth = async (monthName: string) => {
     if (!user?.id) {
       console.error('❌ SITES: Usuário não encontrado para criar mês');
-      return;
+      throw new Error('Usuário não encontrado');
     }
 
     try {
@@ -313,17 +313,48 @@ export const useSitesData = () => {
         items: []
       };
       
-      const newGroups = [...groups, newGroup];
-      console.log('📊 SITES: Salvando novo grupo:', {
+      console.log('📊 SITES: Grupo criado:', {
         groupId: newGroup.id,
-        totalGroups: newGroups.length,
+        groupName: newGroup.name,
         userId: user.id
       });
+
+      // Primeiro inserir no banco de dados
+      const insertData = {
+        user_id: user.id,
+        group_id: newGroup.id,
+        group_name: newGroup.name,
+        group_color: newGroup.color,
+        is_expanded: newGroup.isExpanded,
+        item_data: {
+          id: `empty-${newGroup.id}`,
+          elemento: '',
+          servicos: '',
+          informacoes: '',
+          observacoes: '',
+          attachments: []
+        }
+      };
+
+      console.log('📝 SITES: Inserindo no banco:', insertData);
+
+      const { data: insertResult, error: insertError } = await supabase
+        .from('sites_data')
+        .insert([insertData])
+        .select('id');
+
+      if (insertError) {
+        console.error('❌ SITES: Erro ao inserir mês no banco:', insertError);
+        throw insertError;
+      }
+
+      console.log('✅ SITES: Mês inserido no banco:', insertResult);
       
+      // Só depois atualizar o estado local
+      const newGroups = [...groups, newGroup];
       setGroups(newGroups);
-      await saveSitesToDatabase(newGroups);
       
-      console.log('✅ SITES: Mês criado com sucesso');
+      console.log('✅ SITES: Mês criado com sucesso, total de grupos:', newGroups.length);
       return newGroup.id;
     } catch (error) {
       console.error('❌ SITES: Erro ao criar mês:', error);
