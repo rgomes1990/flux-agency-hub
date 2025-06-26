@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -320,67 +319,21 @@ export const useSitesData = () => {
         userId: user.id
       });
 
-      // Desabilitar RLS temporariamente para inserção ou usar função que bypassa RLS
-      const insertData = {
-        user_id: user.id,
-        group_id: newGroup.id,
-        group_name: newGroup.name,
-        group_color: newGroup.color,
-        is_expanded: newGroup.isExpanded,
-        item_data: {
-          id: `empty-${newGroup.id}`,
-          elemento: '',
-          servicos: '',
-          informacoes: '',
-          observacoes: '',
-          attachments: []
-        }
-      };
-
-      console.log('📝 SITES: Inserindo no banco:', insertData);
-
-      // Usar uma abordagem que bypassa RLS usando service_role ou função personalizada
-      const { data: insertResult, error: insertError } = await supabase
-        .from('sites_data')
-        .insert([insertData])
-        .select('id');
-
-      if (insertError) {
-        console.error('❌ SITES: Erro ao inserir mês no banco:', insertError);
-        console.error('❌ SITES: Detalhes do erro:', JSON.stringify(insertError, null, 2));
-        
-        // Se o erro for de RLS, vamos tentar uma abordagem alternativa
-        if (insertError.message?.includes('row-level security')) {
-          console.log('🔄 SITES: Tentando inserção alternativa...');
-          
-          // Vamos primeiro adicionar ao estado local e depois sincronizar
-          const newGroups = [...groups, newGroup];
-          setGroups(newGroups);
-          
-          // Tentar salvar usando a função existente que pode ter lógica diferente
-          try {
-            await saveSitesToDatabase(newGroups);
-            console.log('✅ SITES: Mês salvo via método alternativo');
-            return newGroup.id;
-          } catch (altError) {
-            console.error('❌ SITES: Erro no método alternativo:', altError);
-            // Reverter o estado se falhar
-            setGroups(groups);
-            throw altError;
-          }
-        }
-        
-        throw insertError;
-      }
-
-      console.log('✅ SITES: Mês inserido no banco:', insertResult);
-      
-      // Só depois atualizar o estado local
+      // Primeiro, vamos adicionar ao estado local
       const newGroups = [...groups, newGroup];
       setGroups(newGroups);
       
-      console.log('✅ SITES: Mês criado com sucesso, total de grupos:', newGroups.length);
-      return newGroup.id;
+      // Depois tentar salvar no banco usando a função existente
+      try {
+        await saveSitesToDatabase(newGroups);
+        console.log('✅ SITES: Mês criado e salvo com sucesso');
+        return newGroup.id;
+      } catch (saveError) {
+        console.error('❌ SITES: Erro ao salvar no banco:', saveError);
+        // Reverter o estado se falhar
+        setGroups(groups);
+        throw saveError;
+      }
     } catch (error) {
       console.error('❌ SITES: Erro ao criar mês:', error);
       throw error;
