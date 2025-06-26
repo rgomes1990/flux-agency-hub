@@ -29,6 +29,7 @@ export default function Traffic() {
   const { 
     groups, 
     columns,
+    customColumns, // Use customColumns for management interface
     statuses,
     updateGroups, 
     createMonth, 
@@ -534,7 +535,7 @@ export default function Traffic() {
             
             <div className="space-y-2">
               <h4 className="font-medium">Colunas Existentes:</h4>
-              {columns.map(column => (
+              {customColumns.map(column => (
                 <div key={column.id} className="flex items-center justify-between p-2 border rounded">
                   <span className="text-sm">
                     {column.name} ({column.type})

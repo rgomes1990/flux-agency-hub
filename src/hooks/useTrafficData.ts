@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +63,9 @@ export const useTrafficData = () => {
     { id: 'informacoes', name: 'Informações', type: 'text', isDefault: true }
   ]);
 
+  // Separate state for custom columns only (for management interface)
+  const [customColumns, setCustomColumns] = useState<TrafficColumn[]>([]);
+
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
 
   const { logAudit, user } = useAuth();
@@ -91,17 +93,23 @@ export const useTrafficData = () => {
       }
 
       if (data && data.length > 0) {
-        const customColumns = data.map(col => ({
+        const customColumnsFromDB = data.map(col => ({
           id: col.column_id,
           name: col.column_name,
           type: col.column_type as 'status' | 'text',
-          isDefault: col.is_default || false
+          isDefault: false
         }));
 
+        // Set custom columns for management interface
+        setCustomColumns(customColumnsFromDB);
+        
+        // Combine with default columns for table display
         const defaultColumns = columns.filter(col => col.isDefault);
-        const newColumns = [...defaultColumns, ...customColumns.filter(col => !col.isDefault)];
+        const newColumns = [...defaultColumns, ...customColumnsFromDB];
         console.log('✅ TRAFFIC: Colunas atualizadas:', newColumns.length);
         setColumns(newColumns);
+      } else {
+        setCustomColumns([]);
       }
     } catch (error) {
       console.error('❌ TRAFFIC: Erro crítico ao carregar colunas:', error);
@@ -257,7 +265,7 @@ export const useTrafficData = () => {
           throw deleteError;
         }
 
-        // Sempre inserir pelo menos o grupo vazio
+        // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
               console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
@@ -378,10 +386,8 @@ export const useTrafficData = () => {
       };
 
       // Adicionar colunas customizadas
-      columns.forEach(column => {
-        if (!column.isDefault) {
-          newClient[column.id] = column.type === 'status' ? '' : '';
-        }
+      customColumns.forEach(column => {
+        newClient[column.id] = column.type === 'status' ? '' : '';
       });
 
       const newGroups = groups.map(group => 
@@ -444,6 +450,7 @@ export const useTrafficData = () => {
       }
       
       setColumns(prev => [...prev, newColumn]);
+      setCustomColumns(prev => [...prev, newColumn]);
       
       // Adicionar a nova coluna a todos os itens existentes
       const newGroups = groups.map(group => ({
@@ -503,6 +510,7 @@ export const useTrafficData = () => {
   return {
     groups,
     columns,
+    customColumns, // Export custom columns for management interface
     statuses,
     updateGroups: async (newGroups: TrafficGroup[]) => {
       console.log('🔄 TRAFFIC: Atualizando grupos:', newGroups.length);
@@ -625,6 +633,9 @@ export const useTrafficData = () => {
         setColumns(prev => prev.map(col => 
           col.id === id ? { ...col, ...updates } : col
         ));
+        setCustomColumns(prev => prev.map(col => 
+          col.id === id ? { ...col, ...updates } : col
+        ));
         const { error } = await supabase
           .from('column_config')
           .update({
@@ -644,6 +655,7 @@ export const useTrafficData = () => {
       if (!user?.id) return;
       try {
         setColumns(prev => prev.filter(col => col.id !== id));
+        setCustomColumns(prev => prev.filter(col => col.id !== id));
         const { error } = await supabase
           .from('column_config')
           .delete()

@@ -12,7 +12,8 @@ import {
   Edit,
   Trash2,
   Paperclip,
-  Eye
+  Eye,
+  Menu
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -21,12 +22,14 @@ import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
-import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Content() {
+  const isMobile = useIsMobile();
   const { 
     groups, 
     columns,
+    customColumns, // Use customColumns for management interface
     statuses,
     updateGroups, 
     createMonth, 
@@ -37,6 +40,7 @@ export default function Content() {
     updateStatus,
     deleteStatus,
     addColumn,
+    updateColumn,
     deleteColumn,
     updateItemStatus,
     addClient,
@@ -45,14 +49,12 @@ export default function Content() {
     getClientFiles
   } = useContentData();
   
-  const { toast } = useToast();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
   const [duplicateMonthName, setDuplicateMonthName] = useState('');
   const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [isDuplicating, setIsDuplicating] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
@@ -69,14 +71,14 @@ export default function Content() {
   const [showFilePreview, setShowFilePreview] = useState(false);
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
 
-  const toggleGroup = async (groupId: string) => {
-    const newGroups = groups.map(group => 
+  const toggleGroup = (groupId: string) => {
+    updateGroups(groups.map(group => 
       group.id === groupId 
         ? { ...group, isExpanded: !group.isExpanded }
         : group
-    );
-    await updateGroups(newGroups);
+    ));
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -96,59 +98,31 @@ export default function Content() {
     }
   };
 
-  const handleCreateMonth = async () => {
+  const handleCreateMonth = () => {
     if (!newMonthName.trim()) return;
     
-    try {
-      await createMonth(newMonthName);
-      setNewMonthName('');
-      setShowCreateDialog(false);
-      
-      toast({
-        title: "Sucesso",
-        description: "Mês criado com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao criar mês:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar mês. Tente novamente.",
-        variant: "destructive",
-      });
-    }
+    createMonth(newMonthName);
+    setNewMonthName('');
+    setShowCreateDialog(false);
   };
 
   const handleDuplicateMonth = async () => {
     if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
     
-    setIsDuplicating(true);
     try {
       await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-      
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
       setShowDuplicateDialog(false);
-      
-      toast({
-        title: "Sucesso",
-        description: "Mês duplicado com sucesso!",
-      });
     } catch (error) {
       console.error('Erro ao duplicar mês:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao duplicar mês. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDuplicating(false);
     }
   };
 
-  const handleCreateClient = async () => {
+  const handleCreateClient = () => {
     if (!newClientName.trim() || !selectedGroupForClient) return;
     
-    await addClient(selectedGroupForClient, {
+    addClient(selectedGroupForClient, {
       elemento: newClientName,
       servicos: newClientServices
     });
@@ -168,8 +142,8 @@ export default function Content() {
     setShowColumnDialog(false);
   };
 
-  const handleDeleteClient = async (clientId: string) => {
-    await deleteClient(clientId);
+  const handleDeleteClient = (clientId: string) => {
+    deleteClient(clientId);
     setConfirmDelete(null);
   };
 
@@ -181,21 +155,22 @@ export default function Content() {
   const handleEditMonth = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      setEditingMonth({ id: groupId, name: group.name });
+      const nameWithoutSuffix = group.name.replace(' - CONTEÚDO', '');
+      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
     }
   };
 
-  const handleUpdateMonth = async () => {
+  const handleUpdateMonth = () => {
     if (editingMonth && editingMonth.name.trim()) {
-      await updateMonth(editingMonth.id, editingMonth.name);
+      updateMonth(editingMonth.id, editingMonth.name);
       setEditingMonth(null);
       setShowEditMonthDialog(false);
     }
   };
 
-  const handleDeleteMonth = async (groupId: string) => {
-    await deleteMonth(groupId);
+  const handleDeleteMonth = (groupId: string) => {
+    deleteMonth(groupId);
     setConfirmDelete(null);
   };
 
@@ -239,21 +214,31 @@ export default function Content() {
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-gray-900">Criação Conteúdo</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Conteúdo</h1>
           </div>
+          {isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center space-x-2">
+      {/* Toolbar */}
+      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
+        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
                 <Plus className="h-4 w-4 mr-1" />
                 Criar mês
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
               <DialogHeader>
                 <DialogTitle>Criar Novo Mês</DialogTitle>
               </DialogHeader>
@@ -264,10 +249,10 @@ export default function Content() {
                   onChange={(e) => setNewMonthName(e.target.value)}
                 />
                 <div className="flex space-x-2">
-                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700">
+                  <Button onClick={handleCreateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                     Criar
                   </Button>
-                  <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
                     Cancelar
                   </Button>
                 </div>
@@ -277,9 +262,9 @@ export default function Content() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={isDuplicating}>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
                 <Copy className="h-4 w-4 mr-1" />
-                {isDuplicating ? 'Duplicando...' : 'Duplicar mês'}
+                Duplicar mês
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -301,6 +286,7 @@ export default function Content() {
             variant="outline" 
             size="sm"
             onClick={() => setShowClientDialog(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Plus className="h-4 w-4 mr-1" />
             Novo Cliente
@@ -310,6 +296,7 @@ export default function Content() {
             variant="outline" 
             size="sm"
             onClick={() => setShowColumnDialog(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Colunas
@@ -319,6 +306,7 @@ export default function Content() {
             variant="outline" 
             size="sm"
             onClick={() => setShowStatusModal(true)}
+            className={isMobile ? 'w-full' : ''}
           >
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Status
@@ -328,7 +316,8 @@ export default function Content() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <div className="min-w-full">
+        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+          {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
               <div className="w-8 flex items-center justify-center p-2">
@@ -348,11 +337,11 @@ export default function Content() {
             </div>
           </div>
 
+          {/* Table Body */}
           {groups.map((group) => (
             <div key={group.id}>
-              <div 
-                className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors"
-              >
+              {/* Group Header */}
+              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
                     <button onClick={() => toggleGroup(group.id)}>
@@ -388,6 +377,7 @@ export default function Content() {
                 </div>
               </div>
 
+              {/* Group Items */}
               {group.isExpanded && group.items.map((item, index) => (
                 <div 
                   key={item.id} 
@@ -454,7 +444,7 @@ export default function Content() {
 
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Duplicar Mês</DialogTitle>
           </DialogHeader>
@@ -463,21 +453,12 @@ export default function Content() {
               placeholder="Nome do novo mês"
               value={duplicateMonthName}
               onChange={(e) => setDuplicateMonthName(e.target.value)}
-              disabled={isDuplicating}
             />
             <div className="flex space-x-2">
-              <Button 
-                onClick={handleDuplicateMonth} 
-                className="bg-orange-600 hover:bg-orange-700"
-                disabled={isDuplicating}
-              >
-                {isDuplicating ? 'Duplicando...' : 'Duplicar'}
+              <Button onClick={handleDuplicateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                Duplicar
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowDuplicateDialog(false)}
-                disabled={isDuplicating}
-              >
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -486,7 +467,7 @@ export default function Content() {
       </Dialog>
 
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Novo Cliente</DialogTitle>
           </DialogHeader>
@@ -497,7 +478,7 @@ export default function Content() {
               onChange={(e) => setNewClientName(e.target.value)}
             />
             <Input
-              placeholder="Serviços (ex: 12 Artes + Conteúdo)"
+              placeholder="Serviços (ex: Gestão de Redes Sociais)"
               value={newClientServices}
               onChange={(e) => setNewClientServices(e.target.value)}
             />
@@ -515,10 +496,10 @@ export default function Content() {
               </select>
             </div>
             <div className="flex space-x-2">
-              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700">
+              <Button onClick={handleCreateClient} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Criar
               </Button>
-              <Button variant="outline" onClick={() => setShowClientDialog(false)}>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -527,7 +508,7 @@ export default function Content() {
       </Dialog>
 
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Gerenciar Colunas</DialogTitle>
           </DialogHeader>
@@ -548,13 +529,13 @@ export default function Content() {
                 <option value="text">Texto livre</option>
               </select>
             </div>
-            <Button onClick={handleCreateColumn} className="w-full bg-orange-600 hover:bg-orange-700">
+            <Button onClick={handleCreateColumn} className="w-full bg-blue-600 hover:bg-blue-700">
               Criar Coluna
             </Button>
             
             <div className="space-y-2">
               <h4 className="font-medium">Colunas Existentes:</h4>
-              {columns.map(column => (
+              {customColumns.map(column => (
                 <div key={column.id} className="flex items-center justify-between p-2 border rounded">
                   <span className="text-sm">
                     {column.name} ({column.type})
@@ -575,7 +556,7 @@ export default function Content() {
       </Dialog>
 
       <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Editar Mês</DialogTitle>
           </DialogHeader>
@@ -586,10 +567,10 @@ export default function Content() {
               onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700">
+              <Button onClick={handleUpdateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Salvar
               </Button>
-              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)}>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
                 Cancelar
               </Button>
             </div>
@@ -598,7 +579,7 @@ export default function Content() {
       </Dialog>
 
       <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={`max-w-md ${isMobile ? 'w-[95vw] max-w-none' : ''}`}>
           <DialogHeader>
             <DialogTitle>Detalhes do Cliente</DialogTitle>
           </DialogHeader>
@@ -639,7 +620,6 @@ export default function Content() {
                     </Button>
                   </div>
                 )}
-                {/* Show existing attachments */}
                 {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
                   <div className="mt-2">
                     <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
@@ -664,11 +644,11 @@ export default function Content() {
               <div className="flex space-x-2">
                 <Button 
                   onClick={saveClientDetails}
-                  className="bg-orange-600 hover:bg-orange-700"
+                  className="bg-blue-600 hover:bg-blue-700 flex-1"
                 >
                   Salvar
                 </Button>
-                <Button variant="outline" onClick={() => setShowClientDetails(null)}>
+                <Button variant="outline" onClick={() => setShowClientDetails(null)} className="flex-1">
                   Cancelar
                 </Button>
               </div>
