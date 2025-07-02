@@ -185,16 +185,10 @@ export const useTrafficData = () => {
     }
   };
 
-  // Salvar dados no Supabase - agora compartilhado
+  // Salvar dados no Supabase - agora compartilhado (sem verificação de usuário)
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
-    if (!user?.id) {
-      console.error('❌ TRAFFIC: Usuário não encontrado para salvar');
-      return;
-    }
-    
     try {
       console.log('🔄 TRAFFIC: Iniciando salvamento compartilhado:', {
-        userId: user.id,
         groupCount: newGroups.length,
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
       });
@@ -213,7 +207,7 @@ export const useTrafficData = () => {
           throw deleteError;
         }
 
-        // Sempre inserir dados do grupo
+        // Sempre inserir dados do grupo (sem user_id para dados compartilhados)
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
               console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
@@ -223,7 +217,6 @@ export const useTrafficData = () => {
               });
 
               return {
-                user_id: user.id,
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -232,7 +225,6 @@ export const useTrafficData = () => {
               };
             })
           : [{
-              user_id: user.id,
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
@@ -249,8 +241,7 @@ export const useTrafficData = () => {
 
         console.log('📝 TRAFFIC: Dados para inserir:', {
           groupId: group.id,
-          itemCount: insertData.length,
-          userId: user.id
+          itemCount: insertData.length
         });
 
         const { data: insertResult, error: insertError } = await supabase
@@ -281,13 +272,8 @@ export const useTrafficData = () => {
   }, []);
 
   const createMonth = async (monthName: string) => {
-    if (!user?.id) {
-      console.error('❌ TRAFFIC: Usuário não encontrado para criar mês');
-      throw new Error('Usuário não encontrado');
-    }
-
     try {
-      console.log('🆕 TRAFFIC: Criando mês compartilhado:', monthName, 'por usuário:', user.id);
+      console.log('🆕 TRAFFIC: Criando mês compartilhado:', monthName);
       
       const timestamp = Date.now();
       const newGroup: TrafficGroup = {
@@ -300,8 +286,7 @@ export const useTrafficData = () => {
       
       console.log('📊 TRAFFIC: Grupo criado:', {
         groupId: newGroup.id,
-        groupName: newGroup.name,
-        userId: user.id
+        groupName: newGroup.name
       });
 
       // Primeiro, vamos adicionar ao estado local
@@ -326,11 +311,6 @@ export const useTrafficData = () => {
   };
 
   const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
-    if (!user?.id) {
-      console.error('❌ TRAFFIC: Usuário não encontrado para adicionar cliente');
-      return;
-    }
-
     try {
       console.log('👤 TRAFFIC: Adicionando cliente compartilhado:', {
         groupId,
@@ -375,11 +355,6 @@ export const useTrafficData = () => {
   };
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
-    if (!user?.id) {
-      console.error('❌ TRAFFIC: Usuário não encontrado para adicionar coluna');
-      return;
-    }
-
     try {
       console.log('🆕 TRAFFIC: Adicionando coluna compartilhada:', { name, type });
       
@@ -390,7 +365,7 @@ export const useTrafficData = () => {
         isDefault: false
       };
       
-      // Salvar no banco
+      // Salvar no banco (sem user_id para dados compartilhados)
       const { data, error } = await supabase
         .from('column_config')
         .insert({
@@ -398,8 +373,7 @@ export const useTrafficData = () => {
           column_name: newColumn.name,
           column_type: newColumn.type,
           module: 'traffic',
-          is_default: false,
-          user_id: user.id
+          is_default: false
         })
         .select();
 
@@ -433,23 +407,17 @@ export const useTrafficData = () => {
   };
 
   const addStatus = async (status: ServiceStatus) => {
-    if (!user?.id) {
-      console.error('❌ TRAFFIC: Usuário não encontrado para adicionar status');
-      return;
-    }
-
     try {
       console.log('🆕 TRAFFIC: Adicionando status compartilhado:', status);
       
-      // Salvar no banco
+      // Salvar no banco (sem user_id para dados compartilhados)
       const { data, error } = await supabase
         .from('status_config')
         .insert({
           status_id: status.id,
           status_name: status.name,
           status_color: status.color,
-          module: 'traffic',
-          user_id: user.id
+          module: 'traffic'
         })
         .select();
 
@@ -517,7 +485,6 @@ export const useTrafficData = () => {
       }
     },
     duplicateMonth: async (sourceGroupId: string, newMonthName: string) => {
-      if (!user?.id) return;
       try {
         const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
         if (!groupToDuplicate) throw new Error('Grupo não encontrado');
