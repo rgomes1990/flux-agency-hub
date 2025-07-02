@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,9 +40,9 @@ export const useTrafficData = () => {
   const [customColumns, setCustomColumns] = useState<TrafficColumn[]>([]);
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
 
-  const { logAudit, user } = useAuth();
+  const { logAudit } = useAuth();
 
-  // Carregar colunas personalizadas do Supabase - agora compartilhadas
+  // Carregar colunas personalizadas do Supabase - compartilhadas
   const loadColumns = async () => {
     try {
       console.log('🔄 TRAFFIC: Carregando colunas compartilhadas');
@@ -66,18 +67,19 @@ export const useTrafficData = () => {
         }));
 
         setCustomColumns(customColumnsFromDB);
-        console.log('✅ TRAFFIC: Colunas atualizadas:', customColumnsFromDB.length);
         setColumns(customColumnsFromDB);
+        console.log('✅ TRAFFIC: Colunas carregadas:', customColumnsFromDB.length);
       } else {
         setCustomColumns([]);
         setColumns([]);
+        console.log('ℹ️ TRAFFIC: Nenhuma coluna encontrada');
       }
     } catch (error) {
       console.error('❌ TRAFFIC: Erro crítico ao carregar colunas:', error);
     }
   };
 
-  // Carregar status personalizados do Supabase - agora compartilhados
+  // Carregar status personalizados do Supabase - compartilhados
   const loadStatuses = async () => {
     try {
       console.log('🔄 TRAFFIC: Carregando status compartilhados');
@@ -100,18 +102,18 @@ export const useTrafficData = () => {
           color: status.status_color
         }));
 
-        console.log('✅ TRAFFIC: Status atualizados:', customStatuses.length);
         setStatuses(customStatuses);
+        console.log('✅ TRAFFIC: Status carregados:', customStatuses.length);
       } else {
-        console.log('ℹ️ TRAFFIC: Nenhum status customizado encontrado');
         setStatuses([]);
+        console.log('ℹ️ TRAFFIC: Nenhum status encontrado');
       }
     } catch (error) {
       console.error('❌ TRAFFIC: Erro crítico ao carregar status:', error);
     }
   };
 
-  // Carregar dados do Supabase - agora compartilhados
+  // Carregar dados do Supabase - compartilhados
   const loadTrafficData = async () => {
     try {
       console.log('🔄 TRAFFIC: Carregando dados compartilhados');
@@ -138,7 +140,6 @@ export const useTrafficData = () => {
         data.forEach((item, index) => {
           console.log(`🔍 TRAFFIC: Processando item ${index + 1}:`, {
             group_id: item.group_id,
-            item_data_type: typeof item.item_data,
             item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
           });
 
@@ -165,7 +166,7 @@ export const useTrafficData = () => {
           }
 
           const group = groupsMap.get(item.group_id)!;
-          if (itemData) {
+          if (itemData && itemData.id && itemData.id !== `empty-${item.group_id}`) {
             group.items.push(itemData);
           }
         });
@@ -177,15 +178,15 @@ export const useTrafficData = () => {
         });
         setGroups(loadedGroups);
       } else {
-        console.log('ℹ️ TRAFFIC: Nenhum dado encontrado');
         setGroups([]);
+        console.log('ℹ️ TRAFFIC: Nenhum dado encontrado');
       }
     } catch (error) {
       console.error('❌ TRAFFIC: Erro crítico ao carregar dados:', error);
     }
   };
 
-  // Salvar dados no Supabase - agora compartilhado (sem verificação de usuário)
+  // Salvar dados no Supabase - compartilhado
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
     try {
       console.log('🔄 TRAFFIC: Iniciando salvamento compartilhado:', {
@@ -207,13 +208,12 @@ export const useTrafficData = () => {
           throw deleteError;
         }
 
-        // Sempre inserir dados do grupo (sem user_id para dados compartilhados)
+        // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
               console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
                 id: item.id,
-                elemento: item.elemento,
-                hasAttachments: !!item.attachments?.length
+                elemento: item.elemento
               });
 
               return {
@@ -289,11 +289,11 @@ export const useTrafficData = () => {
         groupName: newGroup.name
       });
 
-      // Primeiro, vamos adicionar ao estado local
+      // Adicionar ao estado local
       const newGroups = [...groups, newGroup];
       setGroups(newGroups);
       
-      // Depois tentar salvar no banco usando a função existente
+      // Salvar no banco
       try {
         await saveTrafficToDatabase(newGroups);
         console.log('✅ TRAFFIC: Mês criado e salvo com sucesso');
@@ -365,7 +365,7 @@ export const useTrafficData = () => {
         isDefault: false
       };
       
-      // Salvar no banco (sem user_id para dados compartilhados)
+      // Salvar no banco
       const { data, error } = await supabase
         .from('column_config')
         .insert({
@@ -410,7 +410,7 @@ export const useTrafficData = () => {
     try {
       console.log('🆕 TRAFFIC: Adicionando status compartilhado:', status);
       
-      // Salvar no banco (sem user_id para dados compartilhados)
+      // Salvar no banco
       const { data, error } = await supabase
         .from('status_config')
         .insert({
