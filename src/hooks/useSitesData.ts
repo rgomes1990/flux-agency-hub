@@ -42,18 +42,12 @@ export const useSitesData = () => {
   const { logAudit, user } = useAuth();
 
   const loadColumns = async () => {
-    if (!user?.id) {
-      console.log('❌ SITES: Usuário não encontrado para carregar colunas');
-      return;
-    }
-    
     try {
-      console.log('🔄 SITES: Carregando colunas para usuário:', user.id);
+      console.log('🔄 SITES: Carregando colunas compartilhadas');
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       console.log('📊 SITES: Resposta colunas:', { data, error });
 
@@ -83,18 +77,12 @@ export const useSitesData = () => {
   };
 
   const loadStatuses = async () => {
-    if (!user?.id) {
-      console.log('❌ SITES: Usuário não encontrado para carregar status');
-      return;
-    }
-    
     try {
-      console.log('🔄 SITES: Carregando status para usuário:', user.id);
+      console.log('🔄 SITES: Carregando status compartilhados');
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       console.log('📊 SITES: Resposta status:', { data, error });
 
@@ -122,18 +110,12 @@ export const useSitesData = () => {
   };
 
   const loadSitesData = async () => {
-    if (!user?.id) {
-      console.log('❌ SITES: Usuário não encontrado para carregar dados');
-      return;
-    }
-    
     try {
-      console.log('🔄 SITES: Carregando dados para usuário:', user.id);
+      console.log('🔄 SITES: Carregando dados compartilhados');
       
       const { data, error } = await supabase
         .from('sites_data')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
       console.log('📊 SITES: Resposta dados:', { 
@@ -207,7 +189,7 @@ export const useSitesData = () => {
     }
     
     try {
-      console.log('🔄 SITES: Iniciando salvamento:', {
+      console.log('🔄 SITES: Iniciando salvamento compartilhado:', {
         userId: user.id,
         groupCount: newGroups.length,
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
@@ -219,8 +201,7 @@ export const useSitesData = () => {
         const { error: deleteError } = await supabase
           .from('sites_data')
           .delete()
-          .eq('group_id', group.id)
-          .eq('user_id', user.id);
+          .eq('group_id', group.id);
 
         if (deleteError) {
           console.error('❌ SITES: Erro ao deletar:', deleteError);
@@ -287,13 +268,11 @@ export const useSitesData = () => {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      console.log('Usuário logado, inicializando dados de sites:', user.id);
-      loadSitesData();
-      loadColumns();
-      loadStatuses();
-    }
-  }, [user?.id]);
+    console.log('Inicializando dados compartilhados de sites');
+    loadSitesData();
+    loadColumns();
+    loadStatuses();
+  }, []);
 
   const createMonth = async (monthName: string) => {
     if (!user?.id) {
@@ -302,7 +281,7 @@ export const useSitesData = () => {
     }
 
     try {
-      console.log('🆕 SITES: Criando mês:', monthName, 'para usuário:', user.id);
+      console.log('🆕 SITES: Criando mês compartilhado:', monthName, 'por usuário:', user.id);
       
       const timestamp = Date.now();
       const newGroup: SiteGroup = {
@@ -347,7 +326,7 @@ export const useSitesData = () => {
     }
 
     try {
-      console.log('👤 SITES: Adicionando cliente:', {
+      console.log('👤 SITES: Adicionando cliente compartilhado:', {
         groupId,
         elemento: clientData.elemento,
         servicos: clientData.servicos
@@ -395,7 +374,7 @@ export const useSitesData = () => {
     }
 
     try {
-      console.log('🆕 SITES: Adicionando coluna:', { name, type });
+      console.log('🆕 SITES: Adicionando coluna compartilhada:', { name, type });
       
       const newColumn: SiteColumn = {
         id: name.toLowerCase().replace(/\s+/g, '_'),
@@ -451,7 +430,7 @@ export const useSitesData = () => {
     }
 
     try {
-      console.log('🆕 SITES: Adicionando status:', status);
+      console.log('🆕 SITES: Adicionando status compartilhado:', status);
       
       const { data, error } = await supabase
         .from('status_config')
@@ -480,13 +459,8 @@ export const useSitesData = () => {
   };
 
   const updateStatus = async (statusId: string, updates: Partial<ServiceStatus>) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para atualizar status');
-      return;
-    }
-
     try {
-      console.log('Atualizando status de sites:', { statusId, updates, userId: user.id });
+      console.log('Atualizando status compartilhado:', { statusId, updates });
       
       setStatuses(prev => prev.map(status => 
         status.id === statusId ? { ...status, ...updates } : status
@@ -499,8 +473,7 @@ export const useSitesData = () => {
           status_color: updates.color
         })
         .eq('status_id', statusId)
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
@@ -516,13 +489,8 @@ export const useSitesData = () => {
   };
 
   const deleteStatus = async (statusId: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para deletar status');
-      return;
-    }
-
     try {
-      console.log('Deletando status de sites:', { statusId, userId: user.id });
+      console.log('Deletando status compartilhado:', { statusId });
       
       setStatuses(prev => prev.filter(status => status.id !== statusId));
 
@@ -530,8 +498,7 @@ export const useSitesData = () => {
         .from('status_config')
         .delete()
         .eq('status_id', statusId)
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       if (error) {
         console.error('Erro ao deletar status:', error);
@@ -547,13 +514,8 @@ export const useSitesData = () => {
   };
 
   const updateColumn = async (id: string, updates: Partial<SiteColumn>) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para atualizar coluna');
-      return;
-    }
-
     try {
-      console.log('Atualizando coluna de sites:', { id, updates, userId: user.id });
+      console.log('Atualizando coluna compartilhada:', { id, updates });
       
       setColumns(prev => prev.map(col => 
         col.id === id ? { ...col, ...updates } : col
@@ -570,8 +532,7 @@ export const useSitesData = () => {
           column_type: updates.type
         })
         .eq('column_id', id)
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
@@ -587,13 +548,8 @@ export const useSitesData = () => {
   };
 
   const deleteColumn = async (id: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para deletar coluna');
-      return;
-    }
-
     try {
-      console.log('Deletando coluna de sites:', { id, userId: user.id });
+      console.log('Deletando coluna compartilhada:', { id });
       
       setColumns(prev => prev.filter(col => col.id !== id));
       setCustomColumns(prev => prev.filter(col => col.id !== id));
@@ -602,8 +558,7 @@ export const useSitesData = () => {
         .from('column_config')
         .delete()
         .eq('column_id', id)
-        .eq('module', 'sites')
-        .eq('user_id', user.id);
+        .eq('module', 'sites');
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
@@ -632,7 +587,7 @@ export const useSitesData = () => {
 
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
     try {
-      console.log('Atualizando status do item:', { itemId, field, statusId });
+      console.log('Atualizando status do item compartilhado:', { itemId, field, statusId });
       
       const newGroups = groups.map(group => ({
         ...group,
@@ -654,7 +609,7 @@ export const useSitesData = () => {
 
   const deleteClient = async (itemId: string) => {
     try {
-      console.log('Deletando cliente:', itemId);
+      console.log('Deletando cliente compartilhado:', itemId);
       
       const newGroups = groups.map(group => ({
         ...group,
@@ -672,7 +627,7 @@ export const useSitesData = () => {
 
   const updateClient = async (itemId: string, updates: Partial<SiteItem>) => {
     try {
-      console.log('📝 Atualizando cliente:', itemId, 'com:', Object.keys(updates));
+      console.log('📝 Atualizando cliente compartilhado:', itemId, 'com:', Object.keys(updates));
       
       if (updates.attachments && updates.attachments.length > 0) {
         const firstAttachment = updates.attachments[0];
@@ -740,7 +695,7 @@ export const useSitesData = () => {
     customColumns,
     statuses,
     updateGroups: async (newGroups: SiteGroup[]) => {
-      console.log('🔄 SITES: Atualizando grupos:', newGroups.length);
+      console.log('🔄 SITES: Atualizando grupos compartilhados:', newGroups.length);
       try {
         setGroups(newGroups);
         await saveSitesToDatabase(newGroups);
@@ -763,7 +718,6 @@ export const useSitesData = () => {
     updateClient,
     getClientFiles,
     updateMonth: async (groupId: string, newName: string) => {
-      if (!user?.id) return;
       try {
         const newGroups = groups.map(group => 
           group.id === groupId 
@@ -778,13 +732,11 @@ export const useSitesData = () => {
       }
     },
     deleteMonth: async (groupId: string) => {
-      if (!user?.id) return;
       try {
         const { error } = await supabase
           .from('sites_data')
           .delete()
-          .eq('group_id', groupId)
-          .eq('user_id', user.id);
+          .eq('group_id', groupId);
 
         if (error) throw error;
         setGroups(groups.filter(group => group.id !== groupId));
