@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,7 +30,6 @@ interface TrafficColumn {
 interface ServiceStatus {
   id: string;
   name: string;
-  color: string;
 }
 
 export const useTrafficData = () => {
@@ -40,12 +38,12 @@ export const useTrafficData = () => {
   const [customColumns, setCustomColumns] = useState<TrafficColumn[]>([]);
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
 
-  const { logAudit } = useAuth();
+  const { user, logAudit } = useAuth();
 
-  // Carregar colunas personalizadas do Supabase - compartilhadas
+  // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
     try {
-      console.log('🔄 TRAFFIC: Carregando colunas compartilhadas');
+      console.log('🔄 TRAFFIC: Carregando colunas');
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
@@ -79,10 +77,10 @@ export const useTrafficData = () => {
     }
   };
 
-  // Carregar status personalizados do Supabase - compartilhados
+  // Carregar status personalizados do Supabase
   const loadStatuses = async () => {
     try {
-      console.log('🔄 TRAFFIC: Carregando status compartilhados');
+      console.log('🔄 TRAFFIC: Carregando status');
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -113,10 +111,10 @@ export const useTrafficData = () => {
     }
   };
 
-  // Carregar dados do Supabase - compartilhados
+  // Carregar dados do Supabase
   const loadTrafficData = async () => {
     try {
-      console.log('🔄 TRAFFIC: Carregando dados compartilhados');
+      console.log('🔄 TRAFFIC: Carregando dados');
       
       const { data, error } = await supabase
         .from('traffic_data')
@@ -186,12 +184,18 @@ export const useTrafficData = () => {
     }
   };
 
-  // Salvar dados no Supabase - compartilhado
+  // Salvar dados no Supabase
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
     try {
-      console.log('🔄 TRAFFIC: Iniciando salvamento compartilhado:', {
+      if (!user?.id) {
+        console.error('❌ TRAFFIC: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('🔄 TRAFFIC: Iniciando salvamento:', {
         groupCount: newGroups.length,
-        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
+        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0),
+        userId: user.id
       });
       
       for (const group of newGroups) {
@@ -221,7 +225,8 @@ export const useTrafficData = () => {
                 group_name: group.name,
                 group_color: group.color,
                 is_expanded: group.isExpanded,
-                item_data: item
+                item_data: item,
+                user_id: user.id
               };
             })
           : [{
@@ -236,7 +241,8 @@ export const useTrafficData = () => {
                 informacoes: '',
                 observacoes: '',
                 attachments: []
-              }
+              },
+              user_id: user.id
             }];
 
         console.log('📝 TRAFFIC: Dados para inserir:', {
@@ -265,7 +271,7 @@ export const useTrafficData = () => {
   };
 
   useEffect(() => {
-    console.log('Inicializando dados compartilhados de tráfego');
+    console.log('Inicializando dados de tráfego');
     loadTrafficData();
     loadColumns();
     loadStatuses();
@@ -273,7 +279,12 @@ export const useTrafficData = () => {
 
   const createMonth = async (monthName: string) => {
     try {
-      console.log('🆕 TRAFFIC: Criando mês compartilhado:', monthName);
+      if (!user?.id) {
+        console.error('❌ TRAFFIC: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('🆕 TRAFFIC: Criando mês:', monthName);
       
       const timestamp = Date.now();
       const newGroup: TrafficGroup = {
@@ -312,7 +323,12 @@ export const useTrafficData = () => {
 
   const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
     try {
-      console.log('👤 TRAFFIC: Adicionando cliente compartilhado:', {
+      if (!user?.id) {
+        console.error('❌ TRAFFIC: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('👤 TRAFFIC: Adicionando cliente:', {
         groupId,
         elemento: clientData.elemento,
         servicos: clientData.servicos
@@ -356,7 +372,12 @@ export const useTrafficData = () => {
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
     try {
-      console.log('🆕 TRAFFIC: Adicionando coluna compartilhada:', { name, type });
+      if (!user?.id) {
+        console.error('❌ TRAFFIC: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('🆕 TRAFFIC: Adicionando coluna:', { name, type });
       
       const newColumn: TrafficColumn = {
         id: name.toLowerCase().replace(/\s+/g, '_'),
@@ -373,7 +394,8 @@ export const useTrafficData = () => {
           column_name: newColumn.name,
           column_type: newColumn.type,
           module: 'traffic',
-          is_default: false
+          is_default: false,
+          user_id: user.id
         })
         .select();
 
@@ -408,7 +430,12 @@ export const useTrafficData = () => {
 
   const addStatus = async (status: ServiceStatus) => {
     try {
-      console.log('🆕 TRAFFIC: Adicionando status compartilhado:', status);
+      if (!user?.id) {
+        console.error('❌ TRAFFIC: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('🆕 TRAFFIC: Adicionando status:', status);
       
       // Salvar no banco
       const { data, error } = await supabase
@@ -417,7 +444,8 @@ export const useTrafficData = () => {
           status_id: status.id,
           status_name: status.name,
           status_color: status.color,
-          module: 'traffic'
+          module: 'traffic',
+          user_id: user.id
         })
         .select();
 
@@ -442,7 +470,7 @@ export const useTrafficData = () => {
     customColumns,
     statuses,
     updateGroups: async (newGroups: TrafficGroup[]) => {
-      console.log('🔄 TRAFFIC: Atualizando grupos compartilhados:', newGroups.length);
+      console.log('🔄 TRAFFIC: Atualizando grupos:', newGroups.length);
       try {
         setGroups(newGroups);
         await saveTrafficToDatabase(newGroups);
@@ -517,7 +545,7 @@ export const useTrafficData = () => {
     },
     updateStatus: async (statusId: string, updates: Partial<ServiceStatus>) => {
       try {
-        console.log('Atualizando status compartilhado:', { statusId, updates });
+        console.log('Atualizando status:', { statusId, updates });
         
         setStatuses(prev => prev.map(status => 
           status.id === statusId ? { ...status, ...updates } : status
@@ -546,7 +574,7 @@ export const useTrafficData = () => {
     },
     deleteStatus: async (statusId: string) => {
       try {
-        console.log('Deletando status compartilhado:', { statusId });
+        console.log('Deletando status:', { statusId });
         
         setStatuses(prev => prev.filter(status => status.id !== statusId));
 
@@ -570,7 +598,7 @@ export const useTrafficData = () => {
     },
     updateColumn: async (id: string, updates: Partial<TrafficColumn>) => {
       try {
-        console.log('Atualizando coluna compartilhada:', { id, updates });
+        console.log('Atualizando coluna:', { id, updates });
         
         setColumns(prev => prev.map(col => 
           col.id === id ? { ...col, ...updates } : col
@@ -603,7 +631,7 @@ export const useTrafficData = () => {
     },
     deleteColumn: async (id: string) => {
       try {
-        console.log('Deletando coluna compartilhada:', { id });
+        console.log('Deletando coluna:', { id });
         
         setColumns(prev => prev.filter(col => col.id !== id));
         setCustomColumns(prev => prev.filter(col => col.id !== id));
@@ -640,7 +668,7 @@ export const useTrafficData = () => {
     },
     updateItemStatus: async (itemId: string, field: string, statusId: string) => {
       try {
-        console.log('Atualizando status do item compartilhado:', { itemId, field, statusId });
+        console.log('Atualizando status do item:', { itemId, field, statusId });
         
         const newGroups = groups.map(group => ({
           ...group,
@@ -661,7 +689,7 @@ export const useTrafficData = () => {
     },
     deleteClient: async (itemId: string) => {
       try {
-        console.log('Deletando cliente compartilhado:', itemId);
+        console.log('Deletando cliente:', itemId);
         
         const newGroups = groups.map(group => ({
           ...group,
@@ -678,7 +706,7 @@ export const useTrafficData = () => {
     },
     updateClient: async (itemId: string, updates: Partial<TrafficItem>) => {
       try {
-        console.log('📝 Atualizando cliente compartilhado:', itemId, 'com:', Object.keys(updates));
+        console.log('📝 Atualizando cliente:', itemId, 'com:', Object.keys(updates));
         
         if (updates.attachments && updates.attachments.length > 0) {
           const firstAttachment = updates.attachments[0];
