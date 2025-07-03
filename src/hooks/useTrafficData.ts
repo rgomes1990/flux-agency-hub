@@ -30,6 +30,7 @@ interface TrafficColumn {
 interface ServiceStatus {
   id: string;
   name: string;
+  color: string;
 }
 
 export const useTrafficData = () => {
