@@ -188,15 +188,10 @@ export const useTrafficData = () => {
   // Salvar dados no Supabase
   const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
     try {
-      if (!user?.id) {
-        console.error('❌ TRAFFIC: Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
-      }
-
       console.log('🔄 TRAFFIC: Iniciando salvamento:', {
         groupCount: newGroups.length,
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0),
-        userId: user.id
+        userId: user?.id || 'anonymous'
       });
       
       for (const group of newGroups) {
@@ -227,7 +222,7 @@ export const useTrafficData = () => {
                 group_color: group.color,
                 is_expanded: group.isExpanded,
                 item_data: item,
-                user_id: user.id
+                user_id: user?.id || null
               };
             })
           : [{
@@ -243,7 +238,7 @@ export const useTrafficData = () => {
                 observacoes: '',
                 attachments: []
               },
-              user_id: user.id
+              user_id: user?.id || null
             }];
 
         console.log('📝 TRAFFIC: Dados para inserir:', {
@@ -280,11 +275,6 @@ export const useTrafficData = () => {
 
   const createMonth = async (monthName: string) => {
     try {
-      if (!user?.id) {
-        console.error('❌ TRAFFIC: Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
-      }
-
       console.log('🆕 TRAFFIC: Criando mês:', monthName);
       
       const timestamp = Date.now();
@@ -324,11 +314,6 @@ export const useTrafficData = () => {
 
   const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
     try {
-      if (!user?.id) {
-        console.error('❌ TRAFFIC: Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
-      }
-
       console.log('👤 TRAFFIC: Adicionando cliente:', {
         groupId,
         elemento: clientData.elemento,
@@ -373,11 +358,6 @@ export const useTrafficData = () => {
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
     try {
-      if (!user?.id) {
-        console.error('❌ TRAFFIC: Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
-      }
-
       console.log('🆕 TRAFFIC: Adicionando coluna:', { name, type });
       
       const newColumn: TrafficColumn = {
@@ -396,7 +376,7 @@ export const useTrafficData = () => {
           column_type: newColumn.type,
           module: 'traffic',
           is_default: false,
-          user_id: user.id
+          user_id: user?.id || null
         })
         .select();
 
@@ -431,11 +411,6 @@ export const useTrafficData = () => {
 
   const addStatus = async (status: ServiceStatus) => {
     try {
-      if (!user?.id) {
-        console.error('❌ TRAFFIC: Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
-      }
-
       console.log('🆕 TRAFFIC: Adicionando status:', status);
       
       // Salvar no banco
@@ -446,7 +421,7 @@ export const useTrafficData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'traffic',
-          user_id: user.id
+          user_id: user?.id || null
         })
         .select();
 
