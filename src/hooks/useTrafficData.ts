@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -190,8 +191,7 @@ export const useTrafficData = () => {
     try {
       console.log('🔄 TRAFFIC: Iniciando salvamento:', {
         groupCount: newGroups.length,
-        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0),
-        userId: user?.id || 'anonymous'
+        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
       });
       
       for (const group of newGroups) {
@@ -222,7 +222,7 @@ export const useTrafficData = () => {
                 group_color: group.color,
                 is_expanded: group.isExpanded,
                 item_data: item,
-                user_id: user?.id || null
+                user_id: null // Sempre null para tornar global
               };
             })
           : [{
@@ -238,7 +238,7 @@ export const useTrafficData = () => {
                 observacoes: '',
                 attachments: []
               },
-              user_id: user?.id || null
+              user_id: null // Sempre null para tornar global
             }];
 
         console.log('📝 TRAFFIC: Dados para inserir:', {
@@ -376,7 +376,7 @@ export const useTrafficData = () => {
           column_type: newColumn.type,
           module: 'traffic',
           is_default: false,
-          user_id: user?.id || null
+          user_id: null // Sempre null para tornar global
         })
         .select();
 
@@ -421,7 +421,7 @@ export const useTrafficData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'traffic',
-          user_id: user?.id || null
+          user_id: null // Sempre null para tornar global
         })
         .select();
 
