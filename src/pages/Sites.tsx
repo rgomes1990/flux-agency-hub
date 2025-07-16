@@ -7,7 +7,6 @@ import {
   Plus, 
   ChevronDown, 
   ChevronRight,
-  Copy,
   Settings,
   Edit,
   Trash2,
@@ -16,7 +15,7 @@ import {
   Menu,
   RefreshCw
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useSitesData } from '@/hooks/useSitesData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
@@ -36,7 +35,6 @@ export default function Sites() {
     createMonth, 
     updateMonth,
     deleteMonth,
-    duplicateMonth,
     addStatus,
     updateStatus,
     deleteStatus,
@@ -52,10 +50,7 @@ export default function Sites() {
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
-  const [duplicateMonthName, setDuplicateMonthName] = useState('');
-  const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
@@ -107,18 +102,6 @@ export default function Sites() {
     setShowCreateDialog(false);
   };
 
-  const handleDuplicateMonth = async () => {
-    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
-    
-    try {
-      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-      setDuplicateMonthName('');
-      setSelectedGroupToDuplicate('');
-      setShowDuplicateDialog(false);
-    } catch (error) {
-      console.error('Erro ao duplicar mês:', error);
-    }
-  };
 
   const handleCreateClient = () => {
     if (!newClientName.trim() || !selectedGroupForClient) return;
@@ -247,16 +230,16 @@ export default function Sites() {
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
                 <Plus className="h-4 w-4 mr-1" />
-                Criar mês
+                Tipo de Projeto
               </Button>
             </DialogTrigger>
             <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
               <DialogHeader>
-                <DialogTitle>Criar Novo Mês</DialogTitle>
+                <DialogTitle>Criar Novo Tipo de Projeto</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <Input
-                  placeholder="Nome do mês"
+                  placeholder="Nome do tipo de projeto"
                   value={newMonthName}
                   onChange={(e) => setNewMonthName(e.target.value)}
                 />
@@ -272,27 +255,6 @@ export default function Sites() {
             </DialogContent>
           </Dialog>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
-                <Copy className="h-4 w-4 mr-1" />
-                Duplicar mês
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {groups.map((group) => (
-                <DropdownMenuItem
-                  key={group.id}
-                  onClick={() => {
-                    setSelectedGroupToDuplicate(group.id);
-                    setShowDuplicateDialog(true);
-                  }}
-                >
-                  Duplicar {group.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           <Button 
             variant="outline" 
@@ -455,28 +417,6 @@ export default function Sites() {
       </div>
 
       {/* Dialogs */}
-      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
-          <DialogHeader>
-            <DialogTitle>Duplicar Mês</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Nome do novo mês"
-              value={duplicateMonthName}
-              onChange={(e) => setDuplicateMonthName(e.target.value)}
-            />
-            <div className="flex space-x-2">
-              <Button onClick={handleDuplicateMonth} className="bg-green-600 hover:bg-green-700 flex-1">
-                Duplicar
-              </Button>
-              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
@@ -499,7 +439,7 @@ export default function Sites() {
               value={selectedGroupForClient}
               onChange={(e) => setSelectedGroupForClient(e.target.value)}
             >
-              <option value="">Selecione um mês</option>
+              <option value="">Selecione um tipo de projeto</option>
               {groups.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
@@ -572,11 +512,11 @@ export default function Sites() {
       <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
-            <DialogTitle>Editar Mês</DialogTitle>
+            <DialogTitle>Editar Tipo de Projeto</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <Input
-              placeholder="Nome do mês"
+              placeholder="Nome do tipo de projeto"
               value={editingMonth?.name || ''}
               onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
             />
