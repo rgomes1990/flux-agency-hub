@@ -13,7 +13,8 @@ import {
   Trash2,
   Paperclip,
   Eye,
-  Menu
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -215,6 +216,9 @@ export default function Traffic() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900">Tráfego Pago</h1>
+            <div className="text-xs text-gray-500">
+              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
+            </div>
           </div>
           {isMobile && (
             <Button
@@ -225,6 +229,14 @@ export default function Traffic() {
               <Menu className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+            className="ml-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
