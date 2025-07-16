@@ -48,18 +48,12 @@ export const useContentData = () => {
 
   // Carregar colunas personalizadas do Supabase
   const loadColumns = async () => {
-    if (!user?.id) {
-      console.log('❌ CONTENT: Usuário não encontrado para carregar colunas');
-      return;
-    }
-    
     try {
-      console.log('🔄 CONTENT: Carregando colunas para usuário:', user.id);
+      console.log('🔄 CONTENT: Carregando colunas globais');
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       console.log('📊 CONTENT: Resposta colunas:', { data, error });
 
@@ -93,18 +87,12 @@ export const useContentData = () => {
 
   // Carregar status personalizados do Supabase - APENAS os customizados
   const loadStatuses = async () => {
-    if (!user?.id) {
-      console.log('❌ CONTENT: Usuário não encontrado para carregar status');
-      return;
-    }
-    
     try {
-      console.log('🔄 CONTENT: Carregando status para usuário:', user.id);
+      console.log('🔄 CONTENT: Carregando status globais');
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       console.log('📊 CONTENT: Resposta status:', { data, error });
 
@@ -133,18 +121,12 @@ export const useContentData = () => {
 
   // Carregar dados do Supabase
   const loadContentData = async () => {
-    if (!user?.id) {
-      console.log('❌ CONTENT: Usuário não encontrado para carregar dados');
-      return;
-    }
-    
     try {
-      console.log('🔄 CONTENT: Carregando dados para usuário:', user.id);
+      console.log('🔄 CONTENT: Carregando dados globais');
       
       const { data, error } = await supabase
         .from('content_data')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
       console.log('📊 CONTENT: Resposta dados:', { 
@@ -213,14 +195,8 @@ export const useContentData = () => {
 
   // Salvar dados no Supabase
   const saveContentToDatabase = async (newGroups: ContentGroup[]) => {
-    if (!user?.id) {
-      console.error('❌ CONTENT: Usuário não encontrado para salvar');
-      return;
-    }
-    
     try {
       console.log('🔄 CONTENT: Iniciando salvamento:', {
-        userId: user.id,
         groupCount: newGroups.length,
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
       });
@@ -232,8 +208,7 @@ export const useContentData = () => {
         const { error: deleteError } = await supabase
           .from('content_data')
           .delete()
-          .eq('group_id', group.id)
-          .eq('user_id', user.id);
+          .eq('group_id', group.id);
 
         if (deleteError) {
           console.error('❌ CONTENT: Erro ao deletar:', deleteError);
@@ -250,7 +225,7 @@ export const useContentData = () => {
               });
 
               return {
-                user_id: user.id,
+                user_id: null, // Sempre null para tornar global
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -259,7 +234,7 @@ export const useContentData = () => {
               };
             })
           : [{
-              user_id: user.id,
+              user_id: null, // Sempre null para tornar global
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
@@ -295,19 +270,13 @@ export const useContentData = () => {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      console.log('Usuário logado, inicializando dados de conteúdo:', user.id);
-      loadContentData();
-      loadColumns();
-      loadStatuses();
-    }
-  }, [user?.id]);
+    console.log('Inicializando dados de conteúdo globais');
+    loadContentData();
+    loadColumns();
+    loadStatuses();
+  }, []);
 
   const createMonth = async (monthName: string) => {
-    if (!user?.id) {
-      console.error('❌ CONTENT: Usuário não encontrado para criar mês');
-      return;
-    }
 
     try {
       console.log('🆕 CONTENT: Criando mês:', monthName);
@@ -339,10 +308,6 @@ export const useContentData = () => {
   };
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
-    if (!user?.id) {
-      console.error('❌ CONTENT: Usuário não encontrado para adicionar cliente');
-      return;
-    }
 
     try {
       console.log('👤 CONTENT: Adicionando cliente:', {
@@ -388,10 +353,6 @@ export const useContentData = () => {
   };
 
   const addColumn = async (name: string, type: 'status' | 'text') => {
-    if (!user?.id) {
-      console.error('❌ CONTENT: Usuário não encontrado para adicionar coluna');
-      return;
-    }
 
     try {
       console.log('🆕 CONTENT: Adicionando coluna:', { name, type });
@@ -412,7 +373,7 @@ export const useContentData = () => {
           column_type: newColumn.type,
           module: 'content',
           is_default: false,
-          user_id: user.id
+          user_id: null // Sempre null para tornar global
         })
         .select();
 
@@ -446,10 +407,6 @@ export const useContentData = () => {
   };
 
   const addStatus = async (status: ServiceStatus) => {
-    if (!user?.id) {
-      console.error('❌ CONTENT: Usuário não encontrado para adicionar status');
-      return;
-    }
 
     try {
       console.log('🆕 CONTENT: Adicionando status:', status);
@@ -462,7 +419,7 @@ export const useContentData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'content',
-          user_id: user.id
+          user_id: null // Sempre null para tornar global
         })
         .select();
 
@@ -482,10 +439,6 @@ export const useContentData = () => {
   };
 
   const updateStatus = async (statusId: string, updates: Partial<ServiceStatus>) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para atualizar status');
-      return;
-    }
 
     try {
       console.log('Atualizando status de conteúdo:', { statusId, updates, userId: user.id });
@@ -502,8 +455,7 @@ export const useContentData = () => {
           status_color: updates.color
         })
         .eq('status_id', statusId)
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       if (error) {
         console.error('Erro ao atualizar status:', error);
@@ -519,10 +471,6 @@ export const useContentData = () => {
   };
 
   const deleteStatus = async (statusId: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para deletar status');
-      return;
-    }
 
     try {
       console.log('Deletando status de conteúdo:', { statusId, userId: user.id });
@@ -534,8 +482,7 @@ export const useContentData = () => {
         .from('status_config')
         .delete()
         .eq('status_id', statusId)
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       if (error) {
         console.error('Erro ao deletar status:', error);
@@ -551,10 +498,6 @@ export const useContentData = () => {
   };
 
   const updateColumn = async (id: string, updates: Partial<ContentColumn>) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para atualizar coluna');
-      return;
-    }
 
     try {
       console.log('Atualizando coluna de conteúdo:', { id, updates, userId: user.id });
@@ -575,8 +518,7 @@ export const useContentData = () => {
           column_type: updates.type
         })
         .eq('column_id', id)
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       if (error) {
         console.error('Erro ao atualizar coluna:', error);
@@ -592,10 +534,6 @@ export const useContentData = () => {
   };
 
   const deleteColumn = async (id: string) => {
-    if (!user?.id) {
-      console.error('Usuário não encontrado para deletar coluna');
-      return;
-    }
 
     try {
       console.log('Deletando coluna de conteúdo:', { id, userId: user.id });
@@ -608,8 +546,7 @@ export const useContentData = () => {
         .from('column_config')
         .delete()
         .eq('column_id', id)
-        .eq('module', 'content')
-        .eq('user_id', user.id);
+        .eq('module', 'content');
 
       if (error) {
         console.error('Erro ao deletar coluna:', error);
@@ -771,7 +708,6 @@ export const useContentData = () => {
     updateClient,
     getClientFiles,
     updateMonth: async (groupId: string, newName: string) => {
-      if (!user?.id) return;
       try {
         const newGroups = groups.map(group => 
           group.id === groupId 
@@ -786,13 +722,11 @@ export const useContentData = () => {
       }
     },
     deleteMonth: async (groupId: string) => {
-      if (!user?.id) return;
       try {
         const { error } = await supabase
           .from('content_data')
           .delete()
-          .eq('group_id', groupId)
-          .eq('user_id', user.id);
+          .eq('group_id', groupId);
 
         if (error) throw error;
         setGroups(groups.filter(group => group.id !== groupId));
@@ -802,7 +736,6 @@ export const useContentData = () => {
       }
     },
     duplicateMonth: async (sourceGroupId: string, newMonthName: string) => {
-      if (!user?.id) return;
       try {
         const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
         if (!groupToDuplicate) throw new Error('Grupo não encontrado');
