@@ -217,7 +217,7 @@ export const useSitesData = () => {
               });
 
               return {
-                user_id: user.id,
+        user_id: null,
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -226,7 +226,7 @@ export const useSitesData = () => {
               };
             })
           : [{
-              user_id: user.id,
+              user_id: null,
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
@@ -391,7 +391,7 @@ export const useSitesData = () => {
           column_type: newColumn.type,
           module: 'sites',
           is_default: false,
-          user_id: user.id
+          user_id: null
         })
         .select();
 
@@ -439,7 +439,7 @@ export const useSitesData = () => {
           status_name: status.name,
           status_color: status.color,
           module: 'sites',
-          user_id: user.id
+          user_id: null
         })
         .select();
 
