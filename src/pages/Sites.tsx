@@ -594,8 +594,8 @@ export default function Sites() {
             handleDeleteMonth(confirmDelete.id);
           }
         }}
-        title={`Confirmar ${confirmDelete?.type === 'client' ? 'Exclusão de Cliente' : confirmDelete?.type === 'column' ? 'Exclusão de Coluna' : 'Exclusão de Mês'}`}
-        message={`Tem certeza que deseja excluir este ${confirmDelete?.type === 'client' ? 'cliente' : confirmDelete?.type === 'column' ? 'coluna' : 'mês'}? Esta ação não pode ser desfeita.`}
+        title={`Confirmar ${confirmDelete?.type === 'client' ? 'Exclusão de Cliente' : confirmDelete?.type === 'column' ? 'Exclusão de Coluna' : 'Exclusão de Tipo de Projeto'}`}
+        message={`Tem certeza que deseja excluir este ${confirmDelete?.type === 'client' ? 'cliente' : confirmDelete?.type === 'column' ? 'coluna' : 'tipo de projeto'}? Esta ação não pode ser desfeita.`}
       />
 
       <FilePreview
