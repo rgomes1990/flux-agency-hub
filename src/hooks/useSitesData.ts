@@ -217,7 +217,7 @@ export const useSitesData = () => {
               });
 
               return {
-        user_id: null,
+        user_id: user.id,
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -226,7 +226,7 @@ export const useSitesData = () => {
               };
             })
           : [{
-              user_id: null,
+              user_id: user.id,
               group_id: group.id,
               group_name: group.name,
               group_color: group.color,
