@@ -301,7 +301,7 @@ export default function Sites() {
                 />
               </div>
               <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              
               {columns.map((column) => (
                 <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
@@ -377,9 +377,6 @@ export default function Sites() {
                         )}
                       </div>
                     </div>
-                    <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.servicos}
-                    </div>
                     {columns.map((column) => (
                       <div key={column.id} className="w-32 p-2 border-r border-gray-200">
                         {column.type === 'status' ? (
@@ -428,11 +425,6 @@ export default function Sites() {
               placeholder="Nome do cliente"
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
-            />
-            <Input
-              placeholder="Serviços"
-              value={newClientServices}
-              onChange={(e) => setNewClientServices(e.target.value)}
             />
             <select 
               className="w-full p-2 border rounded-md text-sm"

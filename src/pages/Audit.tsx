@@ -60,8 +60,10 @@ export default function Audit() {
     if (confirm('Tem certeza que deseja limpar logs com mais de 30 dias?')) {
       try {
         await clearOldLogs(30);
+        await refreshLogs(); // Atualizar a lista após limpar
         alert('Logs antigos removidos com sucesso!');
       } catch (error) {
+        console.error('Erro ao limpar logs:', error);
         alert('Erro ao limpar logs antigos');
       }
     }

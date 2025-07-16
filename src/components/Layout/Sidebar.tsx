@@ -24,11 +24,6 @@ const menuItems = [
     path: '/content'
   },
   {
-    name: 'Criação de Sites',
-    icon: Globe,
-    path: '/sites'
-  },
-  {
     name: 'Tarefas',
     icon: CheckSquare,
     path: '/tasks'
@@ -37,6 +32,11 @@ const menuItems = [
     name: 'Tráfego Pago',
     icon: TrendingUp,
     path: '/traffic'
+  },
+  {
+    name: 'Criação de Sites',
+    icon: Globe,
+    path: '/sites'
   },
   {
     name: 'Usuários',
