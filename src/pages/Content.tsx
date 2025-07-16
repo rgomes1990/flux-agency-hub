@@ -215,6 +215,9 @@ export default function Content() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900">Conteúdo</h1>
+            <div className="text-xs text-gray-500">
+              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
+            </div>
           </div>
           {isMobile && (
             <Button
