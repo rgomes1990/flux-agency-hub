@@ -270,11 +270,15 @@ export const useContentData = () => {
   };
 
   useEffect(() => {
-    console.log('Inicializando dados de conteúdo globais');
-    loadContentData();
-    loadColumns();
-    loadStatuses();
-  }, []);
+    if (user) {
+      console.log('Inicializando dados de conteúdo globais para usuário:', user.username);
+      loadContentData();
+      loadColumns();
+      loadStatuses();
+    } else {
+      console.log('Usuário não logado, aguardando autenticação...');
+    }
+  }, [user]);
 
   const createMonth = async (monthName: string) => {
 

@@ -267,11 +267,15 @@ export const useTrafficData = () => {
   };
 
   useEffect(() => {
-    console.log('Inicializando dados de tráfego');
-    loadTrafficData();
-    loadColumns();
-    loadStatuses();
-  }, []);
+    if (user) {
+      console.log('Inicializando dados de tráfego globais para usuário:', user.username);
+      loadTrafficData();
+      loadColumns();
+      loadStatuses();
+    } else {
+      console.log('Usuário não logado, aguardando autenticação...');
+    }
+  }, [user]);
 
   const createMonth = async (monthName: string) => {
     try {
