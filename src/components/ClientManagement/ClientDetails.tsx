@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Paperclip, Eye } from 'lucide-react';
+import { Plus, Trash2, Paperclip, Eye, Edit } from 'lucide-react';
 
 interface ObservationItem {
   id: string;
   text: string;
   completed: boolean;
+  isEditing?: boolean;
 }
 
 interface ClientDetailsProps {
@@ -41,6 +42,8 @@ export function ClientDetails({
 }: ClientDetailsProps) {
   const [newObservationText, setNewObservationText] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState(currentGroupId);
+  const [editingObservation, setEditingObservation] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
 
   const addObservation = () => {
     if (newObservationText.trim()) {
@@ -64,6 +67,27 @@ export function ClientDetails({
   const deleteObservation = (id: string) => {
     const updatedObservations = observations.filter(obs => obs.id !== id);
     onUpdateObservations(updatedObservations);
+  };
+
+  const startEditObservation = (id: string, currentText: string) => {
+    setEditingObservation(id);
+    setEditText(currentText);
+  };
+
+  const saveEditObservation = (id: string) => {
+    if (editText.trim()) {
+      const updatedObservations = observations.map(obs =>
+        obs.id === id ? { ...obs, text: editText.trim() } : obs
+      );
+      onUpdateObservations(updatedObservations);
+    }
+    setEditingObservation(null);
+    setEditText('');
+  };
+
+  const cancelEdit = () => {
+    setEditingObservation(null);
+    setEditText('');
   };
 
   const handleMoveClient = () => {
@@ -160,24 +184,55 @@ export function ClientDetails({
                     className="mt-0.5"
                   />
                   <div className="flex-1">
-                    <span 
-                      className={`text-sm ${
-                        observation.completed 
-                          ? 'line-through text-gray-500' 
-                          : 'text-gray-900'
-                      }`}
-                    >
-                      {observation.text}
-                    </span>
+                    {editingObservation === observation.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="min-h-[60px]"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => saveEditObservation(observation.id)}>
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEdit}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span 
+                        className={`text-sm ${
+                          observation.completed 
+                            ? 'line-through text-gray-500' 
+                            : 'text-gray-900'
+                        }`}
+                      >
+                        {observation.text}
+                      </span>
+                    )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteObservation(observation.id)}
-                    className="text-red-600 hover:text-red-800 p-1"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {editingObservation !== observation.id && (
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => startEditObservation(observation.id, observation.text)}
+                        className="text-blue-600 hover:text-blue-800 p-1"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteObservation(observation.id)}
+                        className="text-red-600 hover:text-red-800 p-1"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
               {observations.length === 0 && (

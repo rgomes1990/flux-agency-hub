@@ -18,10 +18,11 @@ export function UndoButton() {
     }
   };
 
-  // Always show button for debugging
+  // Debug logging
   console.log('UndoButton render:', { hasUndo, undoCount: hasUndo });
 
-  if (!hasUndo) return null;
+  // Always show for debugging - remove the hasUndo check temporarily
+  // if (!hasUndo) return null;
 
   return (
     <Button

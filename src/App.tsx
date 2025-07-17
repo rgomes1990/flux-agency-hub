@@ -31,16 +31,18 @@ function App() {
   useEffect(() => {
     const savedRoute = sessionStorage.getItem('lastRoute');
     
-    // Check if this is a page refresh/reload using a simpler method
-    const isPageRefresh = document.referrer === '' || 
-                         (window.performance.getEntriesByType?.('navigation')?.[0] as any)?.type === 'reload';
+    // Check if this is a page refresh/reload
+    const isPageRefresh = window.performance?.navigation?.type === 1 || 
+                         document.referrer === window.location.href;
+    
+    console.log('App useEffect:', { savedRoute, currentPath: window.location.pathname, isPageRefresh });
     
     if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && isPageRefresh) {
-      // Use replaceState instead of window.location.href to avoid loops
+      // Only redirect if we're on the root or dashboard and have a saved route
       if (window.location.pathname === '/' || window.location.pathname === '/dashboard') {
-        window.history.replaceState(null, '', savedRoute);
-        // Force navigation to the saved route
-        window.location.pathname = savedRoute;
+        console.log('Redirecting to saved route:', savedRoute);
+        window.location.replace(savedRoute);
+        return;
       }
     }
   }, []);

@@ -105,7 +105,9 @@ export default function Sites() {
     const monthName = newMonthName;
     createMonth(monthName);
     
+    console.log('Creating month:', monthName, 'Adding undo action');
     addUndoAction(`Criação do tipo de projeto "${monthName}"`, () => {
+      console.log('Executing undo for month creation:', monthName);
       // Actually undo the month creation by deleting it
       deleteMonth(groups.find(g => g.name === monthName)?.id || '');
     });
