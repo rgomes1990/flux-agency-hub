@@ -24,6 +24,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { useUndo } from '@/contexts/UndoContext';
 
 export default function Content() {
   const isMobile = useIsMobile();
@@ -74,6 +75,8 @@ export default function Content() {
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  
+  const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 

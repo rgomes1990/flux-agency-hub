@@ -21,11 +21,14 @@ export function UndoButton() {
   // Always show button for debugging
   console.log('UndoButton render:', { hasUndo, undoCount: hasUndo });
 
+  if (!hasUndo) return null;
+
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={handleUndo}
+      disabled={!hasUndo}
       className="flex items-center gap-2"
     >
       <Undo2 className="h-4 w-4" />

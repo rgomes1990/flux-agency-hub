@@ -30,11 +30,17 @@ function RoutePreserver() {
 function App() {
   useEffect(() => {
     const savedRoute = sessionStorage.getItem('lastRoute');
-    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth') {
-      // Only redirect on hard refresh (full page reload)
-      if (performance.navigation.type === 1) {
-        window.location.href = savedRoute;
-        return;
+    
+    // Check if this is a page refresh/reload using a simpler method
+    const isPageRefresh = document.referrer === '' || 
+                         (window.performance.getEntriesByType?.('navigation')?.[0] as any)?.type === 'reload';
+    
+    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && isPageRefresh) {
+      // Use replaceState instead of window.location.href to avoid loops
+      if (window.location.pathname === '/' || window.location.pathname === '/dashboard') {
+        window.history.replaceState(null, '', savedRoute);
+        // Force navigation to the saved route
+        window.location.pathname = savedRoute;
       }
     }
   }, []);

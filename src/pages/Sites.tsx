@@ -106,8 +106,8 @@ export default function Sites() {
     createMonth(monthName);
     
     addUndoAction(`Criação do tipo de projeto "${monthName}"`, () => {
-      // Logic to undo month creation would go here
-      console.log('Undo create month:', monthName);
+      // Actually undo the month creation by deleting it
+      deleteMonth(groups.find(g => g.name === monthName)?.id || '');
     });
     
     setNewMonthName('');
@@ -215,6 +215,8 @@ export default function Sites() {
     const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
     
     if (client && oldGroup) {
+      const originalGroupId = oldGroup.id; // Store the original group ID for undo
+      
       // Remove from old group
       deleteClient(clientId);
       
@@ -227,8 +229,8 @@ export default function Sites() {
       });
       
       addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
-        // Logic to undo client move would go here
-        console.log('Undo move client:', client.elemento);
+        // Actually undo the client move by moving it back
+        handleMoveClient(clientId, originalGroupId);
       });
       
       setShowClientDetails(null);
