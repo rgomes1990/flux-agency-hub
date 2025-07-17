@@ -39,7 +39,7 @@ function App() {
     <AuthProvider>
       <UndoProvider>
         <Router>
-        <RoutePreserver />
+          <RoutePreserver />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />

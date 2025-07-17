@@ -23,6 +23,7 @@ import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusMo
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 
 export default function Content() {
   const isMobile = useIsMobile();
@@ -72,6 +73,7 @@ export default function Content() {
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -180,13 +182,28 @@ export default function Content() {
       setClientNotes(client.observacoes || '');
       const files = getClientFiles(clientId);
       setClientFile(files[0] || null);
+      
+      // Parse existing observations from client notes
+      try {
+        const parsed = JSON.parse(client.observacoes || '[]');
+        if (Array.isArray(parsed)) {
+          setClientObservations(parsed);
+        } else {
+          setClientObservations([]);
+        }
+      } catch {
+        setClientObservations([]);
+      }
+      
       setShowClientDetails(clientId);
     }
   };
 
   const saveClientDetails = async () => {
     if (showClientDetails) {
-      const updates: any = { observacoes: clientNotes };
+      const updates: any = { 
+        observacoes: JSON.stringify(clientObservations) 
+      };
       
       if (clientFile) {
         updates.attachments = [clientFile];
@@ -195,8 +212,28 @@ export default function Content() {
       await updateClient(showClientDetails, updates);
     }
     setShowClientDetails(null);
-    setClientNotes('');
+    setClientObservations([]);
     setClientFile(null);
+  };
+
+  const handleMoveClient = (clientId: string, newGroupId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
+    
+    if (client && oldGroup) {
+      // Remove from old group
+      deleteClient(clientId);
+      
+      // Add to new group
+      addClient(newGroupId, {
+        elemento: client.elemento,
+        servicos: client.servicos || '',
+        observacoes: client.observacoes,
+        ...client
+      });
+      
+      setShowClientDetails(null);
+    }
   };
 
   const openFilePreview = (file: File) => {
@@ -581,84 +618,21 @@ export default function Content() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showClientDetails} onOpenChange={(open) => !open && setShowClientDetails(null)}>
-        <DialogContent className={`max-w-md ${isMobile ? 'w-[95vw] max-w-none' : ''}`}>
-          <DialogHeader>
-            <DialogTitle>Detalhes do Cliente</DialogTitle>
-          </DialogHeader>
-          {showClientDetails && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Observações</label>
-                <Textarea
-                  value={clientNotes}
-                  onChange={(e) => setClientNotes(e.target.value)}
-                  placeholder="Adicione suas observações..."
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Anexar Arquivo</label>
-                <div className="mt-1 flex items-center space-x-2">
-                  <input
-                    type="file"
-                    onChange={(e) => setClientFile(e.target.files?.[0] || null)}
-                    className="text-sm"
-                    accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
-                  />
-                  <Paperclip className="h-4 w-4 text-gray-400" />
-                </div>
-                {clientFile && (
-                  <div className="mt-2 p-2 border rounded flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Paperclip className="h-4 w-4" />
-                      <span className="text-sm truncate">{clientFile.name}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openFilePreview(clientFile)}
-                    >
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-                {getClientAttachments(showClientDetails).length > 0 && !clientFile && (
-                  <div className="mt-2">
-                    <p className="text-sm font-medium mb-2">Arquivos anexados:</p>
-                    {getClientAttachments(showClientDetails).map((file, index) => (
-                      <div key={index} className="p-2 border rounded flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <Paperclip className="h-4 w-4" />
-                          <span className="text-sm truncate">{file.name}</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openFilePreview(file)}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={saveClientDetails}
-                  className="bg-blue-600 hover:bg-blue-700 flex-1"
-                >
-                  Salvar
-                </Button>
-                <Button variant="outline" onClick={() => setShowClientDetails(null)} className="flex-1">
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {showClientDetails && (
+        <ClientDetails
+          open={!!showClientDetails}
+          onOpenChange={(open) => !open && setShowClientDetails(null)}
+          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
+          observations={clientObservations}
+          onUpdateObservations={setClientObservations}
+          clientFile={clientFile}
+          onFileChange={setClientFile}
+          onFilePreview={openFilePreview}
+          availableGroups={groups}
+          currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails!, newGroupId)}
+        />
+      )}
 
       <CustomStatusModal
         open={showStatusModal}

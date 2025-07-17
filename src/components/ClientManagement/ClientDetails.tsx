@@ -91,7 +91,7 @@ export function ClientDetails({
               >
                 {availableGroups.map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.name.replace(' - SITES', '')}
+                    {group.name.replace(' - SITES', '').replace('SITES - ', '')}
                   </option>
                 ))}
               </select>

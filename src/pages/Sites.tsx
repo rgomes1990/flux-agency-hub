@@ -151,7 +151,7 @@ export default function Sites() {
   const handleEditMonth = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      const nameWithoutSuffix = group.name.replace(' - SITES', '');
+      const nameWithoutSuffix = group.name.replace(' - SITES', '').replace('SITES - ', '');
       setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
     }
@@ -380,7 +380,7 @@ export default function Sites() {
                   </div>
                   <div className="flex items-center space-x-2 p-2 flex-1">
                     <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name.replace(' - SITES', '')}</span>
+                    <span className="font-medium text-gray-900">{group.name.replace(' - SITES', '').replace('SITES - ', '')}</span>
                   </div>
                   <div className="flex items-center space-x-1 p-2">
                     <Button
