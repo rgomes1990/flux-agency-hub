@@ -633,7 +633,14 @@ export default function Traffic() {
           onOpenChange={(open) => !open && setShowClientDetails(null)}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
-          onUpdateObservations={setClientObservations}
+          onUpdateObservations={(newObservations) => {
+            setClientObservations(newObservations);
+            // Save observations to database
+            const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
+            if (clientItem) {
+              updateClient(showClientDetails!, { observacoes: JSON.stringify(newObservations) });
+            }
+          }}
           clientFile={clientFile}
           onFileChange={setClientFile}
           onFilePreview={openFilePreview}

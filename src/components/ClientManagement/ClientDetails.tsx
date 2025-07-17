@@ -137,15 +137,16 @@ export function ClientDetails({
             <h3 className="text-lg font-medium mb-3">Quadros de Observação</h3>
             
             {/* Adicionar nova observação */}
-            <div className="flex gap-2 mb-4">
-              <Input
+            <div className="space-y-2 mb-4">
+              <Textarea
                 placeholder="Digite uma nova observação..."
                 value={newObservationText}
                 onChange={(e) => setNewObservationText(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addObservation()}
+                className="min-h-[80px]"
               />
-              <Button onClick={addObservation} size="sm">
-                <Plus className="h-4 w-4" />
+              <Button onClick={addObservation} size="sm" className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Observação
               </Button>
             </div>
 

@@ -581,7 +581,16 @@ export default function Sites() {
         onOpenChange={() => setShowClientDetails(null)}
         clientName={showClientDetails ? groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || '' : ''}
         observations={clientObservations}
-        onUpdateObservations={setClientObservations}
+        onUpdateObservations={(newObservations) => {
+          setClientObservations(newObservations);
+          // Save observations to database
+          if (showClientDetails) {
+            const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
+            if (clientItem) {
+              updateClient(showClientDetails, { observacoes: JSON.stringify(newObservations) });
+            }
+          }
+        }}
         clientFile={clientFile}
         onFileChange={setClientFile}
         onFilePreview={openFilePreview}

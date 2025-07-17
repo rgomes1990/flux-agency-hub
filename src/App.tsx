@@ -30,8 +30,12 @@ function RoutePreserver() {
 function App() {
   useEffect(() => {
     const savedRoute = sessionStorage.getItem('lastRoute');
-    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && window.location.pathname === '/') {
-      window.history.replaceState(null, '', savedRoute);
+    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth') {
+      // Only redirect on hard refresh (full page reload)
+      if (performance.navigation.type === 1) {
+        window.location.href = savedRoute;
+        return;
+      }
     }
   }, []);
 
