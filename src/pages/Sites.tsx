@@ -23,6 +23,8 @@ import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusMo
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { useUndo } from '@/contexts/UndoContext';
 
 export default function Sites() {
   const isMobile = useIsMobile();
@@ -68,6 +70,9 @@ export default function Sites() {
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  
+  const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -97,7 +102,14 @@ export default function Sites() {
   const handleCreateMonth = () => {
     if (!newMonthName.trim()) return;
     
-    createMonth(newMonthName);
+    const monthName = newMonthName;
+    createMonth(monthName);
+    
+    addUndoAction(`Criação do tipo de projeto "${monthName}"`, () => {
+      // Logic to undo month creation would go here
+      console.log('Undo create month:', monthName);
+    });
+    
     setNewMonthName('');
     setShowCreateDialog(false);
   };
@@ -164,13 +176,28 @@ export default function Sites() {
       setClientNotes(client.observacoes || '');
       const files = getClientFiles(clientId);
       setClientFile(files[0] || null);
+      
+      // Parse existing observations from client notes
+      try {
+        const parsed = JSON.parse(client.observacoes || '[]');
+        if (Array.isArray(parsed)) {
+          setClientObservations(parsed);
+        } else {
+          setClientObservations([]);
+        }
+      } catch {
+        setClientObservations([]);
+      }
+      
       setShowClientDetails(clientId);
     }
   };
 
   const saveClientDetails = async () => {
     if (showClientDetails) {
-      const updates: any = { observacoes: clientNotes };
+      const updates: any = { 
+        observacoes: JSON.stringify(clientObservations) 
+      };
       
       if (clientFile) {
         updates.attachments = [clientFile];
@@ -179,8 +206,33 @@ export default function Sites() {
       await updateClient(showClientDetails, updates);
     }
     setShowClientDetails(null);
-    setClientNotes('');
+    setClientObservations([]);
     setClientFile(null);
+  };
+
+  const handleMoveClient = (clientId: string, newGroupId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
+    
+    if (client && oldGroup) {
+      // Remove from old group
+      deleteClient(clientId);
+      
+      // Add to new group
+      addClient(newGroupId, {
+        elemento: client.elemento,
+        servicos: client.servicos || '',
+        observacoes: client.observacoes,
+        ...client
+      });
+      
+      addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
+        // Logic to undo client move would go here
+        console.log('Undo move client:', client.elemento);
+      });
+      
+      setShowClientDetails(null);
+    }
   };
 
   const openFilePreview = (file: File) => {
@@ -328,7 +380,7 @@ export default function Sites() {
                   </div>
                   <div className="flex items-center space-x-2 p-2 flex-1">
                     <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name}</span>
+                    <span className="font-medium text-gray-900">{group.name.replace(' - SITES', '')}</span>
                   </div>
                   <div className="flex items-center space-x-1 p-2">
                     <Button
@@ -524,54 +576,19 @@ export default function Sites() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showClientDetails} onOpenChange={() => setShowClientDetails(null)}>
-        <DialogContent className={`${isMobile ? 'w-[95vw] max-w-none' : 'max-w-2xl'}`}>
-          <DialogHeader>
-            <DialogTitle>Detalhes do Cliente</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Observações:</label>
-              <Textarea
-                value={clientNotes}
-                onChange={(e) => setClientNotes(e.target.value)}
-                className="mt-1"
-                rows={4}
-                placeholder="Adicione observações sobre o cliente..."
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium">Arquivo:</label>
-              <div className="mt-1">
-                <input
-                  type="file"
-                  onChange={(e) => setClientFile(e.target.files?.[0] || null)}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {clientFile && (
-                  <div className="mt-2 flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">{clientFile.name}</span>
-                     <Button size="sm" variant="outline" onClick={() => openFilePreview(clientFile as File)}>
-                       <Eye className="h-3 w-3 mr-1" />
-                       Visualizar
-                     </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button onClick={saveClientDetails} className="bg-green-600 hover:bg-green-700 flex-1">
-                Salvar
-              </Button>
-              <Button variant="outline" onClick={() => setShowClientDetails(null)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ClientDetails
+        open={!!showClientDetails}
+        onOpenChange={() => setShowClientDetails(null)}
+        clientName={showClientDetails ? groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || '' : ''}
+        observations={clientObservations}
+        onUpdateObservations={setClientObservations}
+        clientFile={clientFile}
+        onFileChange={setClientFile}
+        onFilePreview={openFilePreview}
+        availableGroups={groups}
+        currentGroupId={showClientDetails ? groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || '' : ''}
+        onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+      />
 
       <CustomStatusModal
         open={showStatusModal}

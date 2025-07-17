@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
+import { UndoProvider } from './contexts/UndoContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import MainLayout from './components/Layout/MainLayout';
 import Auth from './pages/Auth';
@@ -16,10 +17,29 @@ import ClientPasswords from './pages/ClientPasswords';
 import Audit from './pages/Audit';
 import NotFound from './pages/NotFound';
 
+function RoutePreserver() {
+  const location = useLocation();
+  
+  useEffect(() => {
+    sessionStorage.setItem('lastRoute', location.pathname);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
+  useEffect(() => {
+    const savedRoute = sessionStorage.getItem('lastRoute');
+    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && window.location.pathname === '/') {
+      window.history.replaceState(null, '', savedRoute);
+    }
+  }, []);
+
   return (
     <AuthProvider>
-      <Router>
+      <UndoProvider>
+        <Router>
+        <RoutePreserver />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -82,6 +102,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
+      </UndoProvider>
     </AuthProvider>
   );
 }

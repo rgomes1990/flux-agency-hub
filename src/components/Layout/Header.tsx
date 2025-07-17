@@ -3,6 +3,7 @@ import React from 'react';
 import { LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { UndoButton } from './UndoButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ export function Header() {
   return (
     <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-end">
       <div className="flex items-center space-x-3">
+        <UndoButton />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="flex items-center space-x-2">

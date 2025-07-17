@@ -92,19 +92,8 @@ export function CustomStatusModal({
             <h3 className="text-lg font-medium mb-4">Criar Novo Status</h3>
             <form onSubmit={handleAddStatus} className="space-y-4">
               <div>
-                <Label htmlFor="statusName">Nome do Status</Label>
-                <Input
-                  id="statusName"
-                  value={statusName}
-                  onChange={(e) => setStatusName(e.target.value)}
-                  placeholder="Ex: Em Revisão"
-                  required
-                />
-              </div>
-              
-              <div>
                 <Label>Cor do Status</Label>
-                <div className="grid grid-cols-5 gap-2 mt-2">
+                <div className="grid grid-cols-5 gap-2 mt-2 mb-4">
                   {colorOptions.map((color) => (
                     <button
                       key={color.value}
@@ -117,6 +106,17 @@ export function CustomStatusModal({
                     />
                   ))}
                 </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="statusName">Nome do Status</Label>
+                <Input
+                  id="statusName"
+                  value={statusName}
+                  onChange={(e) => setStatusName(e.target.value)}
+                  placeholder="Ex: Em Revisão"
+                  required
+                />
               </div>
               
               <Button type="submit" className="w-full">
@@ -132,33 +132,35 @@ export function CustomStatusModal({
               <div className="space-y-2">
                 {existingStatuses.map((status) => (
                   <div key={status.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    {editingStatus === status.id ? (
-                      <div className="flex-1 flex items-center gap-2">
-                        <Input
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="flex-1"
-                        />
-                        <div className="flex gap-1">
-                          {colorOptions.map((color) => (
-                            <button
-                              key={color.value}
-                              type="button"
-                              className={`w-6 h-6 rounded-full ${color.value} ${
-                                editColor === color.value ? 'ring-2 ring-offset-1 ring-gray-400' : ''
-                              }`}
-                              onClick={() => setEditColor(color.value)}
-                              title={color.name}
-                            />
-                          ))}
-                        </div>
-                        <Button size="sm" onClick={handleUpdateStatus}>
-                          Salvar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingStatus(null)}>
-                          Cancelar
-                        </Button>
-                      </div>
+                     {editingStatus === status.id ? (
+                       <div className="flex-1 space-y-3">
+                         <div className="flex gap-1">
+                           {colorOptions.map((color) => (
+                             <button
+                               key={color.value}
+                               type="button"
+                               className={`w-6 h-6 rounded-full ${color.value} ${
+                                 editColor === color.value ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+                               }`}
+                               onClick={() => setEditColor(color.value)}
+                               title={color.name}
+                             />
+                           ))}
+                         </div>
+                         <Input
+                           value={editName}
+                           onChange={(e) => setEditName(e.target.value)}
+                           className="w-full"
+                         />
+                         <div className="flex gap-2">
+                           <Button size="sm" onClick={handleUpdateStatus}>
+                             Salvar
+                           </Button>
+                           <Button size="sm" variant="outline" onClick={() => setEditingStatus(null)}>
+                             Cancelar
+                           </Button>
+                         </div>
+                       </div>
                     ) : (
                       <>
                         <div className="flex items-center gap-3">
