@@ -30,16 +30,21 @@ function RoutePreserver() {
 function App() {
   useEffect(() => {
     const savedRoute = sessionStorage.getItem('lastRoute');
+    const currentPath = window.location.pathname;
     
-    // Check if this is a page refresh/reload
-    const isPageRefresh = window.performance?.navigation?.type === 1 || 
-                         document.referrer === window.location.href;
+    // Verificar se é um refresh da página
+    const isPageRefresh = window.performance?.getEntriesByType('navigation')?.[0]?.type === 'reload';
     
-    console.log('App useEffect:', { savedRoute, currentPath: window.location.pathname, isPageRefresh });
+    console.log('App useEffect:', { 
+      savedRoute, 
+      currentPath, 
+      isPageRefresh,
+      performanceType: window.performance?.getEntriesByType('navigation')?.[0]?.type 
+    });
     
-    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && isPageRefresh) {
-      // Only redirect if we're on the root or dashboard and have a saved route
-      if (window.location.pathname === '/' || window.location.pathname === '/dashboard') {
+    // Só redirecionar se estivermos na raiz ou dashboard e houver uma rota salva
+    if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && savedRoute !== currentPath) {
+      if (currentPath === '/' || currentPath === '/dashboard') {
         console.log('Redirecting to saved route:', savedRoute);
         window.location.replace(savedRoute);
         return;
