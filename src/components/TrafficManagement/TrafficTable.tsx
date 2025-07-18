@@ -209,13 +209,13 @@ export function TrafficTable() {
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Data da Recarga</TableHead>
-                  <TableHead>E-mail para Cobrança</TableHead>
-                  <TableHead>WhatsApp</TableHead>
-                  <TableHead>Orçamento</TableHead>
-                  <TableHead>Crédito da Conta</TableHead>
-                  <TableHead>Status da Campanha</TableHead>
+                  <TableHead className="w-48">Cliente</TableHead>
+                  <TableHead className="w-40">Data da Recarga</TableHead>
+                  <TableHead className="w-52">E-mail para Cobrança</TableHead>
+                  <TableHead className="w-44">WhatsApp</TableHead>
+                  <TableHead className="w-36">Orçamento</TableHead>
+                  <TableHead className="w-48">Crédito da Conta</TableHead>
+                  <TableHead className="w-48">Status da Campanha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

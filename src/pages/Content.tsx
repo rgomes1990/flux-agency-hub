@@ -369,10 +369,10 @@ export default function Content() {
                   onCheckedChange={handleSelectAll}
                 />
               </div>
-              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+              <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
               {columns.map((column) => (
-                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
                 </div>
               ))}
@@ -433,7 +433,7 @@ export default function Content() {
                         onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
                       />
                     </div>
-                    <div className="w-48 p-2 border-r border-gray-200">
+                    <div className="w-56 p-2 border-r border-gray-200">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => openClientDetails(item.id)}
@@ -446,11 +446,11 @@ export default function Content() {
                         )}
                       </div>
                     </div>
-                    <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
+                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
                     </div>
                     {columns.map((column) => (
-                      <div key={column.id} className="w-32 p-2 border-r border-gray-200">
+                      <div key={column.id} className="w-44 p-2 border-r border-gray-200">
                         {column.type === 'status' ? (
                           <StatusButton
                             currentStatus={(item as any)[column.id] || ''}

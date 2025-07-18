@@ -312,7 +312,6 @@ export const useContentData = () => {
   };
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
-
     try {
       console.log('👤 CONTENT: Adicionando cliente:', {
         groupId,
@@ -320,8 +319,28 @@ export const useContentData = () => {
         servicos: clientData.servicos
       });
       
+      // Check for duplicates first
+      const targetGroup = groups.find(g => g.id === groupId);
+      if (targetGroup) {
+        const existingClient = targetGroup.items.find(item => 
+          item.elemento === clientData.elemento && 
+          item.servicos === clientData.servicos
+        );
+        
+        if (existingClient) {
+          console.warn('⚠️ CONTENT: Cliente já existe:', existingClient.id);
+          return existingClient.id;
+        }
+      }
+      
+      // Generate unique ID with better entropy
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const randomString2 = Math.random().toString(36).substring(2, 9);
+      const clientId = `content-client-${timestamp}-${randomString}-${randomString2}`;
+      
       const newClient: ContentItem = {
-        id: `content-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: clientId,
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
         informacoes: '',

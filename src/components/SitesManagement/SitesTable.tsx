@@ -789,13 +789,13 @@ export function SitesTable({
                       <TableHead className="w-12">
                         <Checkbox />
                       </TableHead>
-                      <TableHead>Cliente/Elemento</TableHead>
-                      <TableHead>Serviços</TableHead>
-                      <TableHead>Informações</TableHead>
-                      <TableHead>Observações</TableHead>
-                      <TableHead>Anexos</TableHead>
+                      <TableHead className="w-56">Cliente/Elemento</TableHead>
+                      <TableHead className="w-44">Serviços</TableHead>
+                      <TableHead className="w-40">Informações</TableHead>
+                      <TableHead className="w-48">Observações</TableHead>
+                      <TableHead className="w-32">Anexos</TableHead>
                       {customColumns.map(column => (
-                        <TableHead key={column.id}>{column.name}</TableHead>
+                        <TableHead key={column.id} className="w-44">{column.name}</TableHead>
                       ))}
                       <TableHead className="w-12">Ações</TableHead>
                     </TableRow>

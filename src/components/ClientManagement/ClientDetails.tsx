@@ -224,26 +224,6 @@ export function ClientDetails({
                 </div>
               )}
               
-              {/* Anexo antigo - mantido para compatibilidade */}
-              {clientFile && (
-                <div className="border-t pt-2">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Anexo legado:</h4>
-                  <div className="flex items-center space-x-2 p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <Paperclip className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm text-gray-600">{clientFile.name}</span>
-                    {clientFile instanceof File && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onFilePreview(clientFile)}
-                        className="text-yellow-600 hover:text-yellow-800"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
