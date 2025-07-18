@@ -21,8 +21,23 @@ function RoutePreserver() {
   const location = useLocation();
   
   useEffect(() => {
+    // Marcar que estamos navegando normalmente (não refresh)
+    sessionStorage.setItem('pageRefreshed', 'false');
     sessionStorage.setItem('lastRoute', location.pathname);
   }, [location.pathname]);
+
+  // Detectar refresh usando beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      sessionStorage.setItem('pageRefreshed', 'true');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   return null;
 }
@@ -32,31 +47,42 @@ function App() {
     const savedRoute = sessionStorage.getItem('lastRoute');
     const currentPath = window.location.pathname;
     
-    // Verificar se é um refresh da página
-    const navigationEntries = window.performance?.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-    const isPageRefresh = navigationEntries?.[0]?.type === 'reload';
+    // Usar múltiplas formas de detectar refresh da página
+    const navigation = window.performance?.getEntriesByType('navigation')?.[0] as PerformanceNavigationTiming;
+    const isPageRefresh = 
+      navigation?.type === 'reload' || 
+      window.performance?.navigation?.type === 1 ||
+      document.referrer === window.location.href ||
+      sessionStorage.getItem('pageRefreshed') === 'true';
     
     console.log('App useEffect:', { 
       savedRoute, 
       currentPath, 
       isPageRefresh,
-      navigationType: navigationEntries?.[0]?.type 
+      navigationType: navigation?.type,
+      performanceType: window.performance?.navigation?.type,
+      referrer: document.referrer,
+      sessionFlag: sessionStorage.getItem('pageRefreshed')
     });
     
-    // NUNCA redirecionar em caso de refresh da página
+    // Se for refresh, marcar flag e não redirecionar
     if (isPageRefresh) {
       console.log('Page refresh detected - staying on current page:', currentPath);
+      sessionStorage.setItem('pageRefreshed', 'false'); // Reset flag
       return;
     }
     
-    // Só redirecionar se NÃO for refresh e estivermos na raiz ou dashboard e houver uma rota salva
+    // Só redirecionar em navegação normal (não refresh)
     if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && savedRoute !== currentPath) {
       if (currentPath === '/' || currentPath === '/dashboard') {
-        console.log('Redirecting to saved route:', savedRoute);
+        console.log('Normal navigation - redirecting to saved route:', savedRoute);
         window.location.replace(savedRoute);
         return;
       }
     }
+    
+    // Limpar flag se chegou até aqui
+    sessionStorage.removeItem('pageRefreshed');
   }, []);
 
   return (
