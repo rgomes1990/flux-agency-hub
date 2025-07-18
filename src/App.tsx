@@ -40,7 +40,7 @@ function App() {
       savedRoute, 
       currentPath, 
       isPageRefresh,
-      performanceType: navigationEntries?.[0]?.type 
+      navigationType: navigationEntries?.[0]?.type 
     });
     
     // Só redirecionar se estivermos na raiz ou dashboard e houver uma rota salva
