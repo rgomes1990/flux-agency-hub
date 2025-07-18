@@ -142,6 +142,7 @@ export const useContentData = () => {
 
       if (data && data.length > 0) {
         const groupsMap = new Map<string, ContentGroup>();
+        const seenItems = new Set<string>(); // Track unique combinations
 
         data.forEach((item, index) => {
           console.log(`🔍 CONTENT: Processando item ${index + 1}:`, {
@@ -161,6 +162,16 @@ export const useContentData = () => {
             console.error('❌ CONTENT: Erro ao fazer parse do item_data:', parseError);
             return;
           }
+          
+          // Create unique key to detect duplicates
+          const uniqueKey = `${item.group_id}-${itemData?.elemento}-${itemData?.servicos}`;
+          
+          if (seenItems.has(uniqueKey)) {
+            console.warn('⚠️ CONTENT: Item duplicado detectado e ignorado:', uniqueKey);
+            return;
+          }
+          
+          seenItems.add(uniqueKey);
           
           if (!groupsMap.has(item.group_id)) {
             groupsMap.set(item.group_id, {
@@ -319,7 +330,7 @@ export const useContentData = () => {
         servicos: clientData.servicos
       });
       
-      // Check for duplicates first
+      // Enhanced duplicate check - check both in memory and database
       const targetGroup = groups.find(g => g.id === groupId);
       if (targetGroup) {
         const existingClient = targetGroup.items.find(item => 
@@ -328,16 +339,46 @@ export const useContentData = () => {
         );
         
         if (existingClient) {
-          console.warn('⚠️ CONTENT: Cliente já existe:', existingClient.id);
+          console.warn('⚠️ CONTENT: Cliente já existe no estado:', existingClient.id);
           return existingClient.id;
         }
       }
+
+      // Check database for duplicates too
+      const { data: existingInDB, error: checkError } = await supabase
+        .from('content_data')
+        .select('id, item_data')
+        .eq('group_id', groupId);
+
+      if (checkError) {
+        console.error('❌ CONTENT: Erro ao verificar duplicatas:', checkError);
+      } else if (existingInDB) {
+        const duplicateInDB = existingInDB.find(record => {
+          try {
+            const itemData = typeof record.item_data === 'string' 
+              ? JSON.parse(record.item_data) 
+              : record.item_data;
+            return itemData.elemento === clientData.elemento && 
+                   itemData.servicos === clientData.servicos;
+          } catch {
+            return false;
+          }
+        });
+
+        if (duplicateInDB) {
+          console.warn('⚠️ CONTENT: Cliente já existe no banco:', duplicateInDB.id);
+          // Reload data to sync with database
+          await loadContentData();
+          return null;
+        }
+      }
       
-      // Generate unique ID with better entropy
+      // Generate unique ID with enhanced entropy
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
       const randomString2 = Math.random().toString(36).substring(2, 9);
-      const clientId = `content-client-${timestamp}-${randomString}-${randomString2}`;
+      const randomNum = Math.floor(Math.random() * 10000);
+      const clientId = `content-client-${timestamp}-${randomString}-${randomString2}-${randomNum}`;
       
       const newClient: ContentItem = {
         id: clientId,

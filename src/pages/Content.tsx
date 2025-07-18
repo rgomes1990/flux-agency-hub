@@ -423,7 +423,7 @@ export default function Content() {
               {/* Group Items */}
               {group.isExpanded && group.items.map((item, index) => (
                 <div 
-                  key={item.id} 
+                  key={`${group.id}-${item.id}-${index}`} 
                   className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                 >
                   <div className="flex items-center min-w-max">
