@@ -43,7 +43,13 @@ function App() {
       navigationType: navigationEntries?.[0]?.type 
     });
     
-    // Só redirecionar se estivermos na raiz ou dashboard e houver uma rota salva
+    // NUNCA redirecionar em caso de refresh da página
+    if (isPageRefresh) {
+      console.log('Page refresh detected - staying on current page:', currentPath);
+      return;
+    }
+    
+    // Só redirecionar se NÃO for refresh e estivermos na raiz ou dashboard e houver uma rota salva
     if (savedRoute && savedRoute !== '/' && savedRoute !== '/auth' && savedRoute !== currentPath) {
       if (currentPath === '/' || currentPath === '/dashboard') {
         console.log('Redirecting to saved route:', savedRoute);
