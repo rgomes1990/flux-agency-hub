@@ -147,7 +147,7 @@ export const useTasksData = () => {
       const { error: deleteError } = await supabase
         .from('task_columns')
         .delete()
-        .eq('user_id', null); // Deletar dados globais
+        .is('user_id', null); // Deletar dados globais
 
       if (deleteError) {
         console.error('DEBUG: Erro ao deletar colunas antigas:', deleteError);
@@ -198,7 +198,7 @@ export const useTasksData = () => {
       const { error: deleteError } = await supabase
         .from('tasks_data')
         .delete()
-        .eq('user_id', null); // Deletar dados globais
+        .is('user_id', null); // Deletar dados globais
 
       if (deleteError) {
         console.error('DEBUG: Erro ao deletar tarefas antigas:', deleteError);
@@ -245,8 +245,64 @@ export const useTasksData = () => {
     }
   };
 
+  const initializeDefaultColumns = async () => {
+    try {
+      console.log('DEBUG: Inicializando colunas padrão...');
+      
+      // Primeiro, limpar dados corrompidos das colunas e tarefas
+      const { error: deleteColumnsError } = await supabase
+        .from('task_columns')
+        .delete()
+        .not('user_id', 'is', null);
+
+      const { error: deleteTasksError } = await supabase
+        .from('tasks_data')
+        .delete()
+        .not('user_id', 'is', null);
+
+      if (deleteColumnsError) {
+        console.error('DEBUG: Erro ao limpar colunas corrompidas:', deleteColumnsError);
+      }
+      
+      if (deleteTasksError) {
+        console.error('DEBUG: Erro ao limpar tarefas corrompidas:', deleteTasksError);
+      }
+
+      // Verificar se já existem colunas padrão
+      const { data: existingColumns } = await supabase
+        .from('task_columns')
+        .select('*')
+        .is('user_id', null);
+
+      if (!existingColumns || existingColumns.length === 0) {
+        // Inserir colunas padrão
+        const defaultColumns = [
+          { user_id: null, column_id: 'todo', column_title: 'A Fazer', column_color: 'bg-gray-100', column_order: 0 },
+          { user_id: null, column_id: 'doing', column_title: 'Fazendo', column_color: 'bg-blue-100', column_order: 1 },
+          { user_id: null, column_id: 'done', column_title: 'Feito', column_color: 'bg-green-100', column_order: 2 }
+        ];
+
+        const { error: insertError } = await supabase
+          .from('task_columns')
+          .insert(defaultColumns);
+
+        if (insertError) {
+          console.error('DEBUG: Erro ao inserir colunas padrão:', insertError);
+        } else {
+          console.log('DEBUG: Colunas padrão inseridas com sucesso');
+        }
+      } else {
+        console.log('DEBUG: Colunas padrão já existem:', existingColumns.length);
+      }
+    } catch (error) {
+      console.error('DEBUG: Erro ao inicializar colunas:', error);
+    }
+  };
+
   useEffect(() => {
-    loadTasksData();
+    initializeDefaultColumns().then(() => {
+      loadTasksData();
+    });
   }, []);
 
   const updateColumns = async (newColumns: TaskColumn[]) => {
