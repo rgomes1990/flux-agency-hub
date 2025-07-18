@@ -61,7 +61,7 @@ export default function Sites() {
   const [newClientServices, setNewClientServices] = useState('');
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
   const [clientNotes, setClientNotes] = useState('');
-  const [clientFile, setClientFile] = useState<File | { name: string; data: string; type: string; size: number } | null>(null);
+  const [clientFile, setClientFile] = useState<File | { name: string; data: string; type: string; size?: number } | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
@@ -601,6 +601,13 @@ export default function Sites() {
         availableGroups={groups}
         currentGroupId={showClientDetails ? groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || '' : ''}
         onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+        clientAttachments={showClientDetails ? groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || [] : []}
+        onUpdateAttachments={(attachments) => {
+          // Save attachments automatically to database
+          if (showClientDetails) {
+            updateClient(showClientDetails, { attachments });
+          }
+        }}
       />
 
       <CustomStatusModal

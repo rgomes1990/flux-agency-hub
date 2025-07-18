@@ -650,6 +650,13 @@ export default function Traffic() {
           availableGroups={groups}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
           onMoveClient={(newGroupId) => handleMoveClient(showClientDetails!, newGroupId)}
+          clientAttachments={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || []}
+          onUpdateAttachments={(attachments) => {
+            // Save attachments automatically to database
+            if (showClientDetails) {
+              updateClient(showClientDetails, { attachments });
+            }
+          }}
         />
       )}
 

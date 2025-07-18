@@ -8,7 +8,7 @@ interface SiteItem {
   servicos: string;
   informacoes: string;
   observacoes?: string;
-  attachments?: { name: string; data: string; type: string; size: number }[];
+  attachments?: { name: string; data: string; type: string; size?: number }[];
   [key: string]: any;
 }
 
@@ -677,7 +677,7 @@ export const useSitesData = () => {
     }
   };
 
-  const getClientFiles = (clientId: string): { name: string; data: string; type: string; size: number }[] => {
+  const getClientFiles = (clientId: string): { name: string; data: string; type: string; size?: number }[] => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (!client || !client.attachments) return [];
     

@@ -19,12 +19,14 @@ interface ClientDetailsProps {
   clientName: string;
   observations: ObservationItem[];
   onUpdateObservations: (observations: ObservationItem[]) => void;
-  clientFile?: File | { name: string; data: string; type: string; size: number } | null;
+  clientFile?: File | { name: string; data: string; type: string; size?: number } | null;
   onFileChange: (file: File | null) => void;
   onFilePreview: (file: File) => void;
   availableGroups: Array<{ id: string; name: string }>;
   currentGroupId: string;
   onMoveClient: (newGroupId: string) => void;
+  clientAttachments?: Array<{ name: string; data: string; type: string; size?: number }>;
+  onUpdateAttachments?: (attachments: Array<{ name: string; data: string; type: string; size?: number }>) => void;
 }
 
 export function ClientDetails({
@@ -38,7 +40,9 @@ export function ClientDetails({
   onFilePreview,
   availableGroups,
   currentGroupId,
-  onMoveClient
+  onMoveClient,
+  clientAttachments = [],
+  onUpdateAttachments
 }: ClientDetailsProps) {
   const [newObservationText, setNewObservationText] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState(currentGroupId);
@@ -96,6 +100,33 @@ export function ClientDetails({
     }
   };
 
+  const handleFileUpload = async (file: File) => {
+    if (!file || !onUpdateAttachments) return;
+
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      const serializedFile = {
+        name: file.name,
+        data: reader.result as string,
+        type: file.type,
+        size: file.size
+      };
+      
+      // Add to existing attachments
+      const updatedAttachments = [...clientAttachments, serializedFile];
+      onUpdateAttachments(updatedAttachments);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    if (!onUpdateAttachments) return;
+    
+    const updatedAttachments = clientAttachments.filter((_, i) => i !== index);
+    onUpdateAttachments(updatedAttachments);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -129,28 +160,88 @@ export function ClientDetails({
             </div>
           </div>
 
-          {/* Anexo */}
+          {/* Anexos */}
           <div>
-            <h3 className="text-lg font-medium mb-3">Anexo</h3>
-            <div className="space-y-2">
+            <h3 className="text-lg font-medium mb-3">Anexos</h3>
+            <div className="space-y-3">
               <input
                 type="file"
-                onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  files.forEach(file => handleFileUpload(file));
+                  // Clear input value to allow uploading the same file again
+                  e.target.value = '';
+                }}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
+              
+              {/* Lista de anexos existentes */}
+              {clientAttachments.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700">Arquivos anexados:</h4>
+                  {clientAttachments.map((attachment, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                      <div className="flex items-center space-x-2">
+                        <Paperclip className="h-4 w-4 text-gray-400" />
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600">{attachment.name}</span>
+                          <span className="text-xs text-gray-400">
+                            {attachment.size ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Tamanho desconhecido'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            // Convert base64 back to file for preview
+                            const byteCharacters = atob(attachment.data.split(',')[1]);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                              byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const file = new File([byteArray], attachment.name, { type: attachment.type });
+                            onFilePreview(file);
+                          }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveAttachment(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Anexo antigo - mantido para compatibilidade */}
               {clientFile && (
-                <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
-                  <Paperclip className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{clientFile.name}</span>
-                  {clientFile instanceof File && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onFilePreview(clientFile)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  )}
+                <div className="border-t pt-2">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Anexo legado:</h4>
+                  <div className="flex items-center space-x-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                    <Paperclip className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm text-gray-600">{clientFile.name}</span>
+                    {clientFile instanceof File && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onFilePreview(clientFile)}
+                        className="text-yellow-600 hover:text-yellow-800"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
