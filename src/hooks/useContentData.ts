@@ -321,7 +321,7 @@ export const useContentData = () => {
       });
       
       const newClient: ContentItem = {
-        id: `content-client-${Date.now()}`,
+        id: `content-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
         informacoes: '',
