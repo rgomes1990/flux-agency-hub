@@ -33,13 +33,14 @@ function App() {
     const currentPath = window.location.pathname;
     
     // Verificar se é um refresh da página
-    const isPageRefresh = window.performance?.getEntriesByType('navigation')?.[0]?.type === 'reload';
+    const navigationEntries = window.performance?.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const isPageRefresh = navigationEntries?.[0]?.type === 'reload';
     
     console.log('App useEffect:', { 
       savedRoute, 
       currentPath, 
       isPageRefresh,
-      performanceType: window.performance?.getEntriesByType('navigation')?.[0]?.type 
+      performanceType: navigationEntries?.[0]?.type 
     });
     
     // Só redirecionar se estivermos na raiz ou dashboard e houver uma rota salva
