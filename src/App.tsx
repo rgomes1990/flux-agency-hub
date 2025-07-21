@@ -12,6 +12,7 @@ import Content from './pages/Content';
 import Sites from './pages/Sites';
 import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
+import GoogleMyBusiness from './pages/GoogleMyBusiness';
 import Users from './pages/Users';
 import ClientPasswords from './pages/ClientPasswords';
 import Audit from './pages/Audit';
@@ -73,6 +74,13 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Traffic />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/google-my-business" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <GoogleMyBusiness />
               </MainLayout>
             </ProtectedRoute>
           } />

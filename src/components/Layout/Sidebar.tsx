@@ -9,7 +9,8 @@ import {
   Users,
   Lock,
   History,
-  Globe
+  Globe,
+  MapPin
 } from 'lucide-react';
 
 const menuItems = [
@@ -32,6 +33,11 @@ const menuItems = [
     name: 'Tráfego Pago',
     icon: TrendingUp,
     path: '/traffic'
+  },
+  {
+    name: 'Google My Business',
+    icon: MapPin,
+    path: '/google-my-business'
   },
   {
     name: 'Criação de Sites',
