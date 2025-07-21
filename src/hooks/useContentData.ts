@@ -34,6 +34,7 @@ export const useContentData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [draggedItem, setDraggedItem] = useState<ContentItem | null>(null);
+  const [columns, setColumns] = useState<any[]>([]);
 
   // Estados para rastreamento de performance
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
@@ -86,6 +87,33 @@ export const useContentData = () => {
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro crítico ao carregar status:', error);
+    }
+  }, []);
+
+  // Função para carregar configurações de colunas
+  const loadColumnConfig = useCallback(async () => {
+    try {
+      console.log('🔄 CONTENT: Carregando configurações de colunas');
+      const { data, error } = await supabase
+        .from('column_config')
+        .select('*')
+        .eq('module', 'content')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('❌ CONTENT: Erro ao carregar colunas:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        console.log('✅ CONTENT: Colunas carregadas:', data.length);
+        setColumns(data);
+      } else {
+        console.log('ℹ️ CONTENT: Nenhuma coluna customizada encontrada');
+        setColumns([]);
+      }
+    } catch (error) {
+      console.error('❌ CONTENT: Erro crítico ao carregar colunas:', error);
     }
   }, []);
 
@@ -480,6 +508,7 @@ export const useContentData = () => {
       try {
         await Promise.all([
           loadStatusConfig(),
+          loadColumnConfig(),
           loadContentData()
         ]);
       } catch (error) {
@@ -518,8 +547,8 @@ export const useContentData = () => {
     lastLoadTime,
     loadAttempts,
     // Compatibilidade com Content.tsx
-    columns: [],
-    customColumns: [],
+    columns,
+    customColumns: columns,
     updateGroups: loadContentData,
     createMonth: createGroup,
     updateMonth: async (id: string, name: string) => true,
