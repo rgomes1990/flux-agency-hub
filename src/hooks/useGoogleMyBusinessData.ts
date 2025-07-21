@@ -112,13 +112,13 @@ export const useGoogleMyBusinessData = () => {
     }
   };
 
-  // Criar uma nova tabela específica para Google My Business
+  // Carregar dados do Google My Business
   const loadGoogleMyBusinessData = async () => {
     try {
       console.log('🔄 GMB: Carregando dados');
       
       const { data, error } = await supabase
-        .from('google_my_business_data')
+        .from('google_my_business_data' as any)
         .select('*')
         .order('created_at', { ascending: true });
 
@@ -136,7 +136,7 @@ export const useGoogleMyBusinessData = () => {
       if (data && data.length > 0) {
         const groupsMap = new Map<string, GoogleMyBusinessGroup>();
 
-        data.forEach((item, index) => {
+        data.forEach((item: any, index) => {
           console.log(`🔍 GMB: Processando item ${index + 1}:`, {
             group_id: item.group_id,
             item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
@@ -198,7 +198,7 @@ export const useGoogleMyBusinessData = () => {
         
         // Deletar dados existentes do grupo
         const { error: deleteError } = await supabase
-          .from('google_my_business_data')
+          .from('google_my_business_data' as any)
           .delete()
           .eq('group_id', group.id);
 
@@ -246,7 +246,7 @@ export const useGoogleMyBusinessData = () => {
         });
 
         const { data: insertResult, error: insertError } = await supabase
-          .from('google_my_business_data')
+          .from('google_my_business_data' as any)
           .insert(insertData)
           .select('id');
 
@@ -480,7 +480,7 @@ export const useGoogleMyBusinessData = () => {
     deleteMonth: async (groupId: string) => {
       try {
         const { error } = await supabase
-          .from('google_my_business_data')
+          .from('google_my_business_data' as any)
           .delete()
           .eq('group_id', groupId);
 

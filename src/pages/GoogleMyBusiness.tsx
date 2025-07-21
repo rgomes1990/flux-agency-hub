@@ -647,43 +647,49 @@ export default function GoogleMyBusiness() {
 
       {showStatusModal && (
         <CustomStatusModal
-          isOpen={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          statuses={statuses}
+          open={showStatusModal}
+          onOpenChange={setShowStatusModal}
           onAddStatus={addStatus}
           onUpdateStatus={updateStatus}
           onDeleteStatus={deleteStatus}
-          module="google_my_business"
+          existingStatuses={statuses}
         />
       )}
 
       {showClientDetails && (
         <ClientDetails
-          isOpen={!!showClientDetails}
-          onClose={() => setShowClientDetails(null)}
-          clientId={showClientDetails}
-          client={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)}
-          groups={groups}
+          open={!!showClientDetails}
+          onOpenChange={(open) => open ? null : setShowClientDetails(null)}
+          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
-          setObservations={setClientObservations}
-          onSave={saveClientDetails}
-          onMoveClient={handleMoveClient}
-          attachments={getClientAttachments(showClientDetails)}
+          onUpdateObservations={setClientObservations}
+          onFileChange={setClientFile}
           onFilePreview={openFilePreview}
+          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
+          currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
+          onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+          clientFile={clientFile}
+          clientAttachments={getClientAttachments(showClientDetails).map(file => ({
+            name: file.name,
+            data: '',
+            type: file.type,
+            size: file.size
+          }))}
         />
       )}
 
       {showFilePreview && previewFile && (
         <FilePreview
           file={previewFile}
-          isOpen={showFilePreview}
-          onClose={() => setShowFilePreview(false)}
+          open={showFilePreview}
+          onOpenChange={setShowFilePreview}
         />
       )}
 
       {confirmDelete && (
         <ConfirmationDialog
-          isOpen={!!confirmDelete}
+          open={!!confirmDelete}
+          onOpenChange={(open) => open ? null : setConfirmDelete(null)}
           onConfirm={() => {
             if (confirmDelete.type === 'client') {
               handleDeleteClient(confirmDelete.id);
@@ -693,7 +699,6 @@ export default function GoogleMyBusiness() {
               handleDeleteMonth(confirmDelete.id);
             }
           }}
-          onCancel={() => setConfirmDelete(null)}
           title={`Confirmar ${confirmDelete.type === 'client' ? 'Exclusão do Cliente' : confirmDelete.type === 'column' ? 'Exclusão da Coluna' : 'Exclusão do Mês'}`}
           message={`Tem certeza de que deseja excluir ${confirmDelete.type === 'client' ? 'este cliente' : confirmDelete.type === 'column' ? 'esta coluna' : 'este mês'}? Esta ação não pode ser desfeita.`}
         />

@@ -404,6 +404,42 @@ export type Database = {
           },
         ]
       }
+      google_my_business_data: {
+        Row: {
+          created_at: string
+          group_color: string | null
+          group_id: string
+          group_name: string
+          id: string
+          is_expanded: boolean | null
+          item_data: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          group_color?: string | null
+          group_id: string
+          group_name: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          group_color?: string | null
+          group_id?: string
+          group_name?: string
+          id?: string
+          is_expanded?: boolean | null
+          item_data?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
