@@ -163,8 +163,8 @@ export const useContentData = () => {
             return;
           }
           
-          // Create unique key to detect duplicates
-          const uniqueKey = `${item.group_id}-${itemData?.elemento}-${itemData?.servicos}`;
+          // Create unique key based on actual item ID to detect real duplicates
+          const uniqueKey = `${item.group_id}-${itemData?.id}`;
           
           if (seenItems.has(uniqueKey)) {
             console.warn('⚠️ CONTENT: Item duplicado detectado e ignorado:', uniqueKey);
