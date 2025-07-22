@@ -13,6 +13,7 @@ import Sites from './pages/Sites';
 import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
 import GoogleMyBusiness from './pages/GoogleMyBusiness';
+import RSGAvaliacoes from './pages/RSGAvaliacoes';
 import Users from './pages/Users';
 import ClientPasswords from './pages/ClientPasswords';
 import Audit from './pages/Audit';
@@ -77,13 +78,20 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           } />
-          <Route path="/google-my-business" element={
-            <ProtectedRoute>
-              <MainLayout>
-                <GoogleMyBusiness />
-              </MainLayout>
-            </ProtectedRoute>
-          } />
+            <Route path="/google-my-business" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <GoogleMyBusiness />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/rsg-avaliacoes" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <RSGAvaliacoes />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
           <Route path="/users" element={
             <ProtectedRoute>
               <MainLayout>

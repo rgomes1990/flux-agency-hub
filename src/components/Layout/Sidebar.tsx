@@ -10,7 +10,8 @@ import {
   Lock,
   History,
   Globe,
-  MapPin
+  MapPin,
+  Star
 } from 'lucide-react';
 
 const menuItems = [
@@ -38,6 +39,11 @@ const menuItems = [
     name: 'Google My Business',
     icon: MapPin,
     path: '/google-my-business'
+  },
+  {
+    name: 'RSG Avaliações',
+    icon: Star,
+    path: '/rsg-avaliacoes'
   },
   {
     name: 'Criação de Sites',
