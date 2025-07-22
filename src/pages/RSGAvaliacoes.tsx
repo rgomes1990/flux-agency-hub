@@ -94,10 +94,10 @@ export default function RSGAvaliacoes() {
     }
   };
 
-  const handleCreateMonth = () => {
+  const handleCreateMonth = async () => {
     if (!newMonthName.trim()) return;
     
-    createGroup(newMonthName, 'bg-purple-500');
+    await createGroup(newMonthName, 'bg-purple-500');
     setNewMonthName('');
     setShowCreateDialog(false);
   };

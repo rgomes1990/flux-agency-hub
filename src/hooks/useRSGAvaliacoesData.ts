@@ -355,18 +355,50 @@ const useRSGAvaliacoesData = () => {
     deleteStatusMutation,
     
     // Novos métodos específicos
-    createGroup: (name: string, color: string = 'bg-purple-500') => {
-      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-      const newGroup: RSGAvaliacoesGroup = {
-        id: `group_${Date.now()}`,
-        name,
-        color,
-        isExpanded: true,
-        items: []
-      };
-      const updatedGroups = [...currentGroups, newGroup];
-      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
-      saveData(updatedGroups);
+    createGroup: async (name: string, color: string = 'bg-purple-500') => {
+      try {
+        const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+        const newGroupId = `group_${Date.now()}`;
+        const newGroup: RSGAvaliacoesGroup = {
+          id: newGroupId,
+          name,
+          color,
+          isExpanded: true,
+          items: []
+        };
+        
+        // Criar um item vazio para o grupo
+        const emptyItem = {
+          id: `empty-${newGroupId}`,
+          elemento: '',
+          servicos: '',
+          attachments: [],
+          informacoes: '',
+          observacoes: ''
+        };
+
+        // Inserir no banco de dados
+        const { error } = await (supabase as any)
+          .from('rsg_avaliacoes_data')
+          .insert({
+            group_id: newGroupId,
+            group_name: name,
+            group_color: color,
+            is_expanded: true,
+            item_data: emptyItem
+          });
+
+        if (error) throw error;
+
+        // Atualizar cache local
+        const updatedGroups = [...currentGroups, { ...newGroup, items: [emptyItem] }];
+        queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+        
+        toast.success('Mês criado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao criar mês:', error);
+        toast.error('Erro ao criar mês');
+      }
     },
     
     duplicateGroup: async (sourceGroupId: string, newName: string) => {
