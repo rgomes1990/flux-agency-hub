@@ -1,22 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Settings, ChevronDown, ChevronRight, MoreHorizontal, Upload, Eye, X, Copy, Edit, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  Plus, 
+  ChevronDown, 
+  ChevronRight,
+  Copy,
+  Settings,
+  Edit,
+  Trash2,
+  Paperclip,
+  Eye,
+  Menu,
+  RefreshCw
+} from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import useRSGAvaliacoesData, { RSGAvaliacoesGroup, RSGAvaliacoesItem, RSGAvaliacoesColumn, RSGAvaliacoesStatus } from '@/hooks/useRSGAvaliacoesData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
-import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
-import { FilePreview } from '@/components/FilePreview';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import useRSGAvaliacoesData, { RSGAvaliacoesGroup, RSGAvaliacoesItem, RSGAvaliacoesColumn, RSGAvaliacoesStatus } from '@/hooks/useRSGAvaliacoesData';
-
-const MODULE_NAME = 'rsg_avaliacoes';
+import { FilePreview } from '@/components/FilePreview';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { useUndo } from '@/contexts/UndoContext';
 
 export default function RSGAvaliacoes() {
+  const isMobile = useIsMobile();
   const {
     groups,
     columns,
@@ -32,211 +45,178 @@ export default function RSGAvaliacoes() {
     duplicateGroup,
     deleteMonth
   } = useRSGAvaliacoesData();
-
-  // Estados locais
-  const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [showCreateMonthDialog, setShowCreateMonthDialog] = useState(false);
-  const [showDuplicateMonthDialog, setShowDuplicateMonthDialog] = useState(false);
-  const [showCreateClientDialog, setShowCreateClientDialog] = useState(false);
-  const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
-  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showClientDetails, setShowClientDetails] = useState(false);
-  const [showFilePreview, setShowFilePreview] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
-  const [newMonthColor, setNewMonthColor] = useState('bg-purple-500');
   const [duplicateMonthName, setDuplicateMonthName] = useState('');
-  const [editMonthName, setEditMonthName] = useState('');
-  const [editMonthColor, setEditMonthColor] = useState('bg-purple-500');
-  const [editingGroupId, setEditingGroupId] = useState('');
+  const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showClientDialog, setShowClientDialog] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [newClientName, setNewClientName] = useState('');
+  const [newClientServices, setNewClientServices] = useState('');
+  const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+  const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
-  const [newColumnType, setNewColumnType] = useState('text');
+  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [clientDetailsData, setClientDetailsData] = useState<any>(null);
-  const [deleteGroupId, setDeleteGroupId] = useState('');
-
-  const [localGroups, setLocalGroups] = useState<RSGAvaliacoesGroup[]>([]);
-
-  // Sincronizar dados do hook com estado local
-  useEffect(() => {
-    if (groups) {
-      setLocalGroups([...groups] as RSGAvaliacoesGroup[]);
-      // Inicializar estados expandidos
-      const expanded: { [key: string]: boolean } = {};
-      (groups as RSGAvaliacoesGroup[]).forEach(group => {
-        expanded[group.id] = group.isExpanded;
-      });
-      setExpandedGroups(expanded);
-    }
-  }, [groups]);
+  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
+  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  
+  const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
-    const newExpanded = { ...expandedGroups, [groupId]: !expandedGroups[groupId] };
-    setExpandedGroups(newExpanded);
-    updateGroup(groupId, { isExpanded: newExpanded[groupId] });
+    updateGroup(groupId, { isExpanded: !groups.find(g => g.id === groupId)?.isExpanded });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = groups.flatMap(group => group.items.map(item => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems([...selectedItems, itemId]);
+    } else {
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+    }
   };
 
   const handleCreateMonth = () => {
-    if (newMonthName.trim()) {
-      createGroup(newMonthName.trim(), newMonthColor);
-      setNewMonthName('');
-      setNewMonthColor('bg-purple-500');
-      setShowCreateMonthDialog(false);
-    }
+    if (!newMonthName.trim()) return;
+    
+    createGroup(newMonthName, 'bg-purple-500');
+    setNewMonthName('');
+    setShowCreateDialog(false);
   };
 
   const handleDuplicateMonth = async () => {
-    if (selectedMonth && duplicateMonthName.trim()) {
-      await duplicateGroup(selectedMonth, duplicateMonthName.trim());
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
+    
+    try {
+      await duplicateGroup(selectedGroupToDuplicate, duplicateMonthName);
       setDuplicateMonthName('');
-      setSelectedMonth('');
-      setShowDuplicateMonthDialog(false);
+      setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
     }
   };
 
   const handleCreateClient = () => {
-    if (newClientName.trim() && selectedMonth) {
-      const group = localGroups.find(g => g.id === selectedMonth);
-      if (group) {
-        const newClient: RSGAvaliacoesItem = {
-          id: `client_${Date.now()}`,
-          nome: newClientName.trim(),
-          ...columns.reduce((acc, col) => ({ ...acc, [col.id]: '' }), {})
-        };
-        
-        const updatedGroups = localGroups.map(g => 
-          g.id === selectedMonth 
-            ? { ...g, items: [...g.items, newClient] }
-            : g
-        );
-        
-        setLocalGroups(updatedGroups);
-        saveData(updatedGroups);
-        setNewClientName('');
-        setShowCreateClientDialog(false);
-      }
-    }
+    if (!newClientName.trim() || !selectedGroupForClient) return;
+    
+    const newClient = {
+      id: `rsg-client-${Date.now()}`,
+      elemento: newClientName,
+      servicos: newClientServices
+    };
+    
+    const updatedGroups = groups.map(group => 
+      group.id === selectedGroupForClient 
+        ? { ...group, items: [...group.items, newClient] }
+        : group
+    );
+    
+    saveData(updatedGroups);
+    setNewClientName('');
+    setNewClientServices('');
+    setSelectedGroupForClient('');
+    setShowClientDialog(false);
   };
 
   const handleCreateColumn = () => {
-    if (newColumnName.trim()) {
-      createColumn(newColumnName.trim(), newColumnType);
-      setNewColumnName('');
-      setNewColumnType('text');
-      setShowCreateColumnDialog(false);
-    }
+    if (!newColumnName.trim()) return;
+    
+    createColumn(newColumnName, newColumnType);
+    setNewColumnName('');
+    setNewColumnType('status');
+    setShowColumnDialog(false);
   };
 
   const handleDeleteClient = (clientId: string) => {
-    const updatedGroups = localGroups.map(group => ({
+    const updatedGroups = groups.map(group => ({
       ...group,
       items: group.items.filter(item => item.id !== clientId)
     }));
-    setLocalGroups(updatedGroups);
     saveData(updatedGroups);
+    setConfirmDelete(null);
   };
 
   const handleDeleteColumn = (columnId: string) => {
     deleteColumn(columnId);
+    setConfirmDelete(null);
   };
 
   const handleEditMonth = (groupId: string) => {
-    const group = localGroups.find(g => g.id === groupId);
+    const group = groups.find(g => g.id === groupId);
     if (group) {
-      setEditingGroupId(groupId);
-      setEditMonthName(group.name);
-      setEditMonthColor(group.color);
+      const nameWithoutSuffix = group.name.replace(' - RSG AVALIAÇÕES', '');
+      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
     }
   };
 
   const handleUpdateMonth = () => {
-    if (editMonthName.trim() && editingGroupId) {
-      updateGroup(editingGroupId, { 
-        name: editMonthName.trim(), 
-        color: editMonthColor 
-      });
-      setEditingGroupId('');
-      setEditMonthName('');
-      setEditMonthColor('bg-purple-500');
+    if (editingMonth && editingMonth.name.trim()) {
+      updateGroup(editingMonth.id, { name: editingMonth.name + ' - RSG AVALIAÇÕES' });
+      setEditingMonth(null);
       setShowEditMonthDialog(false);
     }
   };
 
   const handleDeleteMonth = (groupId: string) => {
-    setDeleteGroupId(groupId);
-    setShowDeleteConfirmation(true);
+    deleteMonth(groupId);
+    setConfirmDelete(null);
   };
 
-  const confirmDeleteMonth = async () => {
-    if (deleteGroupId) {
-      await deleteMonth(deleteGroupId);
-      setDeleteGroupId('');
-      setShowDeleteConfirmation(false);
-    }
+  const updateItemStatus = (itemId: string, columnId: string, statusId: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === itemId ? { ...item, [columnId]: statusId } : item
+      )
+    }));
+    saveData(updatedGroups);
+  };
+
+  const updateClientField = (itemId: string, updates: any) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => 
+        item.id === itemId ? { ...item, ...updates } : item
+      )
+    }));
+    saveData(updatedGroups);
+  };
+
+  const getClientFiles = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    return client?.attachments || [];
   };
 
   const openClientDetails = (clientId: string) => {
-    // Encontrar o cliente em todos os grupos
-    let clientData = null;
-    for (const group of localGroups) {
-      const client = group.items.find(item => item.id === clientId);
-      if (client) {
-        clientData = client;
-        break;
-      }
-    }
-    setClientDetailsData(clientData);
-    setShowClientDetails(true);
+    setShowClientDetails(clientId);
   };
 
   const saveClientDetails = async () => {
-    if (clientDetailsData) {
-      const updatedGroups = localGroups.map(group => ({
-        ...group,
-        items: group.items.map(item => 
-          item.id === clientDetailsData.id ? clientDetailsData : item
-        )
-      }));
-      setLocalGroups(updatedGroups);
-      saveData(updatedGroups);
-      setShowClientDetails(false);
-    }
+    setShowClientDetails(null);
   };
 
   const handleMoveClient = (clientId: string, newGroupId: string) => {
-    let clientToMove = null;
-    let sourceGroupId = '';
-    
-    // Encontrar o cliente e o grupo de origem
-    for (const group of localGroups) {
-      const client = group.items.find(item => item.id === clientId);
-      if (client) {
-        clientToMove = client;
-        sourceGroupId = group.id;
-        break;
-      }
-    }
-    
-    if (clientToMove && sourceGroupId !== newGroupId) {
-      const updatedGroups = localGroups.map(group => {
-        if (group.id === sourceGroupId) {
-          // Remover do grupo original
-          return { ...group, items: group.items.filter(item => item.id !== clientId) };
-        } else if (group.id === newGroupId) {
-          // Adicionar ao novo grupo
-          return { ...group, items: [...group.items, clientToMove] };
-        }
-        return group;
-      });
-      
-      setLocalGroups(updatedGroups);
-      saveData(updatedGroups);
-    }
+    // Move client logic here
   };
 
   const openFilePreview = (file: File) => {
@@ -244,478 +224,413 @@ export default function RSGAvaliacoes() {
     setShowFilePreview(true);
   };
 
-  const updateCellValue = (groupId: string, clientId: string, columnId: string, value: any) => {
-    const updatedGroups = localGroups.map(group => {
-      if (group.id === groupId) {
-        return {
-          ...group,
-          items: group.items.map(item => 
-            item.id === clientId 
-              ? { ...item, [columnId]: value }
-              : item
-          )
-        };
-      }
-      return group;
-    });
-    setLocalGroups(updatedGroups);
-    saveData(updatedGroups);
-  };
-
-  const handleFileUpload = (groupId: string, clientId: string, columnId: string, files: FileList | null) => {
-    if (files && files.length > 0) {
-      const fileArray = Array.from(files);
-      updateCellValue(groupId, clientId, columnId, fileArray);
-    }
-  };
-
-  const colorOptions = [
-    { value: 'bg-purple-500', label: 'Roxo' },
-    { value: 'bg-blue-500', label: 'Azul' },
-    { value: 'bg-green-500', label: 'Verde' },
-    { value: 'bg-yellow-500', label: 'Amarelo' },
-    { value: 'bg-red-500', label: 'Vermelho' },
-    { value: 'bg-pink-500', label: 'Rosa' },
-    { value: 'bg-indigo-500', label: 'Índigo' },
-    { value: 'bg-gray-500', label: 'Cinza' }
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">RSG Avaliações</h1>
-          <p className="text-muted-foreground">
-            Gerencie dados e informações de avaliações dos clientes
-          </p>
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-lg font-semibold text-gray-900">RSG Avaliações</h1>
+            <div className="text-xs text-gray-500">
+              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
+            </div>
+          </div>
+          {isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+            className="ml-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-2 p-4 bg-card rounded-lg border">
-        <Dialog open={showCreateMonthDialog} onOpenChange={setShowCreateMonthDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Criar Mês
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Novo Mês</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="month-name">Nome do Mês</Label>
+      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
+        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Plus className="h-4 w-4 mr-1" />
+                Criar mês
+              </Button>
+            </DialogTrigger>
+            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+              <DialogHeader>
+                <DialogTitle>Criar Novo Mês</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
                 <Input
-                  id="month-name"
+                  placeholder="Nome do mês"
                   value={newMonthName}
                   onChange={(e) => setNewMonthName(e.target.value)}
-                  placeholder="Ex: Janeiro 2024"
                 />
-              </div>
-              <div>
-                <Label htmlFor="month-color">Cor</Label>
-                <Select value={newMonthColor} onValueChange={setNewMonthColor}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {colorOptions.map(color => (
-                      <SelectItem key={color.value} value={color.value}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-4 h-4 rounded ${color.value}`} />
-                          {color.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateMonthDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateMonth}>
-                  Criar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showDuplicateMonthDialog} onOpenChange={setShowDuplicateMonthDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Copy className="mr-2 h-4 w-4" />
-              Duplicar Mês
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Duplicar Mês</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="source-month">Mês de Origem</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {localGroups.map(group => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="duplicate-name">Nome do Novo Mês</Label>
-                <Input
-                  id="duplicate-name"
-                  value={duplicateMonthName}
-                  onChange={(e) => setDuplicateMonthName(e.target.value)}
-                  placeholder="Ex: Fevereiro 2024"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowDuplicateMonthDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleDuplicateMonth}>
-                  Duplicar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showCreateClientDialog} onOpenChange={setShowCreateClientDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Criar Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Novo Cliente</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="target-month">Mês de Destino</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {localGroups.map(group => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="client-name">Nome do Cliente</Label>
-                <Input
-                  id="client-name"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  placeholder="Nome do cliente"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateClientDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateClient}>
-                  Criar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showCreateColumnDialog} onOpenChange={setShowCreateColumnDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Gerenciar Colunas
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Gerenciar Colunas</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Colunas Existentes</Label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {columns.map(column => (
-                    <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                      <span className="text-sm">{column.name} ({column.type})</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteColumn(column.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                <div className="flex space-x-2">
+                  <Button onClick={handleCreateMonth} className="bg-purple-600 hover:bg-purple-700 flex-1">
+                    Criar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
+                    Cancelar
+                  </Button>
                 </div>
               </div>
-              
-              <div className="border-t pt-4">
-                <Label htmlFor="column-name">Nome da Nova Coluna</Label>
-                <Input
-                  id="column-name"
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  placeholder="Nome da coluna"
-                />
-              </div>
-              <div>
-                <Label htmlFor="column-type">Tipo da Coluna</Label>
-                <Select value={newColumnType} onValueChange={setNewColumnType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">Texto</SelectItem>
-                    <SelectItem value="status">Status</SelectItem>
-                    <SelectItem value="file">Arquivo</SelectItem>
-                    <SelectItem value="date">Data</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateColumnDialog(false)}>
-                  Fechar
-                </Button>
-                <Button onClick={handleCreateColumn}>
-                  Adicionar Coluna
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
 
-        <Button variant="outline" size="sm" onClick={() => setShowStatusModal(true)}>
-          <Settings className="mr-2 h-4 w-4" />
-          Gerenciar Status
-        </Button>
-      </div>
-
-      {/* Tabela */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="text-left p-3 font-medium min-w-[200px]">Cliente</th>
-                {columns.map(column => (
-                  <th key={column.id} className="text-left p-3 font-medium min-w-[150px]">
-                    {column.name}
-                  </th>
-                ))}
-                <th className="text-left p-3 font-medium w-12">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {localGroups.map(group => (
-                <React.Fragment key={group.id}>
-                  {/* Cabeçalho do Grupo */}
-                  <tr className={`${group.color} text-white`}>
-                    <td colSpan={columns.length + 2} className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleGroup(group.id)}
-                            className="h-6 w-6 p-0 text-white hover:bg-white/20"
-                          >
-                            {expandedGroups[group.id] ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <span className="font-medium">
-                            {group.name} ({group.items.length} clientes)
-                          </span>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-white hover:bg-white/20">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditMonth(group.id)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteMonth(group.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Deletar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
-                  
-                  {/* Itens do Grupo */}
-                  {expandedGroups[group.id] && group.items.map(item => (
-                    <tr key={item.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span>{item.nome || 'Cliente sem nome'}</span>
-                        </div>
-                      </td>
-                      {columns.map(column => (
-                        <td key={column.id} className="p-3">
-                          {column.type === 'status' ? (
-                            <StatusButton
-                              currentStatus={item[column.id] || ''}
-                              statuses={statuses}
-                              onStatusChange={(statusId) => 
-                                updateCellValue(group.id, item.id, column.id, statusId)
-                              }
-                            />
-                          ) : column.type === 'file' ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="file"
-                                multiple
-                                className="hidden"
-                                id={`file-${group.id}-${item.id}-${column.id}`}
-                                onChange={(e) => handleFileUpload(group.id, item.id, column.id, e.target.files)}
-                              />
-                              <label
-                                htmlFor={`file-${group.id}-${item.id}-${column.id}`}
-                                className="cursor-pointer"
-                              >
-                                <Button variant="outline" size="sm" asChild>
-                                  <span>
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    Upload
-                                  </span>
-                                </Button>
-                              </label>
-                              {item[column.id] && Array.isArray(item[column.id]) && item[column.id].length > 0 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openFilePreview(item[column.id][0])}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          ) : column.type === 'date' ? (
-                            <Input
-                              type="date"
-                              value={item[column.id] || ''}
-                              onChange={(e) => updateCellValue(group.id, item.id, column.id, e.target.value)}
-                              className="max-w-[150px]"
-                            />
-                          ) : (
-                            <Input
-                              value={item[column.id] || ''}
-                              onChange={(e) => updateCellValue(group.id, item.id, column.id, e.target.value)}
-                              className="max-w-[200px]"
-                            />
-                          )}
-                        </td>
-                      ))}
-                      <td className="p-3">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openClientDetails(item.id)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteClient(item.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Deletar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-                </React.Fragment>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicar mês
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {groups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => {
+                    setSelectedGroupToDuplicate(group.id);
+                    setShowDuplicateDialog(true);
+                  }}
+                >
+                  Duplicar {group.name}
+                </DropdownMenuItem>
               ))}
-            </tbody>
-          </table>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowClientDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowColumnDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Colunas
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowStatusModal(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Status
+          </Button>
         </div>
       </div>
 
-      {/* Modais */}
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+          {/* Table Header */}
+          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            <div className="flex items-center min-w-max">
+              <div className="w-8 flex items-center justify-center p-2">
+                <Checkbox
+                  checked={selectedItems.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </div>
+              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+              <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              {columns.map((column) => (
+                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                  {column.name}
+                </div>
+              ))}
+              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
+            </div>
+          </div>
+
+          {/* Table Body */}
+          {groups.map((group) => (
+            <div key={group.id}>
+              {/* Group Header */}
+              <div className="bg-purple-50 border-b border-gray-200 hover:bg-purple-100 transition-colors">
+                <div className="flex items-center min-w-max">
+                  <div className="w-8 flex items-center justify-center p-2">
+                    <button onClick={() => toggleGroup(group.id)}>
+                      {group.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2 p-2 flex-1">
+                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                    <span className="font-medium text-gray-900">{group.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 p-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEditMonth(group.id)}
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group Items */}
+              {group.isExpanded && group.items.map((item, index) => (
+                <div 
+                  key={item.id} 
+                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                >
+                  <div className="flex items-center min-w-max">
+                    <div className="w-8 flex items-center justify-center p-2">
+                      <Checkbox
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                      />
+                    </div>
+                    <div className="w-48 p-2 border-r border-gray-200">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openClientDetails(item.id)}
+                          className="text-sm text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {item.elemento}
+                        </button>
+                        {getClientAttachments(item.id).length > 0 && (
+                          <Paperclip className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
+                      {item.servicos}
+                    </div>
+                    {columns.map((column) => (
+                      <div key={column.id} className="w-32 p-2 border-r border-gray-200">
+                        {column.type === 'status' ? (
+                          <StatusButton
+                            currentStatus={(item as any)[column.id] || ''}
+                            statuses={statuses}
+                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
+                          />
+                        ) : (
+                          <Input
+                            value={(item as any)[column.id] || ''}
+                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto"
+                            placeholder="..."
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <div className="w-20 p-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openClientDetails(item.id)}>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialogs and Modals */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Duplicar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do novo mês"
+              value={duplicateMonthName}
+              onChange={(e) => setDuplicateMonthName(e.target.value)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleDuplicateMonth} className="bg-purple-600 hover:bg-purple-700 flex-1">
+                Duplicar
+              </Button>
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Novo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Mês de Destino</label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    {groups.find(g => g.id === selectedGroupForClient)?.name || 'Selecione um mês'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full">
+                  {groups.map((group) => (
+                    <DropdownMenuItem
+                      key={group.id}
+                      onClick={() => setSelectedGroupForClient(group.id)}
+                    >
+                      {group.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Input
+              placeholder="Nome do cliente"
+              value={newClientName}
+              onChange={(e) => setNewClientName(e.target.value)}
+            />
+            <Textarea
+              placeholder="Serviços (opcional)"
+              value={newClientServices}
+              onChange={(e) => setNewClientServices(e.target.value)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateClient} className="bg-purple-600 hover:bg-purple-700 flex-1">
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Colunas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Colunas Existentes</div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {columns.map(column => (
+                  <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                    <span className="text-sm">{column.name} ({column.type})</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="border-t pt-4">
+              <div className="text-sm font-medium mb-2">Nova Coluna</div>
+              <Input
+                placeholder="Nome da coluna"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                className="mb-2"
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start mb-2">
+                    {newColumnType === 'status' ? 'Status' : 'Texto'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setNewColumnType('status')}>
+                    Status
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setNewColumnType('text')}>
+                    Texto
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateColumn} className="bg-purple-600 hover:bg-purple-700 flex-1">
+                Adicionar
+              </Button>
+              <Button variant="outline" onClick={() => setShowColumnDialog(false)} className="flex-1">
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Editar Mês</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-month-name">Nome do Mês</Label>
-              <Input
-                id="edit-month-name"
-                value={editMonthName}
-                onChange={(e) => setEditMonthName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-month-color">Cor</Label>
-              <Select value={editMonthColor} onValueChange={setEditMonthColor}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {colorOptions.map(color => (
-                    <SelectItem key={color.value} value={color.value}>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded ${color.value}`} />
-                        {color.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleUpdateMonth}>
+            <Input
+              placeholder="Nome do mês"
+              value={editingMonth?.name || ''}
+              onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleUpdateMonth} className="bg-purple-600 hover:bg-purple-700 flex-1">
                 Salvar
+              </Button>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
+                Cancelar
               </Button>
             </div>
           </div>
@@ -725,40 +640,63 @@ export default function RSGAvaliacoes() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={(status) => createStatus(status.name, status.color)}
+        statuses={statuses}
+        onAddStatus={addStatus}
+        onUpdateStatus={updateStatus}
         onDeleteStatus={deleteStatus}
-        existingStatuses={statuses}
       />
 
-      <ClientDetails
-        open={showClientDetails}
-        onOpenChange={setShowClientDetails}
-        clientName={clientDetailsData?.nome || ''}
-        observations={[]}
-        onUpdateObservations={() => {}}
-        onFileChange={() => {}}
-        onFilePreview={() => {}}
-        availableGroups={localGroups.map(g => ({ id: g.id, name: g.name }))}
-        currentGroupId=""
-        onMoveClient={(groupId) => {
-          if (clientDetailsData) {
-            handleMoveClient(clientDetailsData.id, groupId);
-          }
-        }}
-      />
+      {showClientDetails && (
+        <ClientDetails
+          clientId={showClientDetails}
+          isOpen={!!showClientDetails}
+          onClose={() => setShowClientDetails(null)}
+          onSave={saveClientDetails}
+          groups={groups}
+          onMoveClient={handleMoveClient}
+          clientNotes={clientNotes}
+          setClientNotes={setClientNotes}
+          clientFile={clientFile}
+          setClientFile={setClientFile}
+          clientObservations={clientObservations}
+          setClientObservations={setClientObservations}
+        />
+      )}
 
       <FilePreview
-        open={showFilePreview}
-        onOpenChange={setShowFilePreview}
         file={previewFile}
+        isOpen={showFilePreview}
+        onClose={() => setShowFilePreview(false)}
       />
 
       <ConfirmationDialog
-        open={showDeleteConfirmation}
-        onOpenChange={setShowDeleteConfirmation}
-        onConfirm={confirmDeleteMonth}
-        title="Deletar Mês"
-        message="Tem certeza que deseja deletar este mês? Esta ação não pode ser desfeita e todos os dados associados serão perdidos."
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          if (!confirmDelete) return;
+          
+          switch (confirmDelete.type) {
+            case 'client':
+              handleDeleteClient(confirmDelete.id);
+              break;
+            case 'column':
+              handleDeleteColumn(confirmDelete.id);
+              break;
+            case 'month':
+              handleDeleteMonth(confirmDelete.id);
+              break;
+          }
+        }}
+        title={`Confirmar ${confirmDelete?.type === 'client' ? 'exclusão do cliente' : 
+               confirmDelete?.type === 'column' ? 'exclusão da coluna' : 
+               'exclusão do mês'}`}
+        description={`Esta ação não pode ser desfeita. ${
+          confirmDelete?.type === 'client' ? 'O cliente será removido permanentemente.' :
+          confirmDelete?.type === 'column' ? 'A coluna será removida permanentemente.' :
+          'O mês e todos os seus dados serão removidos permanentemente.'
+        }`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
       />
     </div>
   );
