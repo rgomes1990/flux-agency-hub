@@ -425,7 +425,7 @@ export default function RSGAvaliacoes() {
                         >
                           {item.elemento}
                         </button>
-                        {getClientAttachments(item.id).length > 0 && (
+                        {getClientFiles(item.id).length > 0 && (
                           <Paperclip className="h-3 w-3 text-gray-400" />
                         )}
                       </div>
@@ -444,7 +444,7 @@ export default function RSGAvaliacoes() {
                         ) : (
                           <Input
                             value={(item as any)[column.id] || ''}
-                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                            onChange={(e) => updateClientField(item.id, { [column.id]: e.target.value })}
                             className="border-0 bg-transparent p-0 h-auto"
                             placeholder="..."
                           />
@@ -640,38 +640,39 @@ export default function RSGAvaliacoes() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        statuses={statuses}
-        onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
+        onAddStatus={(status) => createStatus(status.name, status.color)}
         onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
       />
 
       {showClientDetails && (
         <ClientDetails
-          clientId={showClientDetails}
-          isOpen={!!showClientDetails}
-          onClose={() => setShowClientDetails(null)}
-          onSave={saveClientDetails}
-          groups={groups}
-          onMoveClient={handleMoveClient}
-          clientNotes={clientNotes}
-          setClientNotes={setClientNotes}
-          clientFile={clientFile}
-          setClientFile={setClientFile}
-          clientObservations={clientObservations}
-          setClientObservations={setClientObservations}
+          open={!!showClientDetails}
+          onOpenChange={() => setShowClientDetails(null)}
+          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
+          observations={clientObservations}
+          onUpdateObservations={setClientObservations}
+          onFileChange={setClientFile}
+          onFilePreview={openFilePreview}
+          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
+          currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
+          onMoveClient={(newGroupId) => {
+            if (showClientDetails) {
+              handleMoveClient(showClientDetails, newGroupId);
+            }
+          }}
         />
       )}
 
       <FilePreview
         file={previewFile}
-        isOpen={showFilePreview}
-        onClose={() => setShowFilePreview(false)}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
       />
 
       <ConfirmationDialog
-        isOpen={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
+        open={!!confirmDelete}
+        onOpenChange={() => setConfirmDelete(null)}
         onConfirm={() => {
           if (!confirmDelete) return;
           
@@ -690,7 +691,7 @@ export default function RSGAvaliacoes() {
         title={`Confirmar ${confirmDelete?.type === 'client' ? 'exclusão do cliente' : 
                confirmDelete?.type === 'column' ? 'exclusão da coluna' : 
                'exclusão do mês'}`}
-        description={`Esta ação não pode ser desfeita. ${
+        message={`Esta ação não pode ser desfeita. ${
           confirmDelete?.type === 'client' ? 'O cliente será removido permanentemente.' :
           confirmDelete?.type === 'column' ? 'A coluna será removida permanentemente.' :
           'O mês e todos os seus dados serão removidos permanentemente.'
