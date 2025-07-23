@@ -312,27 +312,6 @@ export default function GoogleMyBusiness() {
             </DialogContent>
           </Dialog>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
-                <Copy className="h-4 w-4 mr-1" />
-                Duplicar mês
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {groups.map((group) => (
-                <DropdownMenuItem
-                  key={group.id}
-                  onClick={() => {
-                    setSelectedGroupToDuplicate(group.id);
-                    setShowDuplicateDialog(true);
-                  }}
-                >
-                  Duplicar {group.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           <Button 
             variant="outline" 
@@ -476,28 +455,18 @@ export default function GoogleMyBusiness() {
                         )}
                       </div>
                     ))}
-                    <div className="w-20 p-2">
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openClientDetails(item.id)}
-                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                     <div className="w-20 p-2">
+                       <Button
+                         size="sm"
+                         variant="ghost"
+                         onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                         className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                       >
+                         <Trash2 className="h-3 w-3" />
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
               ))}
             </div>
           ))}

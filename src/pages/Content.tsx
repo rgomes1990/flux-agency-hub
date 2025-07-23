@@ -116,11 +116,13 @@ export default function Content() {
     
     try {
       await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+    } finally {
+      // Sempre executar limpeza independente de sucesso ou erro
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
       setShowDuplicateDialog(false);
-    } catch (error) {
-      console.error('Erro ao duplicar mês:', error);
     }
   };
 

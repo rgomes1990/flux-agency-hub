@@ -287,27 +287,6 @@ export default function RSGAvaliacoes() {
             </DialogContent>
           </Dialog>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
-                <Copy className="h-4 w-4 mr-1" />
-                Duplicar mês
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {groups.map((group) => (
-                <DropdownMenuItem
-                  key={group.id}
-                  onClick={() => {
-                    setSelectedGroupToDuplicate(group.id);
-                    setShowDuplicateDialog(true);
-                  }}
-                >
-                  Duplicar {group.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           <Button 
             variant="outline" 
@@ -451,28 +430,16 @@ export default function RSGAvaliacoes() {
                         )}
                       </div>
                     ))}
-                    <div className="w-20 p-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openClientDetails(item.id)}>
-                            <Eye className="h-3 w-3 mr-1" />
-                            Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                     <div className="w-20 p-2">
+                       <Button
+                         size="sm"
+                         variant="ghost"
+                         onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                         className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                       >
+                         <Trash2 className="h-3 w-3" />
+                       </Button>
+                     </div>
                   </div>
                 </div>
               ))}
