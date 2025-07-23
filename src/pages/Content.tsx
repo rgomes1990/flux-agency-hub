@@ -112,13 +112,21 @@ export default function Content() {
   };
 
   const handleDuplicateMonth = async () => {
-    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
+    console.log('🔄 Duplicate: Iniciando duplicação...', { duplicateMonthName, selectedGroupToDuplicate });
+    
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) {
+      console.log('⚠️ Duplicate: Dados insuficientes para duplicação');
+      return;
+    }
     
     try {
+      console.log('🔄 Duplicate: Chamando função de duplicação...');
       await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      console.log('✅ Duplicate: Duplicação concluída com sucesso');
     } catch (error) {
-      console.error('Erro ao duplicar mês:', error);
+      console.error('❌ Duplicate: Erro ao duplicar mês:', error);
     } finally {
+      console.log('🔄 Duplicate: Limpando estados...');
       // Sempre executar limpeza independente de sucesso ou erro
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
@@ -317,8 +325,13 @@ export default function Content() {
                 <DropdownMenuItem
                   key={group.id}
                   onClick={() => {
+                    console.log('🔄 Modal: Abrindo diálogo de duplicação para grupo:', group.id);
                     setSelectedGroupToDuplicate(group.id);
-                    setShowDuplicateDialog(true);
+                    // Pequeno delay para evitar conflitos de estado
+                    setTimeout(() => {
+                      console.log('🔄 Modal: Abrindo modal de duplicação');
+                      setShowDuplicateDialog(true);
+                    }, 10);
                   }}
                 >
                   Duplicar {group.name}
@@ -488,7 +501,16 @@ export default function Content() {
       </div>
 
       {/* Dialogs */}
-      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+      <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
+        console.log('🔄 Modal: Estado do diálogo mudou para:', open);
+        if (!open) {
+          // Ao fechar o modal, limpar os estados
+          console.log('🔄 Modal: Fechando modal e limpando estados');
+          setDuplicateMonthName('');
+          setSelectedGroupToDuplicate('');
+        }
+        setShowDuplicateDialog(open);
+      }}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Duplicar Mês</DialogTitle>
@@ -497,13 +519,23 @@ export default function Content() {
             <Input
               placeholder="Nome do novo mês"
               value={duplicateMonthName}
-              onChange={(e) => setDuplicateMonthName(e.target.value)}
+              onChange={(e) => {
+                console.log('🔄 Modal: Nome alterado para:', e.target.value);
+                setDuplicateMonthName(e.target.value);
+              }}
             />
             <div className="flex space-x-2">
               <Button onClick={handleDuplicateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Duplicar
               </Button>
-              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  console.log('🔄 Modal: Botão cancelar clicado');
+                  setShowDuplicateDialog(false);
+                }} 
+                className="flex-1"
+              >
                 Cancelar
               </Button>
             </div>
