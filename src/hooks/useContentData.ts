@@ -801,11 +801,15 @@ export const useContentData = () => {
     },
     duplicateMonth: async (sourceGroupId: string, newMonthName: string) => {
       try {
+        console.log('🔄 CONTENT: Iniciando duplicação de mês...', { sourceGroupId, newMonthName });
+        
         const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
         if (!groupToDuplicate) throw new Error('Grupo não encontrado');
         
         const timestamp = Date.now();
         const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-conteudo-${timestamp}`;
+        
+        console.log('📋 CONTENT: Criando novo grupo...', { newGroupId });
         
         const newGroup: ContentGroup = {
           id: newGroupId,
@@ -821,9 +825,16 @@ export const useContentData = () => {
           }))
         };
         
+        console.log('💾 CONTENT: Salvando no banco antes de atualizar estado...');
+        
+        // Primeiro salvar no banco, depois atualizar estado
         const newGroups = [...groups, newGroup];
-        setGroups(newGroups);
         await saveContentToDatabase(newGroups);
+        
+        console.log('✅ CONTENT: Dados salvos, atualizando estado...');
+        setGroups(newGroups);
+        
+        console.log('🎉 CONTENT: Duplicação concluída com sucesso!');
         return newGroupId;
       } catch (error) {
         console.error('❌ CONTENT: Erro ao duplicar mês:', error);
