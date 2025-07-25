@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,8 +70,18 @@ export default function RSGAvaliacoes() {
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  const [updateTimeout, setUpdateTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const { addUndoAction } = useUndo();
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
+    };
+  }, [updateTimeout]);
 
   const toggleGroup = (groupId: string) => {
     updateGroup(groupId, { isExpanded: !groups.find(g => g.id === groupId)?.isExpanded });
@@ -192,14 +202,36 @@ export default function RSGAvaliacoes() {
     saveData(updatedGroups);
   };
 
+  // Debounced update to prevent duplicate saves during typing
+  
   const updateClientField = (itemId: string, updates: any) => {
+    // Clear existing timeout
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+    }
+    
+    // Update local state immediately for responsive UI
     const updatedGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => 
         item.id === itemId ? { ...item, ...updates } : item
       )
     }));
-    saveData(updatedGroups);
+    
+    // Find the group that contains this item
+    const targetGroup = updatedGroups.find(g => g.items.some(i => i.id === itemId));
+    if (targetGroup) {
+      // Update cache immediately for UI responsiveness  
+      updateGroup(targetGroup.id, { items: targetGroup.items });
+    }
+    
+    // Debounce the actual save to database
+    const newTimeout = setTimeout(() => {
+      console.log('💾 RSG Avaliações: Salvando após debounce para item:', itemId);
+      saveData(updatedGroups);
+    }, 1000); // Wait 1 second after user stops typing
+    
+    setUpdateTimeout(newTimeout);
   };
 
   const getClientFiles = (clientId: string) => {
