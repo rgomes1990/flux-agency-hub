@@ -795,7 +795,7 @@ export function SitesTable({
                       <TableHead className="w-48">Observações</TableHead>
                       <TableHead className="w-32">Anexos</TableHead>
                       {customColumns.map(column => (
-                        <TableHead key={column.id} className="w-44">{column.name}</TableHead>
+                        <TableHead key={column.id} className="w-52">{column.name}</TableHead>
                       ))}
                       <TableHead className="w-12">Ações</TableHead>
                     </TableRow>
