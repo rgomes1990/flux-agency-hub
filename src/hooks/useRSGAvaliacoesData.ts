@@ -139,7 +139,7 @@ const useRSGAvaliacoesData = () => {
     }
   });
 
-  // Salvar dados
+  // Salvar dados com proteção anti-duplicação
   const saveDataMutation = useMutation({
     mutationFn: async (groups: RSGAvaliacoesGroup[]) => {
       console.log('💾 RSG Avaliações: Iniciando salvamento de', groups.length, 'grupos');
@@ -158,9 +158,24 @@ const useRSGAvaliacoesData = () => {
           throw deleteError;
         }
 
-        // Inserir novos dados se houver itens
+        // Inserir novos dados se houver itens, com proteção anti-duplicação
         if (group.items.length > 0) {
-          const insertData = group.items.map(item => ({
+          // Filtrar itens únicos baseado no nome do cliente e serviços
+          const processedClients = new Set<string>();
+          const uniqueItems = group.items.filter(item => {
+            const clientKey = `${item.elemento?.trim()}-${item.servicos?.trim()}`;
+            
+            // Pular se cliente está vazio ou já foi processado
+            if (!item.elemento?.trim() || processedClients.has(clientKey)) {
+              console.log(`⚠️ RSG Avaliações: Cliente duplicado ou vazio ignorado: ${item.elemento}`);
+              return false;
+            }
+            
+            processedClients.add(clientKey);
+            return true;
+          });
+
+          const insertData = uniqueItems.map(item => ({
             user_id: null,
             group_id: group.id,
             group_name: group.name,
@@ -169,23 +184,26 @@ const useRSGAvaliacoesData = () => {
             item_data: item
           }));
 
-          console.log('📥 RSG Avaliações: Inserindo dados:', {
+          console.log('📥 RSG Avaliações: Inserindo dados únicos:', {
             groupId: group.id,
             groupName: group.name,
-            itemCount: insertData.length
+            originalCount: group.items.length,
+            uniqueCount: insertData.length
           });
 
-          const { data: insertResult, error: insertError } = await (supabase as any)
-            .from('rsg_avaliacoes_data')
-            .insert(insertData)
-            .select('id');
+          if (insertData.length > 0) {
+            const { data: insertResult, error: insertError } = await (supabase as any)
+              .from('rsg_avaliacoes_data')
+              .insert(insertData)
+              .select('id');
 
-          if (insertError) {
-            console.error('❌ RSG Avaliações: Erro ao inserir dados:', insertError);
-            throw insertError;
+            if (insertError) {
+              console.error('❌ RSG Avaliações: Erro ao inserir dados:', insertError);
+              throw insertError;
+            }
+
+            console.log('✅ RSG Avaliações: Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
           }
-
-          console.log('✅ RSG Avaliações: Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
         }
       }
 
@@ -402,20 +420,54 @@ const useRSGAvaliacoesData = () => {
     },
     
     duplicateGroup: async (sourceGroupId: string, newName: string) => {
-      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-      const sourceGroup = currentGroups.find(g => g.id === sourceGroupId);
-      
-      if (sourceGroup) {
+      try {
+        const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+        const sourceGroup = currentGroups.find(g => g.id === sourceGroupId);
+        
+        if (!sourceGroup) {
+          toast.error('Grupo não encontrado');
+          return;
+        }
+
+        const newGroupId = `group_${Date.now()}`;
+        
+        // Duplicar cada item do grupo com novos IDs para evitar conflitos
+        const duplicatedItems = sourceGroup.items.map(item => ({
+          ...item,
+          id: `rsg-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+
+        // Inserir todos os itens duplicados no banco
+        const insertPromises = duplicatedItems.map(item => 
+          (supabase as any)
+            .from('rsg_avaliacoes_data')
+            .insert({
+              group_id: newGroupId,
+              group_name: newName,
+              group_color: sourceGroup.color,
+              is_expanded: true,
+              item_data: item
+            })
+        );
+
+        await Promise.all(insertPromises);
+
+        // Atualizar cache local
         const newGroup: RSGAvaliacoesGroup = {
-          id: `group_${Date.now()}`,
+          id: newGroupId,
           name: newName,
           color: sourceGroup.color,
           isExpanded: true,
-          items: [...sourceGroup.items]
+          items: duplicatedItems
         };
+        
         const updatedGroups = [...currentGroups, newGroup];
         queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
-        saveData(updatedGroups);
+        
+        toast.success('Mês duplicado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao duplicar mês:', error);
+        toast.error('Erro ao duplicar mês');
       }
     },
     
