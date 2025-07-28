@@ -373,6 +373,31 @@ export const useTasksData = () => {
     await updateColumns(newColumns);
   };
 
+  const reorderColumn = async (columnId: string, direction: 'up' | 'down') => {
+    console.log('DEBUG: ====== REORDENANDO COLUNA ======');
+    console.log('DEBUG: ID da coluna:', columnId, 'Direção:', direction);
+    
+    const currentIndex = columns.findIndex(col => col.id === columnId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    // Verificar se o movimento é válido
+    if (newIndex < 0 || newIndex >= columns.length) return;
+    
+    const newColumns = [...columns];
+    const [movedColumn] = newColumns.splice(currentIndex, 1);
+    newColumns.splice(newIndex, 0, movedColumn);
+    
+    // Atualizar a propriedade order
+    newColumns.forEach((col, index) => {
+      col.order = index;
+    });
+    
+    console.log('DEBUG: Nova ordem das colunas:', newColumns.map(c => c.title));
+    await updateColumns(newColumns);
+  };
+
   const addTask = async (columnId: string, task: Omit<Task, 'id'>) => {
     console.log('DEBUG: ====== ADICIONANDO NOVA TAREFA ======');
     console.log('DEBUG: Coluna ID:', columnId);
@@ -459,6 +484,7 @@ export const useTasksData = () => {
     addColumn,
     updateColumn,
     deleteColumn,
+    reorderColumn,
     addTask,
     updateTask,
     deleteTask,

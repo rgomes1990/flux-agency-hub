@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye } from 'lucide-react';
+import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -31,7 +31,8 @@ export default function Tasks() {
     deleteTask,
     addColumn,
     deleteColumn,
-    updateColumn
+    updateColumn,
+    reorderColumn
   } = useTasksData();
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -320,21 +321,45 @@ export default function Tasks() {
                 </Button>
                 
                 <div className="space-y-2">
-                  <h4 className="font-medium">Colunas Existentes:</h4>
-                  {columns.map(column => (
-                    <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex items-center space-x-2">
+                  <h4 className="font-medium">Colunas Existentes (arraste para reordenar):</h4>
+                  {columns.map((column, index) => (
+                    <div key={column.id} className="flex items-center justify-between p-2 border rounded bg-gray-50">
+                      <div className="flex items-center space-x-2 flex-1">
                         <div className={`w-4 h-4 rounded ${column.color}`}></div>
-                        <span className="text-sm">{column.title}</span>
+                        <span className="text-sm font-medium">{column.title}</span>
+                        <span className="text-xs text-gray-500">({column.tasks.length} tarefas)</span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => reorderColumn(column.id, 'up')}
+                          disabled={index === 0}
+                          className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                          title="Mover para cima"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => reorderColumn(column.id, 'down')}
+                          disabled={index === columns.length - 1}
+                          className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                          title="Mover para baixo"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                          className="text-red-600 hover:text-red-800"
+                          title="Excluir coluna"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
