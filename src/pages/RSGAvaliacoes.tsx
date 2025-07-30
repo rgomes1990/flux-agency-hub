@@ -367,7 +367,7 @@ export default function RSGAvaliacoes() {
               <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
               <div className="w-52 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
               {columns.map((column) => (
-                <div key={column.id} className="w-40 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                <div key={column.id} className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
                 </div>
               ))}
@@ -445,7 +445,7 @@ export default function RSGAvaliacoes() {
                       {item.servicos}
                     </div>
                     {columns.map((column) => (
-                      <div key={column.id} className="w-40 p-2 border-r border-gray-200">
+                      <div key={column.id} className="w-48 p-2 border-r border-gray-200">
                         {column.type === 'status' ? (
                           <StatusButton
                             currentStatus={(item as any)[column.id] || ''}
