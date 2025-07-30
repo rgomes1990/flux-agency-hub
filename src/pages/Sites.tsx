@@ -212,34 +212,45 @@ export default function Sites() {
     setClientFile(null);
   };
 
-  const handleMoveClient = (clientId: string, newGroupId: string) => {
+  const handleMoveClient = async (clientId: string, newGroupId: string) => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
     
     if (client && oldGroup) {
       const originalGroupId = oldGroup.id; // Store the original group ID for undo
       
-      // Create a complete copy of the client with all properties and status values
-      const clientWithAllStatus = {
-        ...client, // This preserves all custom status fields and other properties
-        elemento: client.elemento,
-        servicos: client.servicos || '',
-        observacoes: client.observacoes,
-        attachments: client.attachments || []
-      };
-      
-      // Remove from old group
-      deleteClient(clientId);
-      
-      // Add to new group with all status preserved
-      addClient(newGroupId, clientWithAllStatus);
-      
-      addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
-        // Actually undo the client move by moving it back
-        handleMoveClient(clientId, originalGroupId);
-      });
-      
-      setShowClientDetails(null);
+      try {
+        // Create updated groups by moving the client (preserving original ID and all data)
+        const newGroups = groups.map(group => {
+          if (group.id === oldGroup.id) {
+            // Remove from old group
+            return {
+              ...group,
+              items: group.items.filter(item => item.id !== clientId)
+            };
+          } else if (group.id === newGroupId) {
+            // Add to new group with original ID and all data preserved
+            return {
+              ...group,
+              items: [...group.items, { ...client }]
+            };
+          }
+          return group;
+        });
+        
+        // Update state and save to database
+        await updateGroups(newGroups);
+        
+        addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
+          // Actually undo the client move by moving it back
+          handleMoveClient(clientId, originalGroupId);
+        });
+        
+        setShowClientDetails(null);
+        console.log(`✅ Cliente ${client.elemento} movido com sucesso, preservando ID ${clientId} e todos os status`);
+      } catch (error) {
+        console.error('❌ Erro ao mover cliente:', error);
+      }
     }
   };
 
