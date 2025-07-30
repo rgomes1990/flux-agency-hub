@@ -219,16 +219,20 @@ export default function Sites() {
     if (client && oldGroup) {
       const originalGroupId = oldGroup.id; // Store the original group ID for undo
       
-      // Remove from old group
-      deleteClient(clientId);
-      
-      // Add to new group
-      addClient(newGroupId, {
+      // Create a complete copy of the client with all properties and status values
+      const clientWithAllStatus = {
+        ...client, // This preserves all custom status fields and other properties
         elemento: client.elemento,
         servicos: client.servicos || '',
         observacoes: client.observacoes,
-        ...client
-      });
+        attachments: client.attachments || []
+      };
+      
+      // Remove from old group
+      deleteClient(clientId);
+      
+      // Add to new group with all status preserved
+      addClient(newGroupId, clientWithAllStatus);
       
       addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
         // Actually undo the client move by moving it back
