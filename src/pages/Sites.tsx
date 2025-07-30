@@ -220,6 +220,8 @@ export default function Sites() {
       const originalGroupId = oldGroup.id; // Store the original group ID for undo
       
       try {
+        console.log(`🔄 Movendo cliente ${client.elemento} de ${oldGroup.name} para grupo ${newGroupId}`);
+        
         // Create updated groups by moving the client (preserving original ID and all data)
         const newGroups = groups.map(group => {
           if (group.id === oldGroup.id) {
@@ -232,7 +234,7 @@ export default function Sites() {
             // Add to new group with original ID and all data preserved
             return {
               ...group,
-              items: [...group.items, { ...client }]
+              items: [...group.items.filter(item => item.id !== clientId), { ...client }]
             };
           }
           return group;
@@ -241,9 +243,9 @@ export default function Sites() {
         // Update state and save to database
         await updateGroups(newGroups);
         
-        addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, () => {
+        addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, async () => {
           // Actually undo the client move by moving it back
-          handleMoveClient(clientId, originalGroupId);
+          await handleMoveClient(clientId, originalGroupId);
         });
         
         setShowClientDetails(null);

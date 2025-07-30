@@ -329,20 +329,30 @@ export const useSitesData = () => {
       console.log('👤 SITES: Adicionando cliente compartilhado:', {
         groupId,
         elemento: clientData.elemento,
-        servicos: clientData.servicos
+        servicos: clientData.servicos,
+        preservedId: clientData.id
       });
       
+      // If we have an existing ID, preserve it (for moves), otherwise create new
       const newClient: SiteItem = {
-        id: `sites-client-${Date.now()}`,
+        id: clientData.id || `sites-client-${Date.now()}`,
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
-        informacoes: '',
-        attachments: []
+        informacoes: clientData.informacoes || '',
+        observacoes: clientData.observacoes || '',
+        attachments: clientData.attachments || [],
+        ...clientData // This preserves all existing status fields
       };
 
-      customColumns.forEach(column => {
-        newClient[column.id] = column.type === 'status' ? '' : '';
-      });
+      // Ensure we don't add default values to custom columns if the client already has data
+      if (!clientData.id) {
+        // Only add default values for new clients
+        customColumns.forEach(column => {
+          if (!newClient[column.id]) {
+            newClient[column.id] = column.type === 'status' ? '' : '';
+          }
+        });
+      }
 
       const newGroups = groups.map(group => 
         group.id === groupId 
