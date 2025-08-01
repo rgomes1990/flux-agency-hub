@@ -624,7 +624,11 @@ export default function GoogleMyBusiness() {
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
-          onOpenChange={(open) => open ? null : setShowClientDetails(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              saveClientDetails();
+            }
+          }}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
           onUpdateObservations={setClientObservations}
