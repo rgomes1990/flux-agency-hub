@@ -14,6 +14,7 @@ import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
 import GoogleMyBusiness from './pages/GoogleMyBusiness';
 import RSGAvaliacoes from './pages/RSGAvaliacoes';
+import Videos from './pages/Videos';
 import Users from './pages/Users';
 import ClientPasswords from './pages/ClientPasswords';
 import Audit from './pages/Audit';
@@ -89,6 +90,13 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <RSGAvaliacoes />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/videos" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Videos />
                 </MainLayout>
               </ProtectedRoute>
             } />

@@ -11,7 +11,8 @@ import {
   History,
   Globe,
   MapPin,
-  Star
+  Star,
+  Video
 } from 'lucide-react';
 
 const menuItems = [
@@ -44,6 +45,11 @@ const menuItems = [
     name: 'RSG Avaliações',
     icon: Star,
     path: '/rsg-avaliacoes'
+  },
+  {
+    name: 'Videos',
+    icon: Video,
+    path: '/videos'
   },
   {
     name: 'Criação de Sites',
