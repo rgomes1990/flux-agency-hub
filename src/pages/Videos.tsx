@@ -589,7 +589,14 @@ export default function Videos() {
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={[]}
           onUpdateObservations={() => {}}
-          onFileSelect={() => {}}
+          clientFile={null}
+          onFileChange={() => {}}
+          onFilePreview={() => {}}
+          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
+          currentGroupId={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.groupId || ''}
+          onMoveClient={() => {}}
+          clientAttachments={[]}
+          onUpdateAttachments={() => {}}
         />
       )}
 
