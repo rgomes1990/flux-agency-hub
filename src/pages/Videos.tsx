@@ -1,612 +1,727 @@
-import { useState } from "react";
-import { Plus, Users, Calendar, ChevronDown, ChevronRight, Ellipsis, Settings, Trash2, Eye, Copy, Edit } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { StatusButton } from "@/components/ServiceManagement/StatusButton";
-import { AddServiceModal } from "@/components/ServiceManagement/AddServiceModal";
-import { CustomStatusModal } from "@/components/ServiceManagement/CustomStatusModal";
-import { ClientDetails } from "@/components/ClientManagement/ClientDetails";
-import { ClientRegistration } from "@/components/ClientManagement/ClientRegistration";
-import { FilePreview } from "@/components/FilePreview";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { toast } from "@/components/ui/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useUndoHistory } from "@/hooks/useUndoHistory";
-import { useVideosData, VideoItem } from "@/hooks/useVideosData";
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  Plus, 
+  ChevronDown, 
+  ChevronRight,
+  Copy,
+  Settings,
+  Edit,
+  Trash2,
+  Paperclip,
+  Eye,
+  Menu
+} from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useVideosData } from '@/hooks/useVideosData';
+import { StatusButton } from '@/components/ServiceManagement/StatusButton';
+import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { FilePreview } from '@/components/FilePreview';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { useUndo } from '@/contexts/UndoContext';
 
 export default function Videos() {
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showClientDialog, setShowClientDialog] = useState(false);
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [showColumnDialog, setShowColumnDialog] = useState(false);
-  const [showCustomStatusDialog, setShowCustomStatusDialog] = useState(false);
-  const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState<string | null>(null);
-  const [showDeleteClientDialog, setShowDeleteClientDialog] = useState<string | null>(null);
-  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
-  const [showFilePreview, setShowFilePreview] = useState<{ clientId: string, fileName: string } | null>(null);
-  const [newMonthName, setNewMonthName] = useState("");
-  const [editMonthName, setEditMonthName] = useState("");
-  const [duplicateMonthName, setDuplicateMonthName] = useState("");
-  const [duplicateSourceId, setDuplicateSourceId] = useState("");
-  const [newColumnName, setNewColumnName] = useState("");
-  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
-  const [selectedGroupId, setSelectedGroupId] = useState("");
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
-  const [clientObservations, setClientObservations] = useState("");
-
   const isMobile = useIsMobile();
-  const { addUndoAction } = useUndoHistory();
-
-  const saveState = (data: any, action: string) => {
-    addUndoAction(action, () => {
-      console.log('Undo action:', action);
-    });
-  };
-
-  const {
-    groups,
+  const { 
+    groups, 
     columns,
-    customColumns,
+    customColumns, // Use customColumns for management interface
     statuses,
-    createMonth,
-    addClient,
-    addColumn,
+    updateGroups, 
+    createMonth, 
+    updateMonth,
+    deleteMonth,
+    duplicateMonth,
     addStatus,
     updateStatus,
     deleteStatus,
+    addColumn,
     updateColumn,
     deleteColumn,
     updateItemStatus,
+    addClient,
     deleteClient,
     updateClient,
-    getClientFiles,
-    updateGroups,
-    updateMonth,
-    deleteMonth,
-    duplicateMonth
+    getClientFiles
   } = useVideosData();
+  
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [newMonthName, setNewMonthName] = useState('');
+  const [duplicateMonthName, setDuplicateMonthName] = useState('');
+  const [selectedGroupToDuplicate, setSelectedGroupToDuplicate] = useState<string>('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showClientDialog, setShowClientDialog] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientServices, setNewClientServices] = useState('');
+  const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+  const [clientFile, setClientFile] = useState<File | null>(null);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
+  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  
+  const { addUndoAction } = useUndo();
 
-  const handleToggleGroup = (groupId: string) => {
-    const newGroups = groups.map(group => 
+  const toggleGroup = (groupId: string) => {
+    updateGroups(groups.map(group => 
       group.id === groupId 
         ? { ...group, isExpanded: !group.isExpanded }
         : group
-    );
-    updateGroups(newGroups);
+    ));
   };
 
-  const handleSelectItem = (itemId: string) => {
-    setSelectedItems(prev => 
-      prev.includes(itemId) 
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    );
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = groups.flatMap(group => group.items.map(item => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems([]);
+    }
   };
 
-  const handleSelectAll = () => {
-    const allItemIds = groups.flatMap(group => group.items.map(item => item.id));
-    setSelectedItems(selectedItems.length === allItemIds.length ? [] : allItemIds);
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems([...selectedItems, itemId]);
+    } else {
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+    }
   };
 
-  const handleCreateMonth = async () => {
+  const handleCreateMonth = () => {
     if (!newMonthName.trim()) return;
     
-    saveState(groups, 'create-month');
-    await createMonth(newMonthName);
-    setNewMonthName("");
+    createMonth(newMonthName);
+    setNewMonthName('');
     setShowCreateDialog(false);
   };
 
   const handleDuplicateMonth = async () => {
-    if (!duplicateMonthName.trim() || !duplicateSourceId) return;
+    console.log('🔄 Duplicate: Iniciando duplicação...', { duplicateMonthName, selectedGroupToDuplicate });
     
-    saveState(groups, 'duplicate-month');
-    await duplicateMonth(duplicateSourceId, duplicateMonthName);
-    setDuplicateMonthName("");
-    setDuplicateSourceId("");
-    setShowDuplicateDialog(false);
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) {
+      console.log('⚠️ Duplicate: Dados insuficientes para duplicação');
+      return;
+    }
+    
+    try {
+      console.log('🔄 Duplicate: Chamando função de duplicação...');
+      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      console.log('✅ Duplicate: Duplicação concluída com sucesso');
+    } catch (error) {
+      console.error('❌ Duplicate: Erro ao duplicar mês:', error);
+    } finally {
+      console.log('🔄 Duplicate: Limpando estados...');
+      // Sempre executar limpeza independente de sucesso ou erro
+      setDuplicateMonthName('');
+      setSelectedGroupToDuplicate('');
+      setShowDuplicateDialog(false);
+    }
   };
 
-  const handleAddClient = async (clientData: any) => {
-    if (!selectedGroupId) return;
+  const handleCreateClient = () => {
+    if (!newClientName.trim() || !selectedGroupForClient) return;
     
-    saveState(groups, 'add-client');
-    await addClient(selectedGroupId, clientData);
+    addClient(selectedGroupForClient, {
+      elemento: newClientName,
+      servicos: newClientServices
+    });
+    
+    setNewClientName('');
+    setNewClientServices('');
+    setSelectedGroupForClient('');
     setShowClientDialog(false);
-    setSelectedGroupId("");
   };
 
-  const handleAddColumn = async () => {
+  const handleCreateColumn = () => {
     if (!newColumnName.trim()) return;
     
-    saveState(groups, 'add-column');
-    await addColumn(newColumnName, newColumnType);
-    setNewColumnName("");
+    addColumn(newColumnName, newColumnType);
+    setNewColumnName('');
+    setNewColumnType('status');
     setShowColumnDialog(false);
   };
 
-  const handleDeleteColumn = async () => {
-    if (!columnToDelete) return;
-    
-    saveState(groups, 'delete-column');
-    await deleteColumn(columnToDelete);
-    setColumnToDelete(null);
-    setShowDeleteColumnDialog(false);
+  const handleDeleteClient = (clientId: string) => {
+    deleteClient(clientId);
+    setConfirmDelete(null);
   };
 
-  const handleEditMonth = async () => {
-    if (!editMonthName.trim() || !showEditDialog) return;
-    
-    saveState(groups, 'edit-month');
-    await updateMonth(showEditDialog, editMonthName);
-    setEditMonthName("");
-    setShowEditDialog(null);
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+    setConfirmDelete(null);
   };
 
-  const handleDeleteMonth = async () => {
-    if (!showDeleteDialog) return;
-    
-    saveState(groups, 'delete-month');
-    await deleteMonth(showDeleteDialog);
-    setShowDeleteDialog(null);
+  const handleEditMonth = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      const nameWithoutSuffix = group.name.replace(' - VÍDEOS', '');
+      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
+      setShowEditMonthDialog(true);
+    }
   };
 
-  const handleDeleteClient = async () => {
-    if (!showDeleteClientDialog) return;
-    
-    saveState(groups, 'delete-client');
-    await deleteClient(showDeleteClientDialog);
-    setShowDeleteClientDialog(null);
+  const handleUpdateMonth = () => {
+    if (editingMonth && editingMonth.name.trim()) {
+      updateMonth(editingMonth.id, editingMonth.name);
+      setEditingMonth(null);
+      setShowEditMonthDialog(false);
+    }
   };
 
-  const handleStatusChange = async (itemId: string, field: string, statusId: string) => {
-    saveState(groups, 'status-change');
-    await updateItemStatus(itemId, field, statusId);
+  const handleDeleteMonth = (groupId: string) => {
+    deleteMonth(groupId);
+    setConfirmDelete(null);
+  };
+
+  const openClientDetails = (clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (client) {
+      setClientNotes(client.observacoes || '');
+      const files = getClientFiles(clientId);
+      setClientFile(files[0] || null);
+      
+      // Parse existing observations from client notes
+      try {
+        const parsed = JSON.parse(client.observacoes || '[]');
+        if (Array.isArray(parsed)) {
+          setClientObservations(parsed);
+        } else {
+          setClientObservations([]);
+        }
+      } catch {
+        setClientObservations([]);
+      }
+      
+      setShowClientDetails(clientId);
+    }
   };
 
   const saveClientDetails = async () => {
-    if (!showClientDetails) return;
-    
-    const item = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
-    if (item) {
-      await updateClient(showClientDetails, { observacoes: clientObservations });
+    if (showClientDetails) {
+      const updates: any = { 
+        observacoes: JSON.stringify(clientObservations) 
+      };
+      
+      if (clientFile) {
+        updates.attachments = [clientFile];
+      }
+      
+      await updateClient(showClientDetails, updates);
     }
     setShowClientDetails(null);
+    setClientObservations([]);
+    setClientFile(null);
   };
 
-  const allColumns = [...columns, ...customColumns.map(col => col.name)];
+  const handleMoveClient = (clientId: string, newGroupId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
+    
+    if (client && oldGroup) {
+      // Remove from old group
+      deleteClient(clientId);
+      
+      // Add to new group
+      addClient(newGroupId, {
+        elemento: client.elemento,
+        servicos: client.servicos || '',
+        observacoes: client.observacoes,
+        ...client
+      });
+      
+      setShowClientDetails(null);
+    }
+  };
 
-  if (isMobile) {
-    return (
-      <div className="p-4">
-        <div className="text-center text-muted-foreground">
-          A visualização de vídeos não está disponível em dispositivos móveis.
-        </div>
-      </div>
-    );
-  }
+  const openFilePreview = (file: File) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
+  };
+
+  const getClientAttachments = (clientId: string) => {
+    return getClientFiles(clientId);
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Vídeos</h1>
-          <p className="text-muted-foreground">Gerencie seus vídeos e campanhas</p>
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-lg font-semibold text-gray-900">Vídeos</h1>
+            <div className="text-xs text-gray-500">
+              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
+            </div>
+          </div>
+          {isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Calendar className="h-4 w-4 mr-2" />
-              Criar Mês
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Novo Mês</DialogTitle>
-              <DialogDescription>
-                Digite o nome do novo mês para organizar seus vídeos.
-              </DialogDescription>
-            </DialogHeader>
-            <Input
-              placeholder="Nome do mês"
-              value={newMonthName}
-              onChange={(e) => setNewMonthName(e.target.value)}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Cancelar
+      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
+        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Plus className="h-4 w-4 mr-1" />
+                Criar mês
               </Button>
-              <Button onClick={handleCreateMonth}>Criar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+              <DialogHeader>
+                <DialogTitle>Criar Novo Mês</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome do mês"
+                  value={newMonthName}
+                  onChange={(e) => setNewMonthName(e.target.value)}
+                />
+                <div className="flex space-x-2">
+                  <Button onClick={handleCreateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                    Criar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-        <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicar Mês
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Duplicar Mês</DialogTitle>
-              <DialogDescription>
-                Selecione um mês para duplicar e digite o nome do novo mês.
-              </DialogDescription>
-            </DialogHeader>
-            <Select value={duplicateSourceId} onValueChange={setDuplicateSourceId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar mês para duplicar" />
-              </SelectTrigger>
-              <SelectContent>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicar mês
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {groups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => {
+                    console.log('🔄 Modal: Abrindo diálogo de duplicação para grupo:', group.id);
+                    setSelectedGroupToDuplicate(group.id);
+                    // Pequeno delay para evitar conflitos de estado
+                    setTimeout(() => {
+                      console.log('🔄 Modal: Abrindo modal de duplicação');
+                      setShowDuplicateDialog(true);
+                    }, 10);
+                  }}
+                >
+                  Duplicar {group.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowClientDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowColumnDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Colunas
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowStatusModal(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Status
+          </Button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+          {/* Table Header */}
+          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            <div className="flex items-center min-w-max">
+              <div className="w-8 flex items-center justify-center p-2">
+                <Checkbox
+                  checked={selectedItems.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+              </div>
+              <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+              <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              {customColumns.map((column) => (
+                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                  {column.name}
+                </div>
+              ))}
+              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
+            </div>
+          </div>
+
+          {/* Table Body */}
+          {groups.map((group) => (
+            <div key={group.id}>
+              {/* Group Header */}
+              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
+                <div className="flex items-center min-w-max">
+                  <div className="w-8 flex items-center justify-center p-2">
+                    <button onClick={() => toggleGroup(group.id)}>
+                      {group.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2 p-2 flex-1">
+                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                    <span className="font-medium text-gray-900">{group.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 p-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEditMonth(group.id)}
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group Items */}
+              {group.isExpanded && group.items.map((item, index) => (
+                <div 
+                  key={`${group.id}-${item.id}-${index}`} 
+                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                >
+                  <div className="flex items-center min-w-max">
+                    <div className="w-8 flex items-center justify-center p-2">
+                      <Checkbox
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                      />
+                    </div>
+                    <div className="w-56 p-2 border-r border-gray-200">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openClientDetails(item.id)}
+                          className="text-sm text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {item.elemento}
+                        </button>
+                        {getClientAttachments(item.id).length > 0 && (
+                          <Paperclip className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
+                      {item.servicos}
+                    </div>
+                    {customColumns.map((column) => (
+                      <div key={column.id} className="w-44 p-2 border-r border-gray-200">
+                        {column.type === 'status' ? (
+                          <StatusButton
+                            currentStatus={(item as any)[column.id] || ''}
+                            statuses={statuses}
+                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
+                          />
+                        ) : (
+                          <Input
+                            value={(item as any)[column.id] || ''}
+                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto"
+                            placeholder="..."
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <div className="w-20 p-2 flex space-x-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
+        console.log('🔄 Modal: Estado do diálogo mudou para:', open);
+        if (!open) {
+          // Ao fechar o modal, limpar os estados
+          console.log('🔄 Modal: Fechando modal e limpando estados');
+          setDuplicateMonthName('');
+          setSelectedGroupToDuplicate('');
+        }
+        setShowDuplicateDialog(open);
+      }}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Duplicar Mês</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <Input
               placeholder="Nome do novo mês"
               value={duplicateMonthName}
-              onChange={(e) => setDuplicateMonthName(e.target.value)}
+              onChange={(e) => {
+                console.log('🔄 Modal: Nome alterado para:', e.target.value);
+                setDuplicateMonthName(e.target.value);
+              }}
             />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+            <div className="flex space-x-2">
+              <Button onClick={handleDuplicateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                Duplicar
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  console.log('🔄 Modal: Botão cancelar clicado');
+                  setShowDuplicateDialog(false);
+                }} 
+                className="flex-1"
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleDuplicateMonth}>Duplicar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Users className="h-4 w-4 mr-2" />
-              Adicionar Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Adicionar Cliente</DialogTitle>
-              <DialogDescription>
-                Selecione um mês e adicione um novo cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar mês" />
-              </SelectTrigger>
-              <SelectContent>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
+      <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Novo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do cliente"
+              value={newClientName}
+              onChange={(e) => setNewClientName(e.target.value)}
+            />
+            <Input
+              placeholder="Serviços (ex: Gestão de Redes Sociais)"
+              value={newClientServices}
+              onChange={(e) => setNewClientServices(e.target.value)}
+            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mês</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={selectedGroupForClient}
+                onChange={(e) => setSelectedGroupForClient(e.target.value)}
+              >
+                <option value="">Selecione um mês</option>
+                {groups.map(group => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
                 ))}
-              </SelectContent>
-            </Select>
-            <div className="space-y-4">
-              <Input
-                placeholder="Nome do cliente"
-                value={clientObservations}
-                onChange={(e) => setClientObservations(e.target.value)}
-              />
-              <Button onClick={() => handleAddClient({ elemento: clientObservations })}>
-                Adicionar
+              </select>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateClient} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
+                Cancelar
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Coluna
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Adicionar Nova Coluna</DialogTitle>
-              <DialogDescription>
-                Crie uma nova coluna para organizar melhor seus dados.
-              </DialogDescription>
-            </DialogHeader>
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Colunas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <Input
               placeholder="Nome da coluna"
               value={newColumnName}
               onChange={(e) => setNewColumnName(e.target.value)}
             />
-            <Select value={newColumnType} onValueChange={(value: 'status' | 'text') => setNewColumnType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="text">Texto</SelectItem>
-              </SelectContent>
-            </Select>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddColumn}>Adicionar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Settings className="h-4 w-4 mr-2" />
-              Gerenciar
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo da Coluna</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={newColumnType}
+                onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
+              >
+                <option value="status">Status (com cores)</option>
+                <option value="text">Texto livre</option>
+              </select>
+            </div>
+            <Button onClick={handleCreateColumn} className="w-full bg-blue-600 hover:bg-blue-700">
+              Criar Coluna
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setShowCustomStatusDialog(true)}>
-              <Settings className="h-4 w-4 mr-2" />
-              Status Personalizados
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setShowDeleteColumnDialog(true)}
-              disabled={customColumns.length === 0}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Deletar Coluna
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Table */}
-      <div className="border rounded-lg">
-        <ScrollArea className="h-[600px]">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background">
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={selectedItems.length === groups.flatMap(g => g.items).length}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-[200px]">Mês</TableHead>
-                {allColumns.map((column, index) => (
-                  <TableHead key={index} className="min-w-[150px]">
-                    {column === 'elemento' ? 'Cliente' : column}
-                  </TableHead>
-                ))}
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groups.map((group) => (
-                <>
-                  <TableRow key={group.id} className="bg-muted/50">
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleGroup(group.id)}
-                      >
-                        {group.isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className={`inline-block w-3 h-3 rounded-full mr-2 ${group.color}`}></div>
-                      {group.name}
-                    </TableCell>
-                    <TableCell colSpan={allColumns.length}>
-                      <span className="text-sm text-muted-foreground">
-                        {group.items.length} clientes
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Ellipsis className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => {
-                            setShowEditDialog(group.id);
-                            setEditMonthName(group.name);
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => setShowDeleteDialog(group.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Deletar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                  {group.isExpanded && group.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedItems.includes(item.id)}
-                          onCheckedChange={() => handleSelectItem(item.id)}
-                        />
-                      </TableCell>
-                      <TableCell></TableCell>
-                      {allColumns.map((column, index) => (
-                        <TableCell key={index}>
-                          {column === 'elemento' ? (
-                            item[column] || ''
-                          ) : customColumns.find(col => col.name === column)?.type === 'status' ? (
-                            <StatusButton
-                              currentStatus={item[column] || ''}
-                              statuses={statuses}
-                              onStatusChange={(statusId) => handleStatusChange(item.id, column, statusId)}
-                            />
-                          ) : (
-                            <span>{item[column] || ''}</span>
-                          )}
-                        </TableCell>
-                      ))}
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Ellipsis className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => {
-                              setShowClientDetails(item.id);
-                              setClientObservations(item.observacoes || '');
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver Detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => setShowDeleteClientDialog(item.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Deletar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">Colunas Existentes:</h4>
+              {customColumns.map(column => (
+                <div key={column.id} className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">
+                    {column.name} ({column.type})
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               ))}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-      </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Dialogs */}
-      <Dialog open={!!showEditDialog} onOpenChange={(open) => !open && setShowEditDialog(null)}>
-        <DialogContent>
+      <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Editar Mês</DialogTitle>
-            <DialogDescription>
-              Digite o novo nome para o mês.
-            </DialogDescription>
           </DialogHeader>
-          <Input
-            placeholder="Nome do mês"
-            value={editMonthName}
-            onChange={(e) => setEditMonthName(e.target.value)}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleEditMonth}>Salvar</Button>
-          </DialogFooter>
+          <div className="space-y-4">
+            <Input
+              placeholder="Nome do mês"
+              value={editingMonth?.name || ''}
+              onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
+            />
+            <div className="flex space-x-2">
+              <Button onClick={handleUpdateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                Salvar
+              </Button>
+              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
-
-      <CustomStatusModal
-        open={showCustomStatusDialog}
-        onOpenChange={setShowCustomStatusDialog}
-        onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
-        onDeleteStatus={deleteStatus}
-      />
-
-      <Dialog open={showDeleteColumnDialog} onOpenChange={setShowDeleteColumnDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deletar Coluna</DialogTitle>
-            <DialogDescription>
-              Selecione a coluna que deseja deletar.
-            </DialogDescription>
-          </DialogHeader>
-          <Select value={columnToDelete || ''} onValueChange={setColumnToDelete}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecionar coluna" />
-            </SelectTrigger>
-            <SelectContent>
-              {customColumns.map((column) => (
-                <SelectItem key={column.id} value={column.id}>
-                  {column.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteColumnDialog(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteColumn}>
-              Deletar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmationDialog
-        open={!!showDeleteDialog}
-        onOpenChange={(open) => !open && setShowDeleteDialog(null)}
-        onConfirm={handleDeleteMonth}
-        title="Deletar Mês"
-        message="Tem certeza que deseja deletar este mês?"
-      />
-
-      <ConfirmationDialog
-        open={!!showDeleteClientDialog}
-        onOpenChange={(open) => !open && setShowDeleteClientDialog(null)}
-        onConfirm={handleDeleteClient}
-        title="Deletar Cliente"
-        message="Tem certeza que deseja deletar este cliente?"
-      />
 
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
-          onOpenChange={(open) => {
-            if (!open) {
-              saveClientDetails();
+          onOpenChange={(open) => !open && setShowClientDetails(null)}
+          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
+          observations={clientObservations}
+          onUpdateObservations={(newObservations) => {
+            setClientObservations(newObservations);
+            // Save observations to database
+            const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
+            if (clientItem) {
+              updateClient(showClientDetails!, { observacoes: JSON.stringify(newObservations) });
             }
           }}
-          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
-          observations={[]}
-          onUpdateObservations={() => {}}
-          clientFile={null}
-          onFileChange={() => {}}
-          onFilePreview={() => {}}
-          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
-          currentGroupId={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.groupId || ''}
-          onMoveClient={() => {}}
-          clientAttachments={[]}
-          onUpdateAttachments={() => {}}
+          clientFile={clientFile}
+          onFileChange={setClientFile}
+          onFilePreview={openFilePreview}
+          availableGroups={groups}
+          currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails!, newGroupId)}
+          clientAttachments={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || []}
+          onUpdateAttachments={(attachments) => {
+            // Save attachments automatically to database
+            if (showClientDetails) {
+              updateClient(showClientDetails, { attachments });
+            }
+          }}
         />
       )}
 
-      {showFilePreview && (
-        <FilePreview
-          open={!!showFilePreview}
-          onOpenChange={(open) => !open && setShowFilePreview(null)}
-          file={null}
-        />
-      )}
+      <CustomStatusModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        onAddStatus={addStatus}
+        onUpdateStatus={updateStatus}
+        onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
+      />
+
+      <FilePreview
+        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
+      />
+
+      <ConfirmationDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.type === 'client') {
+            handleDeleteClient(confirmDelete.id);
+          } else if (confirmDelete?.type === 'column') {
+            handleDeleteColumn(confirmDelete.id);
+          } else if (confirmDelete?.type === 'month') {
+            handleDeleteMonth(confirmDelete.id);
+          }
+        }}
+        title="Confirmar Exclusão"
+        message={
+          confirmDelete?.type === 'client' 
+            ? "Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+            : confirmDelete?.type === 'month'
+            ? "Tem certeza que deseja excluir este mês e todos os seus clientes? Esta ação não pode ser desfeita."
+            : "Tem certeza que deseja excluir esta coluna? Esta ação não pode ser desfeita."
+        }
+        confirmText="Excluir"
+      />
     </div>
   );
 }
