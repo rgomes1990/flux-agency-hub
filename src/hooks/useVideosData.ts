@@ -88,42 +88,89 @@ export function useVideosData() {
 
   const loadVideosData = async () => {
     try {
+      console.log('🔄 VIDEOS: Carregando dados globais');
+      
       const { data, error } = await supabase
         .from('videos_data')
         .select('*')
-        .order('created_at');
+        .order('created_at', { ascending: true });
 
-      if (error) throw error;
-
-      const groupsMap = new Map<string, VideoGroup>();
-
-      data?.forEach((row) => {
-        if (!groupsMap.has(row.group_id)) {
-          groupsMap.set(row.group_id, {
-            id: row.group_id,
-            name: row.group_name,
-            isExpanded: row.is_expanded || false,
-            color: row.group_color || 'bg-purple-500',
-            items: []
-          });
-        }
-
-        const group = groupsMap.get(row.group_id)!;
-        
-        if (Array.isArray(row.item_data)) {
-          row.item_data.forEach((item: any) => {
-            group.items.push({
-              id: item.id || crypto.randomUUID(),
-              elemento: item.elemento || '',
-              ...item
-            });
-          });
-        }
+      console.log('📊 VIDEOS: Resposta dados:', { 
+        dataLength: data?.length || 0, 
+        error,
+        sampleData: data?.[0] 
       });
 
-      setGroups(Array.from(groupsMap.values()));
+      if (error) {
+        console.error('❌ VIDEOS: Erro ao carregar dados:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const groupsMap = new Map<string, VideoGroup>();
+        const seenItems = new Set<string>(); // Track unique combinations
+
+        data.forEach((item, index) => {
+          console.log(`🔍 VIDEOS: Processando item ${index + 1}:`, {
+            group_id: item.group_id,
+            item_data_type: typeof item.item_data,
+            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
+          });
+
+          let itemData;
+          try {
+            if (typeof item.item_data === 'string') {
+              itemData = JSON.parse(item.item_data);
+            } else {
+              itemData = item.item_data;
+            }
+          } catch (parseError) {
+            console.error('❌ VIDEOS: Erro ao fazer parse do item_data:', parseError);
+            return;
+          }
+          
+          // Create unique key based on actual item ID to detect real duplicates
+          const uniqueKey = `${item.group_id}-${itemData?.id}`;
+          
+          if (seenItems.has(uniqueKey)) {
+            console.warn('⚠️ VIDEOS: Item duplicado detectado e ignorado:', uniqueKey);
+            return;
+          }
+          
+          seenItems.add(uniqueKey);
+          
+          if (!groupsMap.has(item.group_id)) {
+            groupsMap.set(item.group_id, {
+              id: item.group_id,
+              name: item.group_name,
+              color: item.group_color || 'bg-purple-500',
+              isExpanded: item.is_expanded,
+              items: []
+            });
+          }
+
+          const group = groupsMap.get(item.group_id)!;
+          if (itemData && itemData.id && itemData.id !== `empty-${item.group_id}`) {
+            group.items.push({
+              id: itemData.id,
+              elemento: itemData.elemento || '',
+              ...itemData
+            });
+          }
+        });
+
+        const loadedGroups = Array.from(groupsMap.values());
+        console.log('✅ VIDEOS: Grupos carregados:', {
+          totalGroups: loadedGroups.length,
+          groupDetails: loadedGroups.map(g => ({ name: g.name, itemCount: g.items.length }))
+        });
+        setGroups(loadedGroups);
+      } else {
+        console.log('ℹ️ VIDEOS: Nenhum dado encontrado');
+        setGroups([]);
+      }
     } catch (error) {
-      console.error('Error loading videos data:', error);
+      console.error('❌ VIDEOS: Erro crítico ao carregar dados:', error);
       toast({
         title: "Erro",
         description: "Não foi possível carregar os dados dos vídeos.",
