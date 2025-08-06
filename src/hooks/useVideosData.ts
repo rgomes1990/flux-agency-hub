@@ -271,7 +271,7 @@ export function useVideosData() {
         column_id: crypto.randomUUID(),
         column_name: name,
         column_type: type,
-        user_id: user?.id
+        user_id: null // Sempre null para tornar global
       };
 
       const { error } = await supabase
@@ -311,7 +311,7 @@ export function useVideosData() {
           status_id: status.id,
           status_name: status.name,
           status_color: status.color,
-          user_id: user?.id
+          user_id: null // Sempre null para tornar global
         });
 
       if (error) throw error;
