@@ -134,26 +134,66 @@ export function useVideosData() {
 
   const saveVideosToDatabase = async (newGroups: VideoGroup[]) => {
     try {
-      const { error: deleteError } = await supabase
-        .from('videos_data')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000');
-
-      if (deleteError) throw deleteError;
-
+      console.log('🔄 VIDEOS: Iniciando salvamento:', {
+        groupCount: newGroups.length,
+        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
+      });
+      
       for (const group of newGroups) {
-        const { error: insertError } = await supabase
+        console.log(`🔄 VIDEOS: Processando grupo: ${group.name} (${group.items.length} itens)`);
+        
+        // Deletar dados existentes do grupo específico
+        const { error: deleteError } = await supabase
           .from('videos_data')
-          .insert({
-            user_id: user?.id,
-            group_id: group.id,
-            group_name: group.name,
-            group_color: group.color,
-            is_expanded: group.isExpanded,
-            item_data: group.items
-          });
+          .delete()
+          .eq('group_id', group.id);
 
-        if (insertError) throw insertError;
+        if (deleteError) {
+          console.error('❌ VIDEOS: Erro ao deletar:', deleteError);
+          throw deleteError;
+        }
+
+        // Sempre inserir dados do grupo
+        const insertData = group.items.length > 0 
+          ? group.items.map((item, index) => {
+              console.log(`📝 VIDEOS: Preparando item ${index + 1}:`, {
+                id: item.id,
+                elemento: item.elemento
+              });
+
+              return {
+                user_id: null, // Sempre null para tornar global
+                group_id: group.id,
+                group_name: group.name,
+                group_color: group.color,
+                is_expanded: group.isExpanded,
+                item_data: item
+              };
+            })
+          : [{
+              user_id: null, // Sempre null para tornar global
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: {
+                id: `empty-${group.id}`,
+                elemento: '',
+                attachments: []
+              }
+            }];
+
+        const { data: insertResult, error: insertError } = await supabase
+          .from('videos_data')
+          .insert(insertData)
+          .select('id');
+
+        if (insertError) {
+          console.error('❌ VIDEOS: Erro ao inserir:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ VIDEOS: Dados inseridos:', insertResult?.length || 0);
       }
 
       toast({
