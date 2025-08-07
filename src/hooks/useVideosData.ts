@@ -186,6 +186,39 @@ export function useVideosData() {
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
       });
       
+      // Get current group IDs from the database
+      const { data: existingData, error: fetchError } = await supabase
+        .from('videos_data')
+        .select('group_id')
+        .eq('user_id', null);
+
+      if (fetchError) {
+        console.error('❌ VIDEOS: Erro ao buscar grupos existentes:', fetchError);
+        throw fetchError;
+      }
+
+      const existingGroupIds = [...new Set(existingData?.map(item => item.group_id) || [])];
+      const newGroupIds = newGroups.map(group => group.id);
+      
+      // Delete groups that are no longer in the new groups array
+      const groupsToDelete = existingGroupIds.filter(id => !newGroupIds.includes(id));
+      console.log('🗑️ VIDEOS: Grupos para deletar:', groupsToDelete);
+      
+      for (const groupId of groupsToDelete) {
+        const { error: deleteError } = await supabase
+          .from('videos_data')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('user_id', null);
+
+        if (deleteError) {
+          console.error('❌ VIDEOS: Erro ao deletar grupo:', deleteError);
+          throw deleteError;
+        }
+        console.log(`✅ VIDEOS: Grupo ${groupId} deletado`);
+      }
+      
+      // Process each existing group
       for (const group of newGroups) {
         console.log(`🔄 VIDEOS: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
@@ -193,7 +226,8 @@ export function useVideosData() {
         const { error: deleteError } = await supabase
           .from('videos_data')
           .delete()
-          .eq('group_id', group.id);
+          .eq('group_id', group.id)
+          .eq('user_id', null);
 
         if (deleteError) {
           console.error('❌ VIDEOS: Erro ao deletar:', deleteError);
