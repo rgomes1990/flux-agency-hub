@@ -404,6 +404,39 @@ export type Database = {
           },
         ]
       }
+      default_observations: {
+        Row: {
+          created_at: string
+          id: string
+          is_completed: boolean
+          module: string
+          order_index: number
+          text: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          module: string
+          order_index?: number
+          text: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          module?: string
+          order_index?: number
+          text?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       google_my_business_data: {
         Row: {
           created_at: string

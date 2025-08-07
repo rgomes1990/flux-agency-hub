@@ -38,6 +38,7 @@ export const useGoogleMyBusinessData = () => {
   const [columns, setColumns] = useState<GoogleMyBusinessColumn[]>([]);
   const [customColumns, setCustomColumns] = useState<GoogleMyBusinessColumn[]>([]);
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
+  const [defaultObservations, setDefaultObservations] = useState<Array<{id: string, text: string, is_completed: boolean, order_index: number}>>([]);
 
   const { user, logAudit } = useAuth();
 
@@ -265,12 +266,49 @@ export const useGoogleMyBusinessData = () => {
     }
   };
 
+  // Carregar observações padrão do Supabase
+  const loadDefaultObservations = async () => {
+    try {
+      console.log('🔄 GMB: Carregando observações padrão');
+      const { data, error } = await supabase
+        .from('default_observations')
+        .select('*')
+        .eq('module', 'google_my_business')
+        .order('order_index');
+
+      console.log('📊 GMB: Resposta observações padrão:', { data, error });
+
+      if (error) {
+        console.error('❌ GMB: Erro ao carregar observações padrão:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const observations = data.map(obs => ({
+          id: obs.id,
+          text: obs.text,
+          is_completed: obs.is_completed,
+          order_index: obs.order_index
+        }));
+
+        setDefaultObservations(observations);
+        console.log('✅ GMB: Observações padrão carregadas:', observations.length);
+      } else {
+        setDefaultObservations([]);
+        console.log('ℹ️ GMB: Nenhuma observação padrão encontrada');
+      }
+    } catch (error) {
+      console.error('❌ GMB: Erro crítico ao carregar observações padrão:', error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       console.log('Inicializando dados de Google My Business globais para usuário:', user.username);
       loadGoogleMyBusinessData();
       loadColumns();
       loadStatuses();
+      loadDefaultObservations();
     } else {
       console.log('Usuário não logado, aguardando autenticação...');
     }
@@ -328,7 +366,12 @@ export const useGoogleMyBusinessData = () => {
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
         informacoes: '',
-        attachments: []
+        attachments: [],
+        observacoes: JSON.stringify(defaultObservations.map(obs => ({
+          id: crypto.randomUUID(),
+          text: obs.text,
+          completed: false
+        })))
       };
 
       // Adicionar colunas customizadas
@@ -443,11 +486,134 @@ export const useGoogleMyBusinessData = () => {
     }
   };
 
+  // Funções para gerenciar observações padrão
+  const addDefaultObservation = async (text: string) => {
+    try {
+      const newObservation = {
+        module: 'google_my_business',
+        text,
+        is_completed: false,
+        order_index: defaultObservations.length,
+        user_id: null
+      };
+
+      const { data, error } = await supabase
+        .from('default_observations')
+        .insert(newObservation)
+        .select();
+
+      if (error) throw error;
+      await loadDefaultObservations();
+    } catch (error) {
+      console.error('❌ GMB: Erro ao adicionar observação padrão:', error);
+      throw error;
+    }
+  };
+
+  const updateDefaultObservation = async (id: string, updates: { text?: string, order_index?: number }) => {
+    try {
+      const { error } = await supabase
+        .from('default_observations')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadDefaultObservations();
+    } catch (error) {
+      console.error('❌ GMB: Erro ao atualizar observação padrão:', error);
+      throw error;
+    }
+  };
+
+  const deleteDefaultObservation = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('default_observations')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadDefaultObservations();
+    } catch (error) {
+      console.error('❌ GMB: Erro ao deletar observação padrão:', error);
+      throw error;
+    }
+  };
+
+  const createDefaultObservationsFromGrupoForte = async () => {
+    try {
+      // Observações padrão baseadas no Grupo Forte
+      const observationsFromGrupoForte = [
+        "Adicionar Fotos",
+        "Adicionar 4 Posts", 
+        "Adicionar Produtos",
+        "Responder Mensagens",
+        "Ver Horários Feriados"
+      ];
+
+      // Limpar observações existentes
+      await supabase
+        .from('default_observations')
+        .delete()
+        .eq('module', 'google_my_business');
+
+      // Inserir novas observações
+      const newObservations = observationsFromGrupoForte.map((text, index) => ({
+        module: 'google_my_business',
+        text,
+        is_completed: false,
+        order_index: index,
+        user_id: null
+      }));
+
+      const { error } = await supabase
+        .from('default_observations')
+        .insert(newObservations);
+
+      if (error) throw error;
+      await loadDefaultObservations();
+      
+      // Aplicar observações padrão em todos os clientes existentes
+      await applyDefaultObservationsToAllClients();
+      
+      console.log('✅ GMB: Observações padrão do Grupo Forte criadas e aplicadas');
+    } catch (error) {
+      console.error('❌ GMB: Erro ao criar observações padrão do Grupo Forte:', error);
+      throw error;
+    }
+  };
+
+  const applyDefaultObservationsToAllClients = async () => {
+    try {
+      const observationsToApply = defaultObservations.map(obs => ({
+        id: crypto.randomUUID(),
+        text: obs.text,
+        completed: false
+      }));
+
+      const newGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => ({
+          ...item,
+          observacoes: JSON.stringify(observationsToApply)
+        }))
+      }));
+
+      setGroups(newGroups);
+      await saveGoogleMyBusinessToDatabase(newGroups);
+      console.log('✅ GMB: Observações padrão aplicadas a todos os clientes');
+    } catch (error) {
+      console.error('❌ GMB: Erro ao aplicar observações padrão:', error);
+      throw error;
+    }
+  };
+
   return {
     groups,
     columns,
     customColumns,
     statuses,
+    defaultObservations,
     updateGroups: async (newGroups: GoogleMyBusinessGroup[]) => {
       console.log('🔄 GMB: Atualizando grupos:', newGroups.length);
       try {
@@ -644,6 +810,12 @@ export const useGoogleMyBusinessData = () => {
         return client.attachments.map(att => new File([att.data], att.name, { type: att.type }));
       }
       return [];
-    }
+    },
+    // Funções de observações padrão
+    addDefaultObservation,
+    updateDefaultObservation,
+    deleteDefaultObservation,
+    createDefaultObservationsFromGrupoForte,
+    applyDefaultObservationsToAllClients
   };
 };

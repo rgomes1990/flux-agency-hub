@@ -34,6 +34,7 @@ export default function GoogleMyBusiness() {
     columns,
     customColumns, // Use customColumns for management interface
     statuses,
+    defaultObservations,
     updateGroups, 
     createMonth, 
     updateMonth,
@@ -49,7 +50,12 @@ export default function GoogleMyBusiness() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles
+    getClientFiles,
+    addDefaultObservation,
+    updateDefaultObservation,
+    deleteDefaultObservation,
+    createDefaultObservationsFromGrupoForte,
+    applyDefaultObservationsToAllClients
   } = useGoogleMyBusinessData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -62,6 +68,7 @@ export default function GoogleMyBusiness() {
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
   const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [showObservationsDialog, setShowObservationsDialog] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientServices, setNewClientServices] = useState('');
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
@@ -69,7 +76,8 @@ export default function GoogleMyBusiness() {
   const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
+  const [newObservationText, setNewObservationText] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month' | 'observation', id: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [showFilePreview, setShowFilePreview] = useState(false);
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
@@ -341,6 +349,16 @@ export default function GoogleMyBusiness() {
           >
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Status
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowObservationsDialog(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Gerenciar Observações Padrões
           </Button>
         </div>
       </div>
@@ -655,6 +673,119 @@ export default function GoogleMyBusiness() {
         />
       )}
 
+      {/* Dialog de Observações Padrão */}
+      <Dialog open={showObservationsDialog} onOpenChange={setShowObservationsDialog}>
+        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : 'max-w-2xl'}>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Observações Padrões</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Botão para criar observações baseadas no Grupo Forte */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Configuração Inicial</h4>
+              <p className="text-sm text-blue-700 mb-3">
+                Criar observações padrão baseadas no cliente "Grupo Forte" e aplicar em todos os clientes existentes.
+              </p>
+              <Button 
+                onClick={async () => {
+                  try {
+                    await createDefaultObservationsFromGrupoForte();
+                    alert('Observações padrão criadas e aplicadas com sucesso!');
+                  } catch (error) {
+                    alert('Erro ao criar observações padrão.');
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Criar e Aplicar Observações do Grupo Forte
+              </Button>
+            </div>
+
+            {/* Lista de observações padrão existentes */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Observações Padrão Atuais ({defaultObservations.length})</h4>
+              {defaultObservations.map((obs, index) => (
+                <div key={obs.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-600">#{index + 1}</span>
+                    <span>{obs.text}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmDelete({ type: 'observation', id: obs.id })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              
+              {defaultObservations.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  Nenhuma observação padrão configurada. Use o botão acima para criar as observações do Grupo Forte.
+                </p>
+              )}
+            </div>
+            
+            {/* Adicionar nova observação */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-2">Adicionar Nova Observação</h4>
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Digite a observação..."
+                  value={newObservationText}
+                  onChange={(e) => setNewObservationText(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={async () => {
+                    if (newObservationText.trim()) {
+                      try {
+                        await addDefaultObservation(newObservationText.trim());
+                        setNewObservationText('');
+                      } catch (error) {
+                        alert('Erro ao adicionar observação.');
+                      }
+                    }
+                  }}
+                  disabled={!newObservationText.trim()}
+                >
+                  Adicionar
+                </Button>
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="border-t pt-4 space-y-2">
+              <Button 
+                onClick={async () => {
+                  try {
+                    await applyDefaultObservationsToAllClients();
+                    alert('Observações padrão aplicadas a todos os clientes!');
+                  } catch (error) {
+                    alert('Erro ao aplicar observações.');
+                  }
+                }}
+                variant="outline"
+                className="w-full"
+                disabled={defaultObservations.length === 0}
+              >
+                Aplicar Observações Atuais a Todos os Clientes
+              </Button>
+              
+              <Button 
+                onClick={() => setShowObservationsDialog(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {confirmDelete && (
         <ConfirmationDialog
           open={!!confirmDelete}
@@ -666,10 +797,23 @@ export default function GoogleMyBusiness() {
               handleDeleteColumn(confirmDelete.id);
             } else if (confirmDelete.type === 'month') {
               handleDeleteMonth(confirmDelete.id);
+            } else if (confirmDelete.type === 'observation') {
+              deleteDefaultObservation(confirmDelete.id);
+              setConfirmDelete(null);
             }
           }}
-          title={`Confirmar ${confirmDelete.type === 'client' ? 'Exclusão do Cliente' : confirmDelete.type === 'column' ? 'Exclusão da Coluna' : 'Exclusão do Mês'}`}
-          message={`Tem certeza de que deseja excluir ${confirmDelete.type === 'client' ? 'este cliente' : confirmDelete.type === 'column' ? 'esta coluna' : 'este mês'}? Esta ação não pode ser desfeita.`}
+          title={`Confirmar ${
+            confirmDelete.type === 'client' ? 'Exclusão do Cliente' : 
+            confirmDelete.type === 'column' ? 'Exclusão da Coluna' : 
+            confirmDelete.type === 'month' ? 'Exclusão do Mês' :
+            'Exclusão da Observação'
+          }`}
+          message={`Tem certeza de que deseja excluir ${
+            confirmDelete.type === 'client' ? 'este cliente' : 
+            confirmDelete.type === 'column' ? 'esta coluna' : 
+            confirmDelete.type === 'month' ? 'este mês' :
+            'esta observação padrão'
+          }? Esta ação não pode ser desfeita.`}
         />
       )}
     </div>
