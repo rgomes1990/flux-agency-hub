@@ -190,7 +190,7 @@ export function useVideosData() {
       const { data: existingData, error: fetchError } = await supabase
         .from('videos_data')
         .select('group_id')
-        .eq('user_id', null);
+        .is('user_id', null);
 
       if (fetchError) {
         console.error('❌ VIDEOS: Erro ao buscar grupos existentes:', fetchError);
@@ -209,7 +209,7 @@ export function useVideosData() {
           .from('videos_data')
           .delete()
           .eq('group_id', groupId)
-          .eq('user_id', null);
+          .is('user_id', null);
 
         if (deleteError) {
           console.error('❌ VIDEOS: Erro ao deletar grupo:', deleteError);
@@ -227,7 +227,7 @@ export function useVideosData() {
           .from('videos_data')
           .delete()
           .eq('group_id', group.id)
-          .eq('user_id', null);
+          .is('user_id', null);
 
         if (deleteError) {
           console.error('❌ VIDEOS: Erro ao deletar:', deleteError);
