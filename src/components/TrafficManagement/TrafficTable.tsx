@@ -211,11 +211,11 @@ export function TrafficTable() {
                   </TableHead>
                   <TableHead className="w-48">Cliente</TableHead>
                   <TableHead className="w-40">Data da Recarga</TableHead>
-                  <TableHead className="w-60">E-mail para Cobrança</TableHead>
-                  <TableHead className="w-52">WhatsApp</TableHead>
+                  <TableHead className="w-72">E-mail para Cobrança</TableHead>
+                  <TableHead className="w-60">WhatsApp</TableHead>
                   <TableHead className="w-36">Orçamento</TableHead>
-                  <TableHead className="w-56">Crédito da Conta</TableHead>
-                  <TableHead className="w-56">Status da Campanha</TableHead>
+                  <TableHead className="w-64">Crédito da Conta</TableHead>
+                  <TableHead className="w-64">Status da Campanha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
