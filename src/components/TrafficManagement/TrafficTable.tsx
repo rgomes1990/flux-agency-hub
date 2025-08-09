@@ -215,7 +215,7 @@ export function TrafficTable() {
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-72">WhatsApp</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-36">Orçamento</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-80">Crédito da Conta</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-80">Status da Campanha</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-96">Status da Campanha</th>
                 </tr>
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
