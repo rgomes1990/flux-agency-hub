@@ -215,7 +215,7 @@ export function TrafficTable() {
                   <TableHead className="w-72">WhatsApp</TableHead>
                   <TableHead className="w-36">Orçamento</TableHead>
                   <TableHead className="w-80">Crédito da Conta</TableHead>
-                  <TableHead className="w-72">Status da Campanha</TableHead>
+                  <TableHead className="w-80">Status da Campanha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
