@@ -380,11 +380,32 @@ export default function Traffic() {
               </div>
               <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
               <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              {columns.map((column) => (
-                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
-                  {column.name}
-                </div>
-              ))}
+              {columns.map((column) => {
+                const getColumnWidth = (columnName: string) => {
+                  switch(columnName.toLowerCase()) {
+                    case 'whatsapp':
+                      return 'w-72';
+                    case 'crédito':
+                    case 'credito':
+                      return 'w-80';
+                    case 'campanhas':
+                      return 'w-96';
+                    case 'email':
+                    case 'e-mail':
+                      return 'w-80';
+                    case 'atualizações':
+                    case 'atualizacoes':
+                      return 'w-64';
+                    default:
+                      return 'w-32';
+                  }
+                };
+                return (
+                  <div key={column.id} className={`${getColumnWidth(column.name)} p-2 text-xs font-medium text-gray-600 border-r border-gray-300`}>
+                    {column.name}
+                  </div>
+                );
+              })}
               <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
             </div>
           </div>
@@ -458,24 +479,45 @@ export default function Traffic() {
                     <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.servicos}
                     </div>
-                    {columns.map((column) => (
-                      <div key={column.id} className="w-32 p-2 border-r border-gray-200">
-                        {column.type === 'status' ? (
-                          <StatusButton
-                            currentStatus={(item as any)[column.id] || ''}
-                            statuses={statuses}
-                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
-                          />
-                        ) : (
-                          <Input
-                            value={(item as any)[column.id] || ''}
-                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
-                            className="border-0 bg-transparent p-0 h-auto"
-                            placeholder="..."
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {columns.map((column) => {
+                      const getColumnWidth = (columnName: string) => {
+                        switch(columnName.toLowerCase()) {
+                          case 'whatsapp':
+                            return 'w-72';
+                          case 'crédito':
+                          case 'credito':
+                            return 'w-80';
+                          case 'campanhas':
+                            return 'w-96';
+                          case 'email':
+                          case 'e-mail':
+                            return 'w-80';
+                          case 'atualizações':
+                          case 'atualizacoes':
+                            return 'w-64';
+                          default:
+                            return 'w-32';
+                        }
+                      };
+                      return (
+                        <div key={column.id} className={`${getColumnWidth(column.name)} p-2 border-r border-gray-200`}>
+                          {column.type === 'status' ? (
+                            <StatusButton
+                              currentStatus={(item as any)[column.id] || ''}
+                              statuses={statuses}
+                              onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
+                            />
+                          ) : (
+                            <Input
+                              value={(item as any)[column.id] || ''}
+                              onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
+                              className="border-0 bg-transparent p-0 h-auto"
+                              placeholder="..."
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                     <div className="w-20 p-2 flex space-x-1">
                       <Button
                         size="sm"
