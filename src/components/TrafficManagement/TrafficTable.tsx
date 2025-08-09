@@ -200,7 +200,7 @@ export function TrafficTable() {
 
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-max">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
