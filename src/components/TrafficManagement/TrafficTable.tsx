@@ -200,84 +200,84 @@ export function TrafficTable() {
 
         <CardContent>
           <div className="overflow-x-auto">
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
+            <table className="w-full table-fixed border-collapse" style={{ minWidth: '1200px' }}>
+              <thead className="[&_tr]:border-b">
+                <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 w-12">
                     <Checkbox
                       checked={selectedItems.length === campaigns.length && campaigns.length > 0}
                       onCheckedChange={handleSelectAll}
                     />
-                  </TableHead>
-                  <TableHead className="w-48">Cliente</TableHead>
-                  <TableHead className="w-40">Data da Recarga</TableHead>
-                  <TableHead className="w-80">E-mail para Cobrança</TableHead>
-                  <TableHead className="w-72">WhatsApp</TableHead>
-                  <TableHead className="w-36">Orçamento</TableHead>
-                  <TableHead className="w-80">Crédito da Conta</TableHead>
-                  <TableHead className="w-80">Status da Campanha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  </th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-48">Cliente</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-40">Data da Recarga</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-80">E-mail para Cobrança</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-72">WhatsApp</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-36">Orçamento</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-80">Crédito da Conta</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-80">Status da Campanha</th>
+                </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
                 {filteredCampaigns.map((campaign) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell>
+                  <tr key={campaign.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                    <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
                       <Checkbox
                         checked={selectedItems.includes(campaign.id)}
                         onCheckedChange={(checked) => handleSelectItem(campaign.id, !!checked)}
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">
+                    </td>
+                    <td className="p-4 align-middle font-medium">
                       <EditableCell
                         value={campaign.clientName}
                         onSave={(value) => handleCellEdit(campaign.id, 'clientName', value)}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <EditableCell
                         value={campaign.rechargeDate}
                         onSave={(value) => handleCellEdit(campaign.id, 'rechargeDate', value)}
                         type="date"
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <EditableCell
                         value={campaign.billingEmail}
                         onSave={(value) => handleCellEdit(campaign.id, 'billingEmail', value)}
                         type="email"
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <EditableCell
                         value={campaign.whatsapp}
                         onSave={(value) => handleCellEdit(campaign.id, 'whatsapp', value)}
                         type="tel"
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <EditableCell
                         value={campaign.budget}
                         onSave={(value) => handleCellEdit(campaign.id, 'budget', value)}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <StatusButton
                         currentStatus={campaign.accountCredit}
                         statuses={creditStatuses}
                         onStatusChange={(statusId) => handleStatusChange(campaign.id, 'accountCredit', statusId)}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="p-4 align-middle">
                       <StatusButton
                         currentStatus={campaign.campaignStatus}
                         statuses={campaignStatuses}
                         onStatusChange={(statusId) => handleStatusChange(campaign.id, 'campaignStatus', statusId)}
                       />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
