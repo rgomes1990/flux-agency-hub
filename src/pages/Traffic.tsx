@@ -384,18 +384,18 @@ export default function Traffic() {
                 const getColumnWidth = (columnName: string) => {
                   switch(columnName.toLowerCase()) {
                     case 'whatsapp':
-                      return 'w-72';
+                      return 'w-50';
                     case 'crédito':
                     case 'credito':
-                      return 'w-80';
+                      return 'w-60';
                     case 'campanhas':
-                      return 'w-96';
+                      return 'w-40';
                     case 'email':
                     case 'e-mail':
-                      return 'w-80';
+                      return 'w-40';
                     case 'atualizações':
                     case 'atualizacoes':
-                      return 'w-64';
+                      return 'w-32';
                     default:
                       return 'w-32';
                   }
@@ -483,18 +483,18 @@ export default function Traffic() {
                       const getColumnWidth = (columnName: string) => {
                         switch(columnName.toLowerCase()) {
                           case 'whatsapp':
-                            return 'w-72';
+                            return 'w-50';
                           case 'crédito':
                           case 'credito':
-                            return 'w-80';
+                            return 'w-60';
                           case 'campanhas':
-                            return 'w-96';
+                            return 'w-40';
                           case 'email':
                           case 'e-mail':
-                            return 'w-80';
+                            return 'w-40';
                           case 'atualizações':
                           case 'atualizacoes':
-                            return 'w-64';
+                            return 'w-32';
                           default:
                             return 'w-32';
                         }
