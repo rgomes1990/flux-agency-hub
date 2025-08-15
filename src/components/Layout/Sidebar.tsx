@@ -27,6 +27,11 @@ const menuItems = [
     path: '/content'
   },
   {
+    name: 'Conteúdo Padarias',
+    icon: FileText,
+    path: '/content-padarias'
+  },
+  {
     name: 'Tarefas',
     icon: CheckSquare,
     path: '/tasks'

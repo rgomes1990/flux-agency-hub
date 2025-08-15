@@ -9,6 +9,7 @@ import Auth from './pages/Auth';
 import Index from './pages/Index';
 import Dashboard from './pages/Dashboard';
 import Content from './pages/Content';
+import ContentPadarias from './pages/ContentPadarias';
 import Sites from './pages/Sites';
 import Tasks from './pages/Tasks';
 import Traffic from './pages/Traffic';
@@ -55,6 +56,13 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Content />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/content-padarias" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ContentPadarias />
               </MainLayout>
             </ProtectedRoute>
           } />
