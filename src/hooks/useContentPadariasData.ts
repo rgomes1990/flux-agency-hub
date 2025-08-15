@@ -56,12 +56,17 @@ export function useContentPadariasData() {
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('table_name', 'content_padarias_data');
+        .eq('module', 'content_padarias_data');
 
       if (error) throw error;
 
       if (data) {
-        setCustomColumns(data);
+        const mappedColumns = data.map(col => ({
+          id: col.column_id,
+          name: col.column_name,
+          type: col.column_type as 'status' | 'text'
+        }));
+        setCustomColumns(mappedColumns);
       }
     } catch (error) {
       console.error('Error loading columns:', error);
@@ -73,12 +78,17 @@ export function useContentPadariasData() {
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
-        .eq('table_name', 'content_padarias_data');
+        .eq('module', 'content_padarias_data');
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setStatuses(data);
+        const mappedStatuses = data.map(status => ({
+          id: status.status_id,
+          name: status.status_name,
+          color: status.status_color
+        }));
+        setStatuses(mappedStatuses);
       }
     } catch (error) {
       console.error('Error loading statuses:', error);
@@ -115,7 +125,7 @@ export function useContentPadariasData() {
           const existingItem = groupedData[groupId].items.find(i => i.id === item.id);
           if (!existingItem) {
             const { group_id, group_name, group_color, created_at, updated_at, ...itemData } = item;
-            groupedData[groupId].items.push(itemData);
+            groupedData[groupId].items.push(itemData as ContentItem);
           }
         });
 
@@ -142,8 +152,13 @@ export function useContentPadariasData() {
           id: item.id,
           group_id: group.id,
           group_name: group.name,
-          grupo_color: group.color,
-          ...item
+          group_color: group.color,
+          elemento: item.elemento,
+          observacoes: item.observacoes,
+          attachments: item.attachments,
+          ...Object.fromEntries(
+            customColumns.map(col => [col.name, item[col.name] || ''])
+          )
         }))
       );
 
@@ -155,7 +170,7 @@ export function useContentPadariasData() {
         if (insertError) throw insertError;
       }
 
-      console.log('Content data saved successfully');
+      console.log('Content padarias data saved successfully');
     } catch (error) {
       console.error('Error saving content data:', error);
       throw error;
@@ -222,10 +237,10 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('column_config')
       .insert({
-        id: newColumn.id,
-        name: newColumn.name,
-        type: newColumn.type,
-        table_name: 'content_padarias_data'
+        column_id: newColumn.id,
+        column_name: newColumn.name,
+        column_type: newColumn.type,
+        module: 'content_padarias_data'
       });
 
     if (error) throw error;
@@ -250,10 +265,10 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('status_config')
       .insert({
-        id: newStatus.id,
-        name: newStatus.name,
-        color: newStatus.color,
-        table_name: 'content_padarias_data'
+        status_id: newStatus.id,
+        status_name: newStatus.name,
+        status_color: newStatus.color,
+        module: 'content_padarias_data'
       });
 
     if (error) throw error;
@@ -265,7 +280,7 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('status_config')
       .update(updates)
-      .eq('id', statusId);
+      .eq('status_id', statusId);
 
     if (error) throw error;
 
@@ -278,7 +293,7 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('status_config')
       .delete()
-      .eq('id', statusId);
+      .eq('status_id', statusId);
 
     if (error) throw error;
 
@@ -289,7 +304,7 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('column_config')
       .update(updates)
-      .eq('id', id);
+      .eq('column_id', id);
 
     if (error) throw error;
 
@@ -305,7 +320,7 @@ export function useContentPadariasData() {
     const { error } = await supabase
       .from('column_config')
       .delete()
-      .eq('id', id);
+      .eq('column_id', id);
 
     if (error) throw error;
 
@@ -315,7 +330,7 @@ export function useContentPadariasData() {
       ...group,
       items: group.items.map(item => {
         const { [columnToDelete.name]: removedField, ...rest } = item;
-        return rest;
+        return rest as ContentItem;
       })
     }));
 

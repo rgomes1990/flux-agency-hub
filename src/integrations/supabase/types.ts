@@ -404,6 +404,42 @@ export type Database = {
           },
         ]
       }
+      content_padarias_data: {
+        Row: {
+          attachments: string[] | null
+          created_at: string
+          elemento: string
+          group_color: string | null
+          group_id: string
+          group_name: string
+          id: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: string[] | null
+          created_at?: string
+          elemento: string
+          group_color?: string | null
+          group_id: string
+          group_name: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: string[] | null
+          created_at?: string
+          elemento?: string
+          group_color?: string | null
+          group_id?: string
+          group_name?: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       default_observations: {
         Row: {
           created_at: string

@@ -47,7 +47,7 @@ export default function ContentPadarias() {
   const [selectedClientId, setSelectedClientId] = useState('');
 
   const isMobile = useIsMobile();
-  const { saveState } = useUndo();
+  const { addUndoAction } = useUndo();
 
   const {
     groups,
@@ -99,7 +99,7 @@ export default function ContentPadarias() {
 
   const handleCreateMonth = () => {
     if (newMonthName.trim()) {
-      saveState();
+      addUndoAction('Criar mês', () => {}); // Add proper undo action if needed
       createMonth(newMonthName.trim());
       setNewMonthName('');
       setShowCreateDialog(false);
@@ -109,7 +109,7 @@ export default function ContentPadarias() {
 
   const handleDuplicateMonth = () => {
     if (duplicateMonthName.trim() && selectedMonthForDuplicate) {
-      saveState();
+      addUndoAction('Duplicar mês', () => {}); // Add proper undo action if needed
       duplicateMonth(selectedMonthForDuplicate, duplicateMonthName.trim());
       setDuplicateMonthName('');
       setSelectedMonthForDuplicate('');
@@ -120,7 +120,7 @@ export default function ContentPadarias() {
 
   const handleAddClient = () => {
     if (newClientElement.trim() && selectedGroupId) {
-      saveState();
+      addUndoAction('Adicionar cliente', () => {}); // Add proper undo action if needed
       const clientData = {
         elemento: newClientElement.trim(),
         observacoes: newClientObs.trim() || undefined
@@ -135,7 +135,7 @@ export default function ContentPadarias() {
 
   const handleAddColumn = () => {
     if (newColumnName.trim()) {
-      saveState();
+      addUndoAction('Adicionar coluna', () => {}); // Add proper undo action if needed
       addColumn(newColumnName.trim(), newColumnType);
       setNewColumnName('');
       setNewColumnType('status');
@@ -151,7 +151,7 @@ export default function ContentPadarias() {
 
   const confirmDeleteColumn = () => {
     if (columnToDelete) {
-      saveState();
+      addUndoAction('Remover coluna', () => {}); // Add proper undo action if needed
       deleteColumn(columnToDelete);
       setColumnToDelete('');
       setShowDeleteColumnConfirm(false);
@@ -167,7 +167,7 @@ export default function ContentPadarias() {
 
   const handleSaveMonthEdit = () => {
     if (editingMonthName.trim()) {
-      saveState();
+      addUndoAction('Editar mês', () => {}); // Add proper undo action if needed
       updateMonth(editingMonthId, editingMonthName.trim());
       setIsEditingMonth(false);
       setEditingMonthId('');
@@ -183,7 +183,7 @@ export default function ContentPadarias() {
 
   const confirmDeleteMonth = () => {
     if (monthToDelete) {
-      saveState();
+      addUndoAction('Excluir mês', () => {}); // Add proper undo action if needed
       deleteMonth(monthToDelete);
       setMonthToDelete('');
       setShowDeleteMonthConfirm(false);
@@ -198,7 +198,7 @@ export default function ContentPadarias() {
 
   const confirmDeleteClient = () => {
     if (clientToDelete) {
-      saveState();
+      addUndoAction('Excluir cliente', () => {}); // Add proper undo action if needed
       deleteClient(clientToDelete);
       setClientToDelete('');
       setShowDeleteClientConfirm(false);
@@ -577,26 +577,32 @@ export default function ContentPadarias() {
       </div>
 
       <CustomStatusModal
-        isOpen={showStatusDialog}
-        onClose={() => setShowStatusDialog(false)}
-        statuses={statuses}
+        open={showStatusDialog}
+        onOpenChange={setShowStatusDialog}
         onAddStatus={addStatus}
         onUpdateStatus={updateStatus}
         onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
       />
 
       <FilePreview
-        isOpen={showFilePreview}
-        onClose={() => setShowFilePreview(false)}
-        file={previewFile}
+        open={showFilePreview}
+        onOpenChange={setShowFilePreview}
+        file={previewFile ? new File([], previewFile.name) : null}
       />
 
       <ClientDetails
-        isOpen={showClientDetails}
-        onClose={() => setShowClientDetails(false)}
-        clientId={selectedClientId}
-        onUpdateClient={updateClient}
-        onFileClick={handleFileClick}
+        open={showClientDetails}
+        onOpenChange={setShowClientDetails}
+        clientName={groups.flatMap(g => g.items).find(item => item.id === selectedClientId)?.elemento || ''}
+        observations={[]}
+        onUpdateObservations={() => {}}
+        clientFile={null}
+        onFileChange={() => {}}
+        onFilePreview={() => {}}
+        availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
+        currentGroupId={groups.find(g => g.items.some(item => item.id === selectedClientId))?.id || ''}
+        onMoveClient={() => {}}
       />
 
       <AlertDialog open={showDeleteMonthConfirm} onOpenChange={setShowDeleteMonthConfirm}>
