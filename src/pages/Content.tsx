@@ -27,6 +27,7 @@ import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 import { useUndo } from '@/contexts/UndoContext';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function Content() {
   const isMobile = useIsMobile();
@@ -377,38 +378,7 @@ export default function Content() {
       </div>
 
       {/* Table */}
-      <div 
-        className="flex-1 overflow-y-auto scrollbar-visible" 
-        style={{ 
-          overflowX: 'scroll',
-          scrollbarWidth: 'thin',
-          scrollbarColor: '#cbd5e1 #f1f5f9'
-        }}
-      >
-        <style dangerouslySetInnerHTML={{
-          __html: `
-            .scrollbar-visible::-webkit-scrollbar {
-              height: 12px !important;
-              width: 12px !important;
-              display: block !important;
-            }
-            .scrollbar-visible::-webkit-scrollbar-track {
-              background: #f1f5f9 !important;
-              border-radius: 6px !important;
-            }
-            .scrollbar-visible::-webkit-scrollbar-thumb {
-              background: #cbd5e1 !important;
-              border-radius: 6px !important;
-            }
-            .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-              background: #94a3b8 !important;
-            }
-            .scrollbar-visible {
-              scrollbar-width: thin !important;
-              scrollbar-color: #cbd5e1 #f1f5f9 !important;
-            }
-          `
-        }} />
+      <ScrollArea className="flex-1">
         <div className="min-w-max" style={{ minWidth: '1200px' }}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
@@ -533,7 +503,8 @@ export default function Content() {
             </div>
           ))}
         </div>
-      </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
