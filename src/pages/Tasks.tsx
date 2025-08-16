@@ -44,6 +44,15 @@ export default function Tasks() {
   const [selectedPosition, setSelectedPosition] = useState<number>(0);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  
+  // Estados para edição completa de tarefa
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDescription, setEditTaskDescription] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [editTaskFiles, setEditTaskFiles] = useState<{name: string; size: number; type: string; data: string}[]>([]);
+  
   const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnColor, setNewColumnColor] = useState('bg-gray-100');
@@ -98,12 +107,39 @@ export default function Tasks() {
     setEditingTitle(currentTitle);
   };
 
+  const startFullEditing = (task: any) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+    setEditTaskDescription(task.description || '');
+    setEditTaskPriority(task.priority);
+    setEditTaskFiles(task.attachments || []);
+    setShowEditTaskDialog(true);
+  };
+
   const saveEdit = async () => {
     if (editingTaskId && editingTitle.trim()) {
       await updateTask(editingTaskId, { title: editingTitle });
     }
     setEditingTaskId(null);
     setEditingTitle('');
+  };
+
+  const saveFullEdit = async () => {
+    if (!editingTask) return;
+
+    await updateTask(editingTask.id, {
+      title: editTaskTitle,
+      description: editTaskDescription,
+      priority: editTaskPriority,
+      attachments: editTaskFiles
+    });
+
+    setShowEditTaskDialog(false);
+    setEditingTask(null);
+    setEditTaskTitle('');
+    setEditTaskDescription('');
+    setEditTaskPriority('medium');
+    setEditTaskFiles([]);
   };
 
   const cancelEdit = () => {
@@ -155,6 +191,32 @@ export default function Tasks() {
           })
         );
         setTaskFiles(processedFiles);
+      };
+      processFiles();
+    }
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const processFiles = async () => {
+        const processedFiles = await Promise.all(
+          files.map(file => {
+            return new Promise<{name: string; size: number; type: string; data: string}>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  data: reader.result as string
+                });
+              };
+              reader.readAsDataURL(file);
+            });
+          })
+        );
+        setEditTaskFiles(processedFiles);
       };
       processFiles();
     }
@@ -276,6 +338,75 @@ export default function Tasks() {
                     Criar
                   </Button>
                   <Button variant="outline" onClick={() => setShowNewTaskDialog(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Task Dialog */}
+          <Dialog open={showEditTaskDialog} onOpenChange={setShowEditTaskDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Tarefa</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Título da tarefa"
+                  value={editTaskTitle}
+                  onChange={(e) => setEditTaskTitle(e.target.value)}
+                />
+                <Textarea
+                  placeholder="Descrição da tarefa"
+                  value={editTaskDescription}
+                  onChange={(e) => setEditTaskDescription(e.target.value)}
+                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Prioridade</label>
+                  <Select value={editTaskPriority} onValueChange={(value: any) => setEditTaskPriority(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Anexos</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleEditFileChange}
+                      className="text-sm"
+                      accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.bitmap"
+                    />
+                    <Paperclip className="h-4 w-4 text-gray-400" />
+                  </div>
+                  {editTaskFiles.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">Anexos atuais:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {editTaskFiles.map((file, index) => (
+                          <div key={index} className="text-xs p-2 bg-gray-50 rounded border">
+                            <span className="truncate block">{file.name}</span>
+                            <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <Button onClick={saveFullEdit} className="bg-orange-600 hover:bg-orange-700">
+                    Salvar
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowEditTaskDialog(false)}>
                     Cancelar
                   </Button>
                 </div>
@@ -436,7 +567,8 @@ export default function Tasks() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => startEditing(task.id, task.title)}
+                          onClick={() => startFullEditing(task)}
+                          title="Editar tarefa completa"
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
