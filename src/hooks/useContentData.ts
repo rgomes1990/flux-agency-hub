@@ -651,28 +651,21 @@ export const useContentData = () => {
       if (columnIndex <= 0) return; // Já está no topo
       
       const newColumns = [...customColumns];
-      const currentColumn = newColumns[columnIndex];
-      const previousColumn = newColumns[columnIndex - 1];
       
-      // Trocar posições
+      // Trocar posições no array
       [newColumns[columnIndex - 1], newColumns[columnIndex]] = [newColumns[columnIndex], newColumns[columnIndex - 1]];
       
-      // Atualizar ordem no banco
-      await supabase
-        .from('column_config')
-        .update({ column_order: previousColumn.order })
-        .eq('column_id', currentColumn.id)
-        .eq('module', 'content');
+      // Recalcular e atualizar ordem sequencial no banco para todas as colunas
+      for (let i = 0; i < newColumns.length; i++) {
+        const newOrder = i + 1;
+        newColumns[i].order = newOrder;
         
-      await supabase
-        .from('column_config')
-        .update({ column_order: currentColumn.order })
-        .eq('column_id', previousColumn.id)
-        .eq('module', 'content');
-      
-      // Atualizar ordem local
-      newColumns[columnIndex - 1].order = previousColumn.order;
-      newColumns[columnIndex].order = currentColumn.order;
+        await supabase
+          .from('column_config')
+          .update({ column_order: newOrder })
+          .eq('column_id', newColumns[i].id)
+          .eq('module', 'content');
+      }
       
       setCustomColumns(newColumns);
       setColumns(newColumns);
@@ -690,28 +683,21 @@ export const useContentData = () => {
       if (columnIndex >= customColumns.length - 1) return; // Já está no final
       
       const newColumns = [...customColumns];
-      const currentColumn = newColumns[columnIndex];
-      const nextColumn = newColumns[columnIndex + 1];
       
-      // Trocar posições
+      // Trocar posições no array
       [newColumns[columnIndex], newColumns[columnIndex + 1]] = [newColumns[columnIndex + 1], newColumns[columnIndex]];
       
-      // Atualizar ordem no banco
-      await supabase
-        .from('column_config')
-        .update({ column_order: nextColumn.order })
-        .eq('column_id', currentColumn.id)
-        .eq('module', 'content');
+      // Recalcular e atualizar ordem sequencial no banco para todas as colunas
+      for (let i = 0; i < newColumns.length; i++) {
+        const newOrder = i + 1;
+        newColumns[i].order = newOrder;
         
-      await supabase
-        .from('column_config')
-        .update({ column_order: currentColumn.order })
-        .eq('column_id', nextColumn.id)
-        .eq('module', 'content');
-      
-      // Atualizar ordem local
-      newColumns[columnIndex].order = nextColumn.order;
-      newColumns[columnIndex + 1].order = currentColumn.order;
+        await supabase
+          .from('column_config')
+          .update({ column_order: newOrder })
+          .eq('column_id', newColumns[i].id)
+          .eq('module', 'content');
+      }
       
       setCustomColumns(newColumns);
       setColumns(newColumns);
