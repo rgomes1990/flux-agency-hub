@@ -13,7 +13,9 @@ import {
   Trash2,
   Paperclip,
   Eye,
-  Menu
+  Menu,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -44,6 +46,8 @@ export default function Content() {
     addColumn,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     addClient,
     deleteClient,
@@ -612,19 +616,42 @@ export default function Content() {
             
             <div className="space-y-2">
               <h4 className="font-medium">Colunas Existentes:</h4>
-              {customColumns.map(column => (
-                <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                  <span className="text-sm">
+              {customColumns.map((column, index) => (
+                <div key={column.id} className="flex items-center justify-between p-3 border rounded bg-gray-50">
+                  <span className="text-sm font-medium">
                     {column.name} ({column.type})
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnUp(column.id)}
+                      disabled={index === 0}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para cima"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnDown(column.id)}
+                      disabled={index === customColumns.length - 1}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para baixo"
+                    >
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+                      title="Excluir coluna"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -25,6 +25,7 @@ interface ContentColumn {
   name: string;
   type: 'status' | 'text';
   isDefault?: boolean;
+  order?: number;
 }
 
 interface ServiceStatus {
@@ -53,7 +54,8 @@ export const useContentData = () => {
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'content');
+        .eq('module', 'content')
+        .order('column_order', { ascending: true });
 
       console.log('📊 CONTENT: Resposta colunas:', { data, error });
 
@@ -67,7 +69,8 @@ export const useContentData = () => {
           id: col.column_id,
           name: col.column_name,
           type: col.column_type as 'status' | 'text',
-          isDefault: false
+          isDefault: false,
+          order: col.column_order || 0
         }));
 
         // Set custom columns for management interface
@@ -421,11 +424,15 @@ export const useContentData = () => {
     try {
       console.log('🆕 CONTENT: Adicionando coluna:', { name, type });
       
+      // Calcular próxima ordem
+      const nextOrder = Math.max(0, ...customColumns.map(col => col.order || 0)) + 1;
+      
       const newColumn: ContentColumn = {
         id: name.toLowerCase().replace(/\s+/g, '_'),
         name,
         type,
-        isDefault: false
+        isDefault: false,
+        order: nextOrder
       };
       
       // Salvar no banco
@@ -435,6 +442,7 @@ export const useContentData = () => {
           column_id: newColumn.id,
           column_name: newColumn.name,
           column_type: newColumn.type,
+          column_order: nextOrder,
           module: 'content',
           is_default: false,
           user_id: null // Sempre null para tornar global
@@ -637,6 +645,84 @@ export const useContentData = () => {
     }
   };
 
+  const moveColumnUp = async (columnId: string) => {
+    try {
+      const columnIndex = customColumns.findIndex(col => col.id === columnId);
+      if (columnIndex <= 0) return; // Já está no topo
+      
+      const newColumns = [...customColumns];
+      const currentColumn = newColumns[columnIndex];
+      const previousColumn = newColumns[columnIndex - 1];
+      
+      // Trocar posições
+      [newColumns[columnIndex - 1], newColumns[columnIndex]] = [newColumns[columnIndex], newColumns[columnIndex - 1]];
+      
+      // Atualizar ordem no banco
+      await supabase
+        .from('column_config')
+        .update({ column_order: previousColumn.order })
+        .eq('column_id', currentColumn.id)
+        .eq('module', 'content');
+        
+      await supabase
+        .from('column_config')
+        .update({ column_order: currentColumn.order })
+        .eq('column_id', previousColumn.id)
+        .eq('module', 'content');
+      
+      // Atualizar ordem local
+      newColumns[columnIndex - 1].order = previousColumn.order;
+      newColumns[columnIndex].order = currentColumn.order;
+      
+      setCustomColumns(newColumns);
+      setColumns(newColumns);
+      
+      console.log('✅ CONTENT: Coluna movida para cima');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao mover coluna para cima:', error);
+      throw error;
+    }
+  };
+
+  const moveColumnDown = async (columnId: string) => {
+    try {
+      const columnIndex = customColumns.findIndex(col => col.id === columnId);
+      if (columnIndex >= customColumns.length - 1) return; // Já está no final
+      
+      const newColumns = [...customColumns];
+      const currentColumn = newColumns[columnIndex];
+      const nextColumn = newColumns[columnIndex + 1];
+      
+      // Trocar posições
+      [newColumns[columnIndex], newColumns[columnIndex + 1]] = [newColumns[columnIndex + 1], newColumns[columnIndex]];
+      
+      // Atualizar ordem no banco
+      await supabase
+        .from('column_config')
+        .update({ column_order: nextColumn.order })
+        .eq('column_id', currentColumn.id)
+        .eq('module', 'content');
+        
+      await supabase
+        .from('column_config')
+        .update({ column_order: currentColumn.order })
+        .eq('column_id', nextColumn.id)
+        .eq('module', 'content');
+      
+      // Atualizar ordem local
+      newColumns[columnIndex].order = nextColumn.order;
+      newColumns[columnIndex + 1].order = currentColumn.order;
+      
+      setCustomColumns(newColumns);
+      setColumns(newColumns);
+      
+      console.log('✅ CONTENT: Coluna movida para baixo');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao mover coluna para baixo:', error);
+      throw error;
+    }
+  };
+
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
     try {
       console.log('Atualizando status do item:', { itemId, field, statusId });
@@ -767,6 +853,8 @@ export const useContentData = () => {
     deleteStatus,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     deleteClient,
     updateClient,

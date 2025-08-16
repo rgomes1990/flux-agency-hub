@@ -254,6 +254,7 @@ export type Database = {
         Row: {
           column_id: string
           column_name: string
+          column_order: number | null
           column_type: string
           created_at: string
           id: string
@@ -264,6 +265,7 @@ export type Database = {
         Insert: {
           column_id: string
           column_name: string
+          column_order?: number | null
           column_type: string
           created_at?: string
           id?: string
@@ -274,6 +276,7 @@ export type Database = {
         Update: {
           column_id?: string
           column_name?: string
+          column_order?: number | null
           column_type?: string
           created_at?: string
           id?: string
