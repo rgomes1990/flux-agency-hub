@@ -517,7 +517,10 @@ export default function Content() {
               </div>
             ))}
           </div>
-          <ScrollBar orientation="horizontal" />
+          <ScrollBar 
+            orientation="horizontal" 
+            className="h-4 opacity-100 transition-none [&>div]:bg-gray-400 [&>div]:h-3" 
+          />
         </ScrollArea>
       </div>
 
