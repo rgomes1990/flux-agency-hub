@@ -133,11 +133,22 @@ export function useContentPadariasData() {
             console.log('📂 Grupo criado:', groupId, groupName);
           }
 
-          // Só adicionar item se não for um placeholder (elemento vazio)
-          if (item.elemento && item.elemento.trim() !== '') {
-            const existingItem = groupedData[groupId].items.find(i => i.id === item.id);
+          // Só adicionar item se não for um placeholder (elemento vazio) e se tem item_data
+          if (item.elemento && item.elemento.trim() !== '' && item.item_data) {
+            let itemData;
+            try {
+              if (typeof item.item_data === 'string') {
+                itemData = JSON.parse(item.item_data);
+              } else {
+                itemData = item.item_data;
+              }
+            } catch (parseError) {
+              console.error('❌ Erro ao fazer parse do item_data:', parseError);
+              return;
+            }
+
+            const existingItem = groupedData[groupId].items.find(i => i.id === itemData.id);
             if (!existingItem) {
-              const { group_id, group_name, group_color, created_at, updated_at, ...itemData } = item;
               groupedData[groupId].items.push(itemData as ContentItem);
               console.log('📂 Item adicionado ao grupo:', item.elemento);
             }
@@ -182,32 +193,34 @@ export function useContentPadariasData() {
         if (group.items.length === 0) {
           // Se não há itens, criar um registro placeholder para o grupo
           const placeholder = {
-            id: crypto.randomUUID(),
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
             elemento: '', // Placeholder vazio
             observacoes: null as string | null,
             attachments: null as string[] | null,
-            ...Object.fromEntries(
-              customColumns.map(col => [col.name, ''])
-            )
+            item_data: null as any
           };
           console.log('💾 Criando placeholder para grupo vazio:', placeholder);
           return [placeholder];
         }
         
         return group.items.map(item => ({
-          id: item.id,
           group_id: group.id,
           group_name: group.name,
           group_color: group.color,
           elemento: item.elemento,
           observacoes: item.observacoes || null,
           attachments: item.attachments || null,
-          ...Object.fromEntries(
-            customColumns.map(col => [col.name, item[col.name] || ''])
-          )
+          item_data: {
+            id: item.id,
+            elemento: item.elemento,
+            observacoes: item.observacoes,
+            attachments: item.attachments,
+            ...Object.fromEntries(
+              customColumns.map(col => [col.name, item[col.name] || ''])
+            )
+          }
         }));
       });
 

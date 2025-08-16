@@ -413,6 +413,7 @@ export type Database = {
           group_id: string
           group_name: string
           id: string
+          item_data: Json | null
           observacoes: string | null
           updated_at: string
         }
@@ -424,6 +425,7 @@ export type Database = {
           group_id: string
           group_name: string
           id?: string
+          item_data?: Json | null
           observacoes?: string | null
           updated_at?: string
         }
@@ -435,6 +437,7 @@ export type Database = {
           group_id?: string
           group_name?: string
           id?: string
+          item_data?: Json | null
           observacoes?: string | null
           updated_at?: string
         }
