@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye, ChevronUp, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -32,7 +32,8 @@ export default function Tasks() {
     addColumn,
     deleteColumn,
     updateColumn,
-    reorderColumn
+    reorderColumn,
+    reorderTask
   } = useTasksData();
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -596,38 +597,60 @@ export default function Tasks() {
             </div>
             
             <div className="flex-1 bg-white rounded-b-lg p-3 space-y-3 overflow-y-auto shadow-sm border border-gray-200">
-              {column.tasks.map((task) => (
+              {column.tasks.map((task, taskIndex) => (
                 <Card key={task.id} className="cursor-pointer hover:shadow-md transition-shadow border border-gray-200">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <Badge className={getPriorityColor(task.priority)}>
                         {getPriorityText(task.priority)}
                       </Badge>
-                      <div className="flex space-x-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setShowTaskDetailsDialog(task.id)}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => startFullEditing(task)}
-                          title="Editar tarefa completa"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setConfirmDelete({ type: 'task', id: task.id })}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                       <div className="flex space-x-1">
+                         {/* Botões de reordenação */}
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => reorderTask(task.id, column.id, 'up')}
+                           disabled={taskIndex === 0}
+                           className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                           title="Mover tarefa para cima"
+                         >
+                           <ArrowUp className="h-3 w-3" />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => reorderTask(task.id, column.id, 'down')}
+                           disabled={taskIndex === column.tasks.length - 1}
+                           className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                           title="Mover tarefa para baixo"
+                         >
+                           <ArrowDown className="h-3 w-3" />
+                         </Button>
+                         
+                         <Button 
+                           variant="ghost" 
+                           size="sm"
+                           onClick={() => setShowTaskDetailsDialog(task.id)}
+                         >
+                           <Eye className="h-3 w-3" />
+                         </Button>
+                         <Button 
+                           variant="ghost" 
+                           size="sm"
+                           onClick={() => startFullEditing(task)}
+                           title="Editar tarefa completa"
+                         >
+                           <Edit className="h-3 w-3" />
+                         </Button>
+                         <Button 
+                           variant="ghost" 
+                           size="sm"
+                           onClick={() => setConfirmDelete({ type: 'task', id: task.id })}
+                           className="text-red-600 hover:text-red-800"
+                         >
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">

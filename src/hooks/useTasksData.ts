@@ -477,6 +477,35 @@ export const useTasksData = () => {
     await updateColumns(newColumns);
   };
 
+  const reorderTask = async (taskId: string, columnId: string, direction: 'up' | 'down') => {
+    console.log('DEBUG: ====== REORDENANDO TAREFA ======');
+    console.log('DEBUG: ID da tarefa:', taskId, 'Direção:', direction);
+    
+    const column = columns.find(col => col.id === columnId);
+    if (!column) return;
+    
+    const currentIndex = column.tasks.findIndex(task => task.id === taskId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    // Verificar se o movimento é válido
+    if (newIndex < 0 || newIndex >= column.tasks.length) return;
+    
+    const newColumns = columns.map(col => {
+      if (col.id !== columnId) return col;
+      
+      const newTasks = [...col.tasks];
+      const [movedTask] = newTasks.splice(currentIndex, 1);
+      newTasks.splice(newIndex, 0, movedTask);
+      
+      return { ...col, tasks: newTasks };
+    });
+    
+    console.log('DEBUG: Tarefas reordenadas na coluna:', newColumns.find(c => c.id === columnId)?.tasks.map(t => t.title));
+    await updateColumns(newColumns);
+  };
+
   return {
     columns,
     loading,
@@ -489,6 +518,7 @@ export const useTasksData = () => {
     updateTask,
     deleteTask,
     moveTask,
+    reorderTask,
     refreshData: loadTasksData
   };
 };
