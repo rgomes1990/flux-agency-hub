@@ -377,8 +377,8 @@ export default function Content() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-x-auto overflow-y-auto">
-        <div className="min-w-max" style={{ minWidth: isMobile ? '800px' : '100%' }}>
+      <div className="flex-1 overflow-y-auto" style={{ overflowX: 'scroll' }}>
+        <div className="min-w-max" style={{ minWidth: '1200px' }}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
