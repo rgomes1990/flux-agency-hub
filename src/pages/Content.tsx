@@ -517,12 +517,8 @@ export default function Content() {
               </div>
             ))}
           </div>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
-        
-        {/* Fixed horizontal scrollbar */}
-        <div className="absolute bottom-0 left-0 right-0 h-4 z-30">
-          <ScrollBar orientation="horizontal" className="bg-border" />
-        </div>
       </div>
 
       {/* Dialogs */}
