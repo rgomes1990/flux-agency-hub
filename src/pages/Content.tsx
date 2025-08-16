@@ -517,11 +517,20 @@ export default function Content() {
               </div>
             ))}
           </div>
-          <ScrollBar 
-            orientation="horizontal" 
-            className="h-4 opacity-100 transition-none [&>div]:bg-gray-400 [&>div]:h-3" 
-          />
         </ScrollArea>
+        
+        {/* Fixed floating horizontal scrollbar */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-sm border-t border-gray-200 p-1">
+          <div 
+            className="h-4 bg-gray-300 rounded-full cursor-pointer relative overflow-hidden mx-4"
+            style={{ minWidth: '200px' }}
+          >
+            <div 
+              className="h-full bg-gray-600 rounded-full transition-all duration-200 hover:bg-gray-700"
+              style={{ width: '30%' }}
+            ></div>
+          </div>
+        </div>
       </div>
 
       {/* Dialogs */}
