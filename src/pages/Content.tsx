@@ -503,7 +503,16 @@ export default function Content() {
             </div>
           ))}
         </div>
-        <ScrollBar orientation="horizontal" />
+        <ScrollBar 
+          orientation="horizontal" 
+          className="h-4 bg-gray-800 rounded-none border-t border-gray-300" 
+          style={{ 
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 20,
+            backgroundColor: '#374151'
+          }}
+        />
       </ScrollArea>
 
       {/* Dialogs */}
