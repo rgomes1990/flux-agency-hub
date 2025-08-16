@@ -273,15 +273,15 @@ export function ClientDetails({
                         </div>
                       </div>
                     ) : (
-                      <span 
-                        className={`text-sm ${
+                      <pre 
+                        className={`text-sm whitespace-pre-wrap font-sans ${
                           observation.completed 
                             ? 'line-through text-gray-500' 
                             : 'text-gray-900'
                         }`}
                       >
                         {observation.text}
-                      </span>
+                      </pre>
                     )}
                   </div>
                   {editingObservation !== observation.id && (
