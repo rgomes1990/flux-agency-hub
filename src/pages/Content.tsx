@@ -378,120 +378,61 @@ export default function Content() {
       </div>
 
       {/* Table */}
-      <ScrollArea className="flex-1">
-        <div className="min-w-max" style={{ minWidth: '1200px' }}>
-          {/* Table Header */}
-          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-            <div className="flex items-center min-w-max">
-              <div className="w-8 flex items-center justify-center p-2">
-                <Checkbox
-                  checked={selectedItems.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </div>
-              <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              {columns.map((column) => (
-                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
-                  {column.name}
+      <div className="flex-1 relative">
+        <ScrollArea className="h-full">
+          <div className="min-w-max" style={{ minWidth: '1200px' }}>
+            {/* Table Header */}
+            <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+              <div className="flex items-center min-w-max">
+                <div className="w-8 flex items-center justify-center p-2">
+                  <Checkbox
+                    checked={selectedItems.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
                 </div>
-              ))}
-              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
+                <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+                {columns.map((column) => (
+                  <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                    {column.name}
+                  </div>
+                ))}
+                <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
+              </div>
             </div>
-          </div>
 
-          {/* Table Body */}
-          {groups.map((group) => (
-            <div key={group.id}>
-              {/* Group Header */}
-              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
-                <div className="flex items-center min-w-max">
-                  <div className="w-8 flex items-center justify-center p-2">
-                    <button onClick={() => toggleGroup(group.id)}>
-                      {group.isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex items-center space-x-2 p-2 flex-1">
-                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name}</span>
-                  </div>
-                  <div className="flex items-center space-x-1 p-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditMonth(group.id)}
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Group Items */}
-              {group.isExpanded && group.items.map((item, index) => (
-                <div 
-                  key={`${group.id}-${item.id}-${index}`} 
-                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                >
+            {/* Table Body */}
+            {groups.map((group) => (
+              <div key={group.id}>
+                {/* Group Header */}
+                <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
                   <div className="flex items-center min-w-max">
                     <div className="w-8 flex items-center justify-center p-2">
-                      <Checkbox
-                        checked={selectedItems.includes(item.id)}
-                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
-                      />
-                    </div>
-                    <div className="w-56 p-2 border-r border-gray-200">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openClientDetails(item.id)}
-                          className="text-sm text-blue-600 hover:underline font-medium text-left"
-                        >
-                          {item.elemento}
-                        </button>
-                        {getClientAttachments(item.id).length > 0 && (
-                          <Paperclip className="h-3 w-3 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.servicos}
-                    </div>
-                    {columns.map((column) => (
-                      <div key={column.id} className="w-44 p-2 border-r border-gray-200">
-                        {column.type === 'status' ? (
-                          <StatusButton
-                            currentStatus={(item as any)[column.id] || ''}
-                            statuses={statuses}
-                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
-                          />
+                      <button onClick={() => toggleGroup(group.id)}>
+                        {group.isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-gray-600" />
                         ) : (
-                          <Input
-                            value={(item as any)[column.id] || ''}
-                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
-                            className="border-0 bg-transparent p-0 h-auto"
-                            placeholder="..."
-                          />
+                          <ChevronRight className="h-4 w-4 text-gray-600" />
                         )}
-                      </div>
-                    ))}
-                    <div className="w-20 p-2 flex space-x-1">
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2 p-2 flex-1">
+                      <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                      <span className="font-medium text-gray-900">{group.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 p-2">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                        onClick={() => handleEditMonth(group.id)}
+                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
                         className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -499,21 +440,90 @@ export default function Content() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ))}
+
+                {/* Group Items */}
+                {group.isExpanded && group.items.map((item, index) => (
+                  <div 
+                    key={`${group.id}-${item.id}-${index}`} 
+                    className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  >
+                    <div className="flex items-center min-w-max">
+                      <div className="w-8 flex items-center justify-center p-2">
+                        <Checkbox
+                          checked={selectedItems.includes(item.id)}
+                          onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                        />
+                      </div>
+                      <div className="w-56 p-2 border-r border-gray-200">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => openClientDetails(item.id)}
+                            className="text-sm text-blue-600 hover:underline font-medium text-left"
+                          >
+                            {item.elemento}
+                          </button>
+                          {getClientAttachments(item.id).length > 0 && (
+                            <Paperclip className="h-3 w-3 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
+                        {item.servicos}
+                      </div>
+                      {columns.map((column) => (
+                        <div key={column.id} className="w-44 p-2 border-r border-gray-200">
+                          {column.type === 'status' ? (
+                            <StatusButton
+                              currentStatus={item[column.id] || statuses[0]?.name || 'Pendente'}
+                              statuses={statuses}
+                              onStatusChange={(newStatus) => updateItemStatus(item.id, column.id, newStatus)}
+                            />
+                          ) : (
+                            <Input
+                              value={item[column.id] || ''}
+                              onChange={(e) => updateItemStatus(item.id, column.id, e.target.value)}
+                              className="text-sm"
+                              placeholder={`Digite ${column.name.toLowerCase()}`}
+                            />
+                          )}
+                        </div>
+                      ))}
+                      <div className="w-20 p-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                              <span className="sr-only">Ações</span>
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openClientDetails(item.id)}>
+                              <Eye className="h-3 w-3 mr-2" />
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-3 w-3 mr-2" />
+                              Deletar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        
+        {/* Fixed horizontal scrollbar */}
+        <div className="absolute bottom-0 left-0 right-0 h-4 z-30">
+          <ScrollBar orientation="horizontal" className="bg-border" />
         </div>
-        <ScrollBar 
-          orientation="horizontal" 
-          className="h-4 bg-gray-800 rounded-none border-t border-gray-300" 
-          style={{ 
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 20,
-            backgroundColor: '#374151'
-          }}
-        />
-      </ScrollArea>
+      </div>
 
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
