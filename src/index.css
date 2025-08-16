@@ -102,25 +102,34 @@
   }
 
   /* Custom scrollbar styles for Content page */
-  .h-full.overflow-auto::-webkit-scrollbar {
-    height: 16px;
-    background: rgba(0, 0, 0, 0.1);
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 16px !important;
+    background: rgba(0, 0, 0, 0.1) !important;
   }
 
-  .h-full.overflow-auto::-webkit-scrollbar-thumb {
-    background: #6b7280;
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: content-box;
+  .overflow-x-auto::-webkit-scrollbar:horizontal {
+    height: 16px !important;
   }
 
-  .h-full.overflow-auto::-webkit-scrollbar-thumb:hover {
-    background: #374151;
-    background-clip: content-box;
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-radius: 8px !important;
+    border: 2px solid transparent !important;
+    background-clip: content-box !important;
   }
 
-  .h-full.overflow-auto::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #374151 !important;
+    background-clip: content-box !important;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 8px !important;
+  }
+
+  /* Force horizontal scrollbar to always show */
+  .overflow-x-auto {
+    overflow-x: scroll !important;
   }
 }

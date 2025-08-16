@@ -380,7 +380,7 @@ export default function Content() {
       {/* Table */}
       <div className="flex-1 relative">
         <div 
-          className="h-full overflow-auto" 
+          className="h-full overflow-x-auto overflow-y-auto" 
           style={{ 
             paddingBottom: '10px',
             scrollbarWidth: 'auto',
