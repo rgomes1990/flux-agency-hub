@@ -122,10 +122,13 @@ export function useContentPadariasData() {
             };
           }
 
-          const existingItem = groupedData[groupId].items.find(i => i.id === item.id);
-          if (!existingItem) {
-            const { group_id, group_name, group_color, created_at, updated_at, ...itemData } = item;
-            groupedData[groupId].items.push(itemData as ContentItem);
+          // Só adicionar item se não for um placeholder (elemento vazio)
+          if (item.elemento && item.elemento.trim() !== '') {
+            const existingItem = groupedData[groupId].items.find(i => i.id === item.id);
+            if (!existingItem) {
+              const { group_id, group_name, group_color, created_at, updated_at, ...itemData } = item;
+              groupedData[groupId].items.push(itemData as ContentItem);
+            }
           }
         });
 
@@ -147,8 +150,25 @@ export function useContentPadariasData() {
 
       if (deleteError) throw deleteError;
 
-      const dataToInsert = newGroups.flatMap(group =>
-        group.items.map(item => ({
+      // Para cada grupo, se não tiver itens, ainda precisa ser salvo
+      const dataToInsert = newGroups.flatMap(group => {
+        if (group.items.length === 0) {
+          // Se não há itens, criar um registro placeholder para o grupo
+          return [{
+            id: crypto.randomUUID(),
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
+            elemento: '',
+            observacoes: null,
+            attachments: null,
+            ...Object.fromEntries(
+              customColumns.map(col => [col.name, ''])
+            )
+          }];
+        }
+        
+        return group.items.map(item => ({
           id: item.id,
           group_id: group.id,
           group_name: group.name,
@@ -159,8 +179,8 @@ export function useContentPadariasData() {
           ...Object.fromEntries(
             customColumns.map(col => [col.name, item[col.name] || ''])
           )
-        }))
-      );
+        }));
+      });
 
       if (dataToInsert.length > 0) {
         const { error: insertError } = await supabase
