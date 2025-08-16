@@ -190,7 +190,8 @@ export default function Tasks() {
             });
           })
         );
-        setTaskFiles(processedFiles);
+        // Adicionar aos arquivos existentes em vez de substituir
+        setTaskFiles(prev => [...prev, ...processedFiles]);
       };
       processFiles();
     }
@@ -216,10 +217,19 @@ export default function Tasks() {
             });
           })
         );
-        setEditTaskFiles(processedFiles);
+        // Adicionar aos arquivos existentes em vez de substituir
+        setEditTaskFiles(prev => [...prev, ...processedFiles]);
       };
       processFiles();
     }
+  };
+
+  const removeTaskFile = (index: number) => {
+    setTaskFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeEditTaskFile = (index: number) => {
+    setEditTaskFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -301,6 +311,31 @@ export default function Tasks() {
                     />
                     <Paperclip className="h-4 w-4 text-gray-400" />
                   </div>
+                  {taskFiles.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">Arquivos selecionados:</p>
+                      <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                        {taskFiles.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded border">
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <Paperclip className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="truncate">{file.name}</span>
+                              <span className="text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeTaskFile(index)}
+                              className="text-red-600 hover:text-red-800 p-1 h-auto"
+                              title="Remover arquivo"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Coluna</label>
@@ -391,11 +426,23 @@ export default function Tasks() {
                   {editTaskFiles.length > 0 && (
                     <div className="mt-2">
                       <p className="text-xs text-gray-500 mb-2">Anexos atuais:</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
                         {editTaskFiles.map((file, index) => (
-                          <div key={index} className="text-xs p-2 bg-gray-50 rounded border">
-                            <span className="truncate block">{file.name}</span>
-                            <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                          <div key={index} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded border">
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <Paperclip className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="truncate">{file.name}</span>
+                              <span className="text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeEditTaskFile(index)}
+                              className="text-red-600 hover:text-red-800 p-1 h-auto"
+                              title="Remover arquivo"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -599,9 +646,17 @@ export default function Tasks() {
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
-                    ) : (
-                      <p className="text-sm font-medium">{task.title}</p>
-                    )}
+                     ) : (
+                       <div className="space-y-2">
+                         <p className="text-sm font-medium">{task.title}</p>
+                         {task.attachments && task.attachments.length > 0 && (
+                           <div className="flex items-center space-x-1">
+                             <Paperclip className="h-3 w-3 text-gray-500" />
+                             <span className="text-xs text-gray-500">{task.attachments.length} anexo{task.attachments.length !== 1 ? 's' : ''}</span>
+                           </div>
+                         )}
+                       </div>
+                     )}
                   </CardContent>
                 </Card>
               ))}
