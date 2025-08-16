@@ -413,9 +413,10 @@ export function useContentPadariasData() {
     }
   };
 
-  const updateGroups = async (newGroups: ContentGroup[]) => {
+  const updateGroups = (newGroups: ContentGroup[]) => {
     setGroups(newGroups);
-    await saveContentPadariasToDatabase(newGroups);
+    // Save to database
+    saveContentPadariasToDatabase(newGroups);
   };
 
   const updateMonth = async (groupId: string, newName: string) => {
