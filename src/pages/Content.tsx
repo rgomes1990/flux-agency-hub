@@ -379,7 +379,14 @@ export default function Content() {
 
       {/* Table */}
       <div className="flex-1 relative">
-        <ScrollArea className="h-full">
+        <div 
+          className="h-full overflow-auto" 
+          style={{ 
+            paddingBottom: '10px',
+            scrollbarWidth: 'auto',
+            scrollbarColor: '#6b7280 #f3f4f6'
+          }}
+        >
           <div className="min-w-max" style={{ minWidth: '1200px' }}>
             {/* Table Header */}
             <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
@@ -517,21 +524,9 @@ export default function Content() {
               </div>
             ))}
           </div>
-        </ScrollArea>
-        
-        {/* Fixed floating horizontal scrollbar */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-sm border-t border-gray-200 p-1">
-          <div 
-            className="h-4 bg-gray-300 rounded-full cursor-pointer relative overflow-hidden mx-4"
-            style={{ minWidth: '200px' }}
-          >
-            <div 
-              className="h-full bg-gray-600 rounded-full transition-all duration-200 hover:bg-gray-700"
-              style={{ width: '30%' }}
-            ></div>
-          </div>
         </div>
       </div>
+
 
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => {

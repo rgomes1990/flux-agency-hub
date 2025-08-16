@@ -100,4 +100,27 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Custom scrollbar styles for Content page */
+  .h-full.overflow-auto::-webkit-scrollbar {
+    height: 16px;
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .h-full.overflow-auto::-webkit-scrollbar-thumb {
+    background: #6b7280;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .h-full.overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: #374151;
+    background-clip: content-box;
+  }
+
+  .h-full.overflow-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+  }
 }
