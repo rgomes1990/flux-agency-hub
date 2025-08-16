@@ -97,13 +97,21 @@ export function useContentPadariasData() {
 
   const loadContentPadariasData = async () => {
     setIsLoading(true);
+    console.log('📂 loadContentPadariasData: Iniciando carregamento dos dados...');
+    
     try {
       const { data, error } = await supabase
         .from('content_padarias_data')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao carregar dados:', error);
+        throw error;
+      }
+
+      console.log('📂 Dados carregados do banco:', data?.length || 0, 'registros');
+      console.log('📂 Dados completos:', JSON.stringify(data, null, 2));
 
       if (data) {
         const groupedData: { [key: string]: ContentGroup } = {};
@@ -111,6 +119,8 @@ export function useContentPadariasData() {
         data.forEach(item => {
           const groupId = item.group_id;
           const groupName = item.group_name;
+          
+          console.log('📂 Processando item:', groupId, groupName, item.elemento);
           
           if (!groupedData[groupId]) {
             groupedData[groupId] = {
@@ -120,6 +130,7 @@ export function useContentPadariasData() {
               color: item.group_color || '#3b82f6',
               items: []
             };
+            console.log('📂 Grupo criado:', groupId, groupName);
           }
 
           // Só adicionar item se não for um placeholder (elemento vazio)
@@ -128,44 +139,62 @@ export function useContentPadariasData() {
             if (!existingItem) {
               const { group_id, group_name, group_color, created_at, updated_at, ...itemData } = item;
               groupedData[groupId].items.push(itemData as ContentItem);
+              console.log('📂 Item adicionado ao grupo:', item.elemento);
             }
+          } else {
+            console.log('📂 Placeholder ignorado para grupo:', groupName);
           }
         });
 
-        setGroups(Object.values(groupedData));
+        const finalGroups = Object.values(groupedData);
+        console.log('📂 Grupos finais carregados:', finalGroups.length);
+        console.log('📂 Estrutura final:', JSON.stringify(finalGroups, null, 2));
+        
+        setGroups(finalGroups);
       }
     } catch (error) {
-      console.error('Error loading content data:', error);
+      console.error('❌ Error loading content data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const saveContentPadariasToDatabase = async (newGroups: ContentGroup[]) => {
+    console.log('💾 saveContentPadariasToDatabase: Iniciando salvamento de', newGroups.length, 'grupos');
+    
     try {
+      console.log('💾 Deletando dados antigos...');
       const { error: deleteError } = await supabase
         .from('content_padarias_data')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('❌ Erro ao deletar dados antigos:', deleteError);
+        throw deleteError;
+      }
+      console.log('✅ Dados antigos deletados com sucesso');
 
       // Para cada grupo, se não tiver itens, ainda precisa ser salvo
       const dataToInsert = newGroups.flatMap(group => {
+        console.log('💾 Processando grupo:', group.name, 'com', group.items.length, 'itens');
+        
         if (group.items.length === 0) {
           // Se não há itens, criar um registro placeholder para o grupo
-          return [{
+          const placeholder = {
             id: crypto.randomUUID(),
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
-            elemento: '',
-            observacoes: null,
-            attachments: null,
+            elemento: '', // Placeholder vazio
+            observacoes: null as string | null,
+            attachments: null as string[] | null,
             ...Object.fromEntries(
               customColumns.map(col => [col.name, ''])
             )
-          }];
+          };
+          console.log('💾 Criando placeholder para grupo vazio:', placeholder);
+          return [placeholder];
         }
         
         return group.items.map(item => ({
@@ -174,30 +203,44 @@ export function useContentPadariasData() {
           group_name: group.name,
           group_color: group.color,
           elemento: item.elemento,
-          observacoes: item.observacoes,
-          attachments: item.attachments,
+          observacoes: item.observacoes || null,
+          attachments: item.attachments || null,
           ...Object.fromEntries(
             customColumns.map(col => [col.name, item[col.name] || ''])
           )
         }));
       });
 
-      if (dataToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('content_padarias_data')
-          .insert(dataToInsert);
+      console.log('💾 Dados para inserir:', dataToInsert.length, 'registros');
+      console.log('💾 Dados completos:', JSON.stringify(dataToInsert, null, 2));
 
-        if (insertError) throw insertError;
+      if (dataToInsert.length > 0) {
+        console.log('💾 Inserindo dados no banco...');
+        const { data: insertedData, error: insertError } = await supabase
+          .from('content_padarias_data')
+          .insert(dataToInsert)
+          .select();
+
+        if (insertError) {
+          console.error('❌ Erro ao inserir dados:', insertError);
+          throw insertError;
+        }
+        
+        console.log('✅ Dados inseridos com sucesso:', insertedData?.length || 0, 'registros');
+      } else {
+        console.log('⚠️ Nenhum dado para inserir');
       }
 
-      console.log('Content padarias data saved successfully');
+      console.log('✅ Content padarias data saved successfully');
     } catch (error) {
-      console.error('Error saving content data:', error);
+      console.error('❌ Error saving content data:', error);
       throw error;
     }
   };
 
   const createMonth = async (monthName: string) => {
+    console.log('🔵 createMonth: Iniciando criação do mês:', monthName);
+    
     const newGroup: ContentGroup = {
       id: crypto.randomUUID(),
       name: monthName,
@@ -206,9 +249,20 @@ export function useContentPadariasData() {
       items: []
     };
 
+    console.log('🔵 createMonth: Novo grupo criado:', newGroup);
+
     const newGroups = [...groups, newGroup];
+    console.log('🔵 createMonth: Lista de grupos atualizada:', newGroups.length, 'grupos');
+    
     setGroups(newGroups);
-    await saveContentPadariasToDatabase(newGroups);
+    
+    try {
+      await saveContentPadariasToDatabase(newGroups);
+      console.log('✅ createMonth: Mês salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ createMonth: Erro ao salvar mês:', error);
+      throw error;
+    }
   };
 
   const addClient = async (groupId: string, clientData: Partial<ContentItem>) => {
