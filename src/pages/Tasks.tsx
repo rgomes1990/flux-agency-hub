@@ -868,7 +868,7 @@ export default function Tasks() {
 
       {/* Task Details Dialog */}
       <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes da Tarefa</DialogTitle>
           </DialogHeader>
