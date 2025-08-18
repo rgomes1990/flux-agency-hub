@@ -13,7 +13,9 @@ import {
   Trash2,
   Paperclip,
   Eye,
-  Menu
+  Menu,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -25,6 +27,22 @@ import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 import { useUndo } from '@/contexts/UndoContext';
+import { SortablePadariasRow } from '@/components/ClientManagement/SortablePadariasRow';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import { 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy, 
+  arrayMove 
+} from '@dnd-kit/sortable';
 
 export default function ContentPadarias() {
   const isMobile = useIsMobile();
@@ -44,6 +62,8 @@ export default function ContentPadarias() {
     addColumn,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     addClient,
     deleteClient,
@@ -254,6 +274,41 @@ export default function ContentPadarias() {
     setShowFilePreview(true);
   };
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // Find which group the item belongs to
+    const activeGroupId = active.data.current?.groupId;
+    const group = groups.find(g => g.id === activeGroupId);
+    
+    if (!group) return;
+
+    const oldIndex = group.items.findIndex(item => item.id === active.id);
+    const newIndex = group.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newItems = arrayMove(group.items, oldIndex, newIndex);
+      const updatedGroups = groups.map(g => 
+        g.id === activeGroupId 
+          ? { ...g, items: newItems }
+          : g
+      );
+      updateGroups(updatedGroups);
+    }
+  };
+
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -370,8 +425,21 @@ export default function ContentPadarias() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+      <div className="flex-1 relative">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div 
+            className="h-full overflow-x-auto overflow-y-auto" 
+            style={{ 
+              paddingBottom: '10px',
+              scrollbarWidth: 'auto',
+              scrollbarColor: '#6b7280 #f3f4f6'
+            }}
+          >
+            <div className="min-w-max" style={{ minWidth: '1200px' }}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
@@ -434,76 +502,33 @@ export default function ContentPadarias() {
               </div>
 
               {/* Group Items */}
-              {group.isExpanded && group.items.map((item, index) => (
-                <div 
-                  key={`${group.id}-${item.id}-${index}`} 
-                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              {group.isExpanded && (
+                <SortableContext 
+                  items={group.items.map(item => item.id)} 
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex items-center min-w-max">
-                    <div className="w-8 flex items-center justify-center p-2">
-                      <Checkbox
-                        checked={selectedItems.includes(item.id)}
-                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
-                      />
-                    </div>
-                    <div className="w-56 p-2 border-r border-gray-200">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openClientDetails(item.id)}
-                          className="text-sm text-blue-600 hover:underline font-medium text-left"
-                        >
-                          {item.elemento}
-                        </button>
-                        {item.attachments && item.attachments.length > 0 && (
-                          <Paperclip className="h-3 w-3 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.servicos}
-                    </div>
-                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.observacoes}
-                    </div>
-                    {customColumns.map((column) => (
-                      <div key={column.id} className="w-44 p-2 border-r border-gray-200">
-                        {column.type === 'status' ? (
-                          <StatusButton
-                            currentStatus={item[column.name] || ''}
-                            statuses={statuses}
-                            onStatusChange={(statusId) => updateItemStatus(item.id, column.name, statusId)}
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-600">{item[column.name] || ''}</span>
-                        )}
-                      </div>
-                    ))}
-                    <div className="w-20 p-2">
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openClientDetails(item.id)}
-                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  {group.items.map((item, index) => (
+                    <SortablePadariasRow 
+                      key={item.id}
+                      item={item}
+                      groupId={group.id}
+                      index={index}
+                      selectedItems={selectedItems}
+                      customColumns={customColumns}
+                      onSelectItem={handleSelectItem}
+                      onOpenClientDetails={openClientDetails}
+                      onUpdateItemStatus={updateItemStatus}
+                      onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      statuses={statuses}
+                    />
+                  ))}
+                </SortableContext>
+              )}
             </div>
           ))}
-        </div>
+            </div>
+          </div>
+        </DndContext>
       </div>
 
       {/* Duplicate Month Dialog */}
@@ -582,39 +607,64 @@ export default function ContentPadarias() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Colunas Existentes</label>
-              {customColumns.map((column) => (
-                <div key={column.id} className="flex items-center justify-between p-2 border border-gray-200 rounded">
-                  <span className="text-sm">{column.name} ({column.type})</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              <h4 className="font-medium">Colunas Existentes:</h4>
+              {customColumns.map((column, index) => (
+                <div key={column.id} className="flex items-center justify-between p-3 border rounded bg-gray-50">
+                  <span className="text-sm font-medium">
+                    {column.name} ({column.type})
+                  </span>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnUp(column.id)}
+                      disabled={index === 0}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para cima"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnDown(column.id)}
+                      disabled={index === customColumns.length - 1}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para baixo"
+                    >
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+                      title="Excluir coluna"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="border-t pt-4">
-              <label className="text-sm font-medium">Nova Coluna</label>
+              <Input
+                placeholder="Nome da coluna"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+              />
               <div className="space-y-2 mt-2">
-                <Input
-                  placeholder="Nome da coluna"
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                />
+                <label className="text-sm font-medium">Tipo da Coluna</label>
                 <select
                   value={newColumnType}
                   onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 >
-                  <option value="status">Status</option>
-                  <option value="text">Texto</option>
+                  <option value="status">Status (com cores)</option>
+                  <option value="text">Texto livre</option>
                 </select>
-                <Button onClick={handleCreateColumn} className="w-full">
-                  Adicionar Coluna
+                <Button onClick={handleCreateColumn} className="w-full bg-blue-600 hover:bg-blue-700">
+                  Criar Coluna
                 </Button>
               </div>
             </div>

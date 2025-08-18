@@ -430,6 +430,46 @@ export function useContentPadariasData() {
     await saveContentPadariasToDatabase(newGroups);
   };
 
+  const moveColumnUp = async (columnId: string) => {
+    const currentIndex = customColumns.findIndex(col => col.id === columnId);
+    if (currentIndex <= 0) return;
+
+    const newColumns = [...customColumns];
+    [newColumns[currentIndex], newColumns[currentIndex - 1]] = [newColumns[currentIndex - 1], newColumns[currentIndex]];
+    
+    // Update column orders in database
+    const updatePromises = newColumns.map((col, index) => 
+      supabase
+        .from('column_config')
+        .update({ column_order: index })
+        .eq('column_id', col.id)
+        .eq('module', 'content_padarias_data')
+    );
+
+    await Promise.all(updatePromises);
+    setCustomColumns(newColumns);
+  };
+
+  const moveColumnDown = async (columnId: string) => {
+    const currentIndex = customColumns.findIndex(col => col.id === columnId);
+    if (currentIndex >= customColumns.length - 1) return;
+
+    const newColumns = [...customColumns];
+    [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
+    
+    // Update column orders in database
+    const updatePromises = newColumns.map((col, index) => 
+      supabase
+        .from('column_config')
+        .update({ column_order: index })
+        .eq('column_id', col.id)
+        .eq('module', 'content_padarias_data')
+    );
+
+    await Promise.all(updatePromises);
+    setCustomColumns(newColumns);
+  };
+
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
     const newGroups = groups.map(group => ({
       ...group,
@@ -568,6 +608,8 @@ export function useContentPadariasData() {
     updateStatus,
     deleteStatus,
     updateColumn,
+    moveColumnUp,
+    moveColumnDown,
     deleteColumn,
     updateItemStatus,
     deleteClient,
