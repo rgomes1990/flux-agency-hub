@@ -879,23 +879,9 @@ export default function Tasks() {
             return (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Título</label>
-                  <div className="text-sm p-2 bg-gray-50 rounded border">{task.title}</div>
-                </div>
-                
-                <div className="space-y-2">
                   <label className="text-sm font-medium">Descrição</label>
-                  <div className="text-sm p-2 bg-gray-50 rounded border min-h-[80px]">
+                  <div className="text-sm p-2 bg-gray-50 rounded border min-h-[80px] whitespace-pre-wrap">
                     {task.description || 'Sem descrição'}
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Prioridade</label>
-                  <div className="flex">
-                    <Badge className={getPriorityColor(task.priority)}>
-                      {getPriorityText(task.priority)}
-                    </Badge>
                   </div>
                 </div>
                 
