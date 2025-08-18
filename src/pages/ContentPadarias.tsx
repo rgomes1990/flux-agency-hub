@@ -553,6 +553,11 @@ export default function ContentPadarias() {
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
             />
+            <Input
+              placeholder="Serviços (ex: Gestão de Redes Sociais)"
+              value={newClientServices}
+              onChange={(e) => setNewClientServices(e.target.value)}
+            />
             <div className="flex space-x-2">
               <Button onClick={handleCreateClient} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Adicionar
