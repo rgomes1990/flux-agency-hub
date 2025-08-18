@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye, ChevronUp, ChevronDown, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Plus, Edit, Save, X, Trash2, Settings, Paperclip, Eye, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTasksData } from '@/hooks/useTasksData';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -51,7 +51,6 @@ export default function Tasks() {
     deleteColumn,
     updateColumn,
     reorderColumn,
-    reorderTask,
     moveTask
   } = useTasksData();
   
@@ -418,28 +417,6 @@ export default function Tasks() {
                 >
                   <GripVertical className="h-4 w-4 text-gray-400" />
                 </div>
-                
-                {/* Botões de reordenação */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => reorderTask(task.id, columnId, 'up')}
-                  disabled={taskIndex === 0}
-                  className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
-                  title="Mover tarefa para cima"
-                >
-                  <ArrowUp className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => reorderTask(task.id, columnId, 'down')}
-                  disabled={taskIndex === columns.find(col => col.id === columnId)?.tasks.length! - 1}
-                  className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
-                  title="Mover tarefa para baixo"
-                >
-                  <ArrowDown className="h-3 w-3" />
-                </Button>
                 
                 <Button 
                   variant="ghost" 
