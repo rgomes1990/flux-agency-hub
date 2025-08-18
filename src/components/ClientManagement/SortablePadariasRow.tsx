@@ -89,9 +89,6 @@ export function SortablePadariasRow({
         <div className="w-44 p-2 border-r border-gray-200">
           <span className="text-sm text-gray-700">{item.servicos}</span>
         </div>
-        <div className="w-44 p-2 border-r border-gray-200">
-          <span className="text-sm text-gray-700">{item.observacoes}</span>
-        </div>
         {customColumns.map((column) => (
           <div key={column.id} className="w-44 p-2 border-r border-gray-200">
             {column.type === 'status' ? (

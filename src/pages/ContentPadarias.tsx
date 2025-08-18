@@ -451,7 +451,6 @@ export default function ContentPadarias() {
               </div>
                 <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
                 <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Observações</div>
               {customColumns.map((column) => (
                 <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
