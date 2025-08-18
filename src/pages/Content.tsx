@@ -15,8 +15,28 @@ import {
   Eye,
   Menu,
   ChevronUp,
-  ChevronDown as ChevronDownIcon
+  ChevronDown as ChevronDownIcon,
+  GripVertical
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useContentData } from '@/hooks/useContentData';
@@ -26,6 +46,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { SortableClientRow } from '@/components/ClientManagement/SortableClientRow';
 import { useUndo } from '@/contexts/UndoContext';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -254,6 +275,40 @@ export default function Content() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // Find which group the item belongs to
+    const activeGroupId = active.data.current?.groupId;
+    const group = groups.find(g => g.id === activeGroupId);
+    
+    if (!group) return;
+
+    const oldIndex = group.items.findIndex(item => item.id === active.id);
+    const newIndex = group.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newItems = arrayMove(group.items, oldIndex, newIndex);
+      const updatedGroups = groups.map(g => 
+        g.id === activeGroupId 
+          ? { ...g, items: newItems }
+          : g
+      );
+      updateGroups(updatedGroups);
+    }
+  };
+
   const openFilePreview = (file: File) => {
     setPreviewFile(file);
     setShowFilePreview(true);
@@ -379,15 +434,20 @@ export default function Content() {
 
       {/* Table */}
       <div className="flex-1 relative">
-        <div 
-          className="h-full overflow-x-auto overflow-y-auto" 
-          style={{ 
-            paddingBottom: '10px',
-            scrollbarWidth: 'auto',
-            scrollbarColor: '#6b7280 #f3f4f6'
-          }}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
         >
-          <div className="min-w-max" style={{ minWidth: '1200px' }}>
+          <div 
+            className="h-full overflow-x-auto overflow-y-auto" 
+            style={{ 
+              paddingBottom: '10px',
+              scrollbarWidth: 'auto',
+              scrollbarColor: '#6b7280 #f3f4f6'
+            }}
+          >
+            <div className="min-w-max" style={{ minWidth: '1200px' }}>
             {/* Table Header */}
             <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
               <div className="flex items-center min-w-max">
@@ -449,82 +509,35 @@ export default function Content() {
                 </div>
 
                 {/* Group Items */}
-                {group.isExpanded && group.items.map((item, index) => (
-                  <div 
-                    key={`${group.id}-${item.id}-${index}`} 
-                    className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                {group.isExpanded && (
+                  <SortableContext 
+                    items={group.items.map(item => item.id)} 
+                    strategy={verticalListSortingStrategy}
                   >
-                    <div className="flex items-center min-w-max">
-                      <div className="w-8 flex items-center justify-center p-2">
-                        <Checkbox
-                          checked={selectedItems.includes(item.id)}
-                          onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
-                        />
-                      </div>
-                      <div className="w-56 p-2 border-r border-gray-200">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => openClientDetails(item.id)}
-                            className="text-sm text-blue-600 hover:underline font-medium text-left"
-                          >
-                            {item.elemento}
-                          </button>
-                          {getClientAttachments(item.id).length > 0 && (
-                            <Paperclip className="h-3 w-3 text-gray-400" />
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
-                        {item.servicos}
-                      </div>
-                      {columns.map((column) => (
-                        <div key={column.id} className="w-44 p-2 border-r border-gray-200">
-                          {column.type === 'status' ? (
-                            <StatusButton
-                              currentStatus={item[column.id] || statuses[0]?.name || 'Pendente'}
-                              statuses={statuses}
-                              onStatusChange={(newStatus) => updateItemStatus(item.id, column.id, newStatus)}
-                            />
-                          ) : (
-                            <Input
-                              value={item[column.id] || ''}
-                              onChange={(e) => updateItemStatus(item.id, column.id, e.target.value)}
-                              className="text-sm"
-                              placeholder={`Digite ${column.name.toLowerCase()}`}
-                            />
-                          )}
-                        </div>
-                      ))}
-                      <div className="w-20 p-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              <span className="sr-only">Ações</span>
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openClientDetails(item.id)}>
-                              <Eye className="h-3 w-3 mr-2" />
-                              Ver detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3 mr-2" />
-                              Deletar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    {group.items.map((item, index) => (
+                      <SortableClientRow 
+                        key={item.id}
+                        item={item}
+                        groupId={group.id}
+                        index={index}
+                        selectedItems={selectedItems}
+                        columns={columns}
+                        onSelectItem={handleSelectItem}
+                        onOpenClientDetails={openClientDetails}
+                        onUpdateItemStatus={updateItemStatus}
+                        onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                        getClientAttachments={getClientAttachments}
+                        openFilePreview={openFilePreview}
+                        statuses={statuses}
+                      />
+                    ))}
+                  </SortableContext>
+                )}
               </div>
             ))}
+            </div>
           </div>
-        </div>
+        </DndContext>
       </div>
 
 
