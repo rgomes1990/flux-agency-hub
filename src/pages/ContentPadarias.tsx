@@ -381,8 +381,9 @@ export default function ContentPadarias() {
                   onCheckedChange={handleSelectAll}
                 />
               </div>
-              <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Observações</div>
+                <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Observações</div>
               {customColumns.map((column) => (
                 <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
@@ -457,6 +458,9 @@ export default function ContentPadarias() {
                           <Paperclip className="h-3 w-3 text-gray-400" />
                         )}
                       </div>
+                    </div>
+                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
+                      {item.servicos}
                     </div>
                     <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
                       {item.observacoes}

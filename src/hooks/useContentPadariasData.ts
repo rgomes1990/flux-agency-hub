@@ -11,6 +11,7 @@ interface ServiceStatus {
 interface ContentItem {
   id: string;
   elemento: string;
+  servicos?: string;
   observacoes?: string;
   attachments?: string[];
   [key: string]: any;
@@ -197,6 +198,7 @@ export function useContentPadariasData() {
             group_name: group.name,
             group_color: group.color,
             elemento: '', // Placeholder vazio
+            servicos: null as string | null,
             observacoes: null as string | null,
             attachments: null as string[] | null,
             item_data: null as any
@@ -210,11 +212,13 @@ export function useContentPadariasData() {
           group_name: group.name,
           group_color: group.color,
           elemento: item.elemento,
+          servicos: item.servicos || null,
           observacoes: item.observacoes || null,
           attachments: item.attachments || null,
           item_data: {
             id: item.id,
             elemento: item.elemento,
+            servicos: item.servicos,
             observacoes: item.observacoes,
             attachments: item.attachments,
             ...Object.fromEntries(
@@ -290,6 +294,7 @@ export function useContentPadariasData() {
     const newItem: ContentItem = {
       id: crypto.randomUUID(),
       elemento: clientData.elemento || '',
+      servicos: clientData.servicos || '',
       observacoes: clientData.observacoes,
       attachments: clientData.attachments || []
     };

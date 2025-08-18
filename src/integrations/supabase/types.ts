@@ -418,6 +418,7 @@ export type Database = {
           id: string
           item_data: Json | null
           observacoes: string | null
+          servicos: string | null
           updated_at: string
         }
         Insert: {
@@ -430,6 +431,7 @@ export type Database = {
           id?: string
           item_data?: Json | null
           observacoes?: string | null
+          servicos?: string | null
           updated_at?: string
         }
         Update: {
@@ -442,6 +444,7 @@ export type Database = {
           id?: string
           item_data?: Json | null
           observacoes?: string | null
+          servicos?: string | null
           updated_at?: string
         }
         Relationships: []
