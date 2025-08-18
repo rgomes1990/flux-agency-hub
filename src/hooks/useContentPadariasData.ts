@@ -57,7 +57,8 @@ export function useContentPadariasData() {
       const { data, error } = await supabase
         .from('column_config')
         .select('*')
-        .eq('module', 'content_padarias_data');
+        .eq('module', 'content_padarias_data')
+        .order('column_order', { ascending: true });
 
       if (error) throw error;
 
