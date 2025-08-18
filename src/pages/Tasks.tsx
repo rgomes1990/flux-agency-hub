@@ -868,56 +868,68 @@ export default function Tasks() {
 
       {/* Task Details Dialog */}
       <Dialog open={!!showTaskDetailsDialog} onOpenChange={(open) => !open && setShowTaskDetailsDialog(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Detalhes da Tarefa</DialogTitle>
           </DialogHeader>
-          {showTaskDetailsDialog && (
-            <div className="space-y-4">
-              {(() => {
-                const task = getTaskDetails(showTaskDetailsDialog);
-                if (!task) return <p>Tarefa não encontrada</p>;
+          {showTaskDetailsDialog && (() => {
+            const task = getTaskDetails(showTaskDetailsDialog);
+            if (!task) return <p>Tarefa não encontrada</p>;
+            
+            return (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Título</label>
+                  <div className="text-sm p-2 bg-gray-50 rounded border">{task.title}</div>
+                </div>
                 
-                return (
-                  <>
-                    <div>
-                      <h3 className="font-medium text-lg">{task.title}</h3>
-                      <Badge className={`${getPriorityColor(task.priority)} mt-2`}>
-                        {getPriorityText(task.priority)}
-                      </Badge>
-                    </div>
-                    
-                    <div>
-                      <label className="font-medium">Descrição:</label>
-                      <p className="text-gray-600 mt-1">{task.description}</p>
-                    </div>
-                    
-                    {task.attachments && task.attachments.length > 0 && (
-                      <div>
-                        <label className="font-medium">Anexos:</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          {task.attachments.map((attachment, index) => (
-                            <div key={index} className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Descrição</label>
+                  <div className="text-sm p-2 bg-gray-50 rounded border min-h-[80px]">
+                    {task.description || 'Sem descrição'}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Prioridade</label>
+                  <div className="flex">
+                    <Badge className={getPriorityColor(task.priority)}>
+                      {getPriorityText(task.priority)}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Anexos</label>
+                  {task.attachments && task.attachments.length > 0 ? (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">Anexos atuais:</p>
+                      <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                        {task.attachments.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded border">
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <Paperclip className="h-3 w-3 text-gray-400 flex-shrink-0" />
                               <button
-                                onClick={() => openAttachmentPreview(attachment)}
-                                className="flex items-center space-x-2 text-sm text-blue-600 w-full text-left"
+                                onClick={() => openAttachmentPreview(file)}
+                                className="text-blue-600 hover:text-blue-800 truncate"
                               >
-                                <Paperclip className="h-4 w-4" />
-                                <span className="truncate">{attachment.name}</span>
+                                {file.name}
                               </button>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {(attachment.size / 1024).toFixed(1)} KB
-                              </p>
+                              <span className="text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 p-2 bg-gray-50 rounded border">
+                      Nenhum anexo
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
