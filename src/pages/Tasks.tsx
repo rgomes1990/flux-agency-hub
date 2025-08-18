@@ -20,6 +20,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -499,6 +500,29 @@ export default function Tasks() {
     );
   };
 
+  // Droppable Column Component
+  const DroppableColumn = ({ column, children }: { column: any, children: React.ReactNode }) => {
+    const { setNodeRef, isOver } = useDroppable({
+      id: column.id,
+    });
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={`flex-1 bg-white rounded-b-lg p-3 space-y-3 overflow-y-auto shadow-sm border border-gray-200 min-h-[200px] ${
+          isOver ? 'bg-blue-50 border-blue-300 border-2' : ''
+        }`}
+      >
+        {children}
+        {column.tasks.length === 0 && (
+          <div className="flex items-center justify-center h-32 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+            <p className="text-sm">Arraste tarefas aqui</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -850,7 +874,7 @@ export default function Tasks() {
               items={column.tasks.map(task => task.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="flex-1 bg-white rounded-b-lg p-3 space-y-3 overflow-y-auto shadow-sm border border-gray-200 min-h-[200px]" id={column.id}>
+              <DroppableColumn column={column}>
                 {column.tasks.map((task, taskIndex) => (
                   <SortableTask
                     key={task.id}
@@ -859,7 +883,7 @@ export default function Tasks() {
                     taskIndex={taskIndex}
                   />
                 ))}
-              </div>
+              </DroppableColumn>
             </SortableContext>
           </div>
         ))}
