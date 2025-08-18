@@ -13,8 +13,24 @@ import {
   Trash2,
   Paperclip,
   Eye,
-  Menu
+  Menu,
+  GripVertical
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useVideosData } from '@/hooks/useVideosData';
@@ -24,6 +40,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { SortableVideoRow } from '@/components/ClientManagement/SortableVideoRow';
 import { useUndo } from '@/contexts/UndoContext';
 
 export default function Videos() {
@@ -249,6 +266,40 @@ export default function Videos() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // Find which group the item belongs to
+    const activeGroupId = active.data.current?.groupId;
+    const group = groups.find(g => g.id === activeGroupId);
+    
+    if (!group) return;
+
+    const oldIndex = group.items.findIndex(item => item.id === active.id);
+    const newIndex = group.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newItems = arrayMove(group.items, oldIndex, newIndex);
+      const updatedGroups = groups.map(g => 
+        g.id === activeGroupId 
+          ? { ...g, items: newItems }
+          : g
+      );
+      updateGroups(updatedGroups);
+    }
+  };
+
   const openFilePreview = (file: File) => {
     setPreviewFile(file);
     setShowFilePreview(true);
@@ -374,7 +425,12 @@ export default function Videos() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
@@ -436,68 +492,34 @@ export default function Videos() {
               </div>
 
               {/* Group Items */}
-              {group.isExpanded && group.items.map((item, index) => (
-                <div 
-                  key={`${group.id}-${item.id}-${index}`} 
-                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              {group.isExpanded && (
+                <SortableContext 
+                  items={group.items.map(item => item.id)} 
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex items-center min-w-max">
-                    <div className="w-8 flex items-center justify-center p-2">
-                      <Checkbox
-                        checked={selectedItems.includes(item.id)}
-                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
-                      />
-                    </div>
-                    <div className="w-56 p-2 border-r border-gray-200">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openClientDetails(item.id)}
-                          className="text-sm text-blue-600 hover:underline font-medium text-left"
-                        >
-                          {item.elemento}
-                        </button>
-                        {getClientAttachments(item.id).length > 0 && (
-                          <Paperclip className="h-3 w-3 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.servicos}
-                    </div>
-                    {customColumns.map((column) => (
-                      <div key={column.id} className="w-44 p-2 border-r border-gray-200">
-                        {column.type === 'status' ? (
-                          <StatusButton
-                            currentStatus={(item as any)[column.id] || ''}
-                            statuses={statuses}
-                            onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
-                          />
-                        ) : (
-                          <Input
-                            value={(item as any)[column.id] || ''}
-                            onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
-                            className="border-0 bg-transparent p-0 h-auto"
-                            placeholder="..."
-                          />
-                        )}
-                      </div>
-                    ))}
-                    <div className="w-20 p-2 flex space-x-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  {group.items.map((item, index) => (
+                    <SortableVideoRow 
+                      key={item.id}
+                      item={item}
+                      groupId={group.id}
+                      index={index}
+                      selectedItems={selectedItems}
+                      columns={customColumns}
+                      onSelectItem={handleSelectItem}
+                      onOpenClientDetails={openClientDetails}
+                      onUpdateItemStatus={updateItemStatus}
+                      onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      getClientAttachments={getClientAttachments}
+                      openFilePreview={openFilePreview}
+                      statuses={statuses}
+                    />
+                  ))}
+                </SortableContext>
+              )}
             </div>
           ))}
-        </div>
+          </div>
+        </DndContext>
       </div>
 
       {/* Dialogs */}
