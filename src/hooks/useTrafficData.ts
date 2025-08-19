@@ -460,6 +460,25 @@ export const useTrafficData = () => {
         throw error;
       }
     },
+    updateClient: async (itemId: string, updates: Partial<TrafficItem>) => {
+      try {
+        console.log('👤 TRAFFIC: Atualizando cliente:', { itemId, updates });
+        
+        const newGroups = groups.map(group => ({
+          ...group,
+          items: group.items.map(item => 
+            item.id === itemId ? { ...item, ...updates } : item
+          )
+        }));
+        
+        setGroups(newGroups);
+        await saveTrafficToDatabase(newGroups);
+        console.log('✅ TRAFFIC: Cliente atualizado com sucesso');
+      } catch (error) {
+        console.error('❌ TRAFFIC: Erro ao atualizar cliente:', error);
+        throw error;
+      }
+    },
     createMonth,
     addClient,
     addColumn,
@@ -682,56 +701,6 @@ export const useTrafficData = () => {
         console.log('Cliente deletado com sucesso');
       } catch (error) {
         console.error('Erro ao deletar cliente:', error);
-      }
-    },
-    updateClient: async (itemId: string, updates: Partial<TrafficItem>) => {
-      try {
-        console.log('📝 Atualizando cliente:', itemId, 'com:', Object.keys(updates));
-        
-        if (updates.attachments && updates.attachments.length > 0) {
-          const firstAttachment = updates.attachments[0];
-          if (firstAttachment instanceof File) {
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const serializedFile = {
-                name: firstAttachment.name,
-                data: reader.result as string,
-                type: firstAttachment.type
-              };
-              updates.attachments = [serializedFile as any];
-              
-              const newGroups = groups.map(group => ({
-                ...group,
-                items: group.items.map(item => 
-                  item.id === itemId 
-                    ? { ...item, ...updates }
-                    : item
-                )
-              }));
-              
-              setGroups(newGroups);
-              await saveTrafficToDatabase(newGroups);
-            };
-            reader.readAsDataURL(firstAttachment);
-            return;
-          }
-        }
-
-        const newGroups = groups.map(group => ({
-          ...group,
-          items: group.items.map(item => 
-            item.id === itemId 
-              ? { ...item, ...updates }
-              : item
-          )
-        }));
-        
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        console.log('✅ Cliente atualizado com sucesso');
-      } catch (error) {
-        console.error('❌ Erro ao atualizar cliente:', error);
-        throw error;
       }
     },
     getClientFiles: (clientId: string): File[] => {

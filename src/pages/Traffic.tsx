@@ -16,6 +16,8 @@ import {
   Menu,
   RefreshCw
 } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTrafficData } from '@/hooks/useTrafficData';
@@ -26,6 +28,7 @@ import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 import { useUndo } from '@/contexts/UndoContext';
+import { SortableTrafficRow } from '@/components/ClientManagement/SortableTrafficRow';
 
 export default function Traffic() {
   const isMobile = useIsMobile();
@@ -51,6 +54,13 @@ export default function Traffic() {
     updateClient,
     getClientFiles
   } = useTrafficData();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
@@ -247,6 +257,51 @@ export default function Traffic() {
 
   const getClientAttachments = (clientId: string) => {
     return getClientFiles(clientId);
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    if (activeId === overId) return;
+
+    // Find the source and target groups
+    const activeGroupId = active.data.current?.groupId;
+    const overGroupId = over.data.current?.groupId;
+
+    if (!activeGroupId) return;
+
+    const newGroups = [...groups];
+    const activeGroupIndex = newGroups.findIndex(g => g.id === activeGroupId);
+    const overGroupIndex = overGroupId ? newGroups.findIndex(g => g.id === overGroupId) : activeGroupIndex;
+
+    if (activeGroupIndex === -1) return;
+
+    const activeGroup = newGroups[activeGroupIndex];
+    const activeItemIndex = activeGroup.items.findIndex(item => item.id === activeId);
+
+    if (activeItemIndex === -1) return;
+
+    const [movedItem] = activeGroup.items.splice(activeItemIndex, 1);
+
+    if (activeGroupId === overGroupId || overGroupIndex === activeGroupIndex) {
+      // Moving within the same group
+      const overItemIndex = activeGroup.items.findIndex(item => item.id === overId);
+      const insertIndex = overItemIndex === -1 ? activeGroup.items.length : overItemIndex;
+      activeGroup.items.splice(insertIndex, 0, movedItem);
+    } else if (overGroupIndex !== -1) {
+      // Moving to a different group
+      const overGroup = newGroups[overGroupIndex];
+      const overItemIndex = overGroup.items.findIndex(item => item.id === overId);
+      const insertIndex = overItemIndex === -1 ? overGroup.items.length : overItemIndex;
+      overGroup.items.splice(insertIndex, 0, movedItem);
+    }
+
+    updateGroups(newGroups);
   };
 
   return (
@@ -451,86 +506,34 @@ export default function Traffic() {
               </div>
 
               {/* Group Items */}
-              {group.isExpanded && group.items.map((item, index) => (
-                <div 
-                  key={item.id} 
-                  className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              {group.isExpanded && (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  <div className="flex items-center min-w-max">
-                    <div className="w-8 flex items-center justify-center p-2">
-                      <Checkbox
-                        checked={selectedItems.includes(item.id)}
-                        onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                  <SortableContext items={group.items.map(item => item.id)} strategy={verticalListSortingStrategy}>
+                    {group.items.map((item, index) => (
+                      <SortableTrafficRow
+                        key={item.id}
+                        item={item}
+                        groupId={group.id}
+                        index={index}
+                        selectedItems={selectedItems}
+                        columns={columns}
+                        onSelectItem={handleSelectItem}
+                        onOpenClientDetails={openClientDetails}
+                        onUpdateItemStatus={updateItemStatus}
+                        onUpdateClientField={updateClient}
+                        onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                        getClientAttachments={getClientAttachments}
+                        openFilePreview={openFilePreview}
+                        statuses={statuses}
                       />
-                    </div>
-                    <div className="w-48 p-2 border-r border-gray-200">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openClientDetails(item.id)}
-                          className="text-sm text-blue-600 hover:underline font-medium text-left"
-                        >
-                          {item.elemento}
-                        </button>
-                        {getClientAttachments(item.id).length > 0 && (
-                          <Paperclip className="h-3 w-3 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-36 p-2 text-sm text-gray-600 border-r border-gray-200">
-                      {item.servicos}
-                    </div>
-                    {columns.map((column) => {
-                      const getColumnWidth = (columnName: string) => {
-                        switch(columnName.toLowerCase()) {
-                          case 'whatsapp':
-                            return 'w-50';
-                          case 'crédito':
-                          case 'credito':
-                            return 'w-60';
-                          case 'campanhas':
-                            return 'w-40';
-                          case 'email':
-                          case 'e-mail':
-                            return 'w-40';
-                          case 'atualizações':
-                          case 'atualizacoes':
-                            return 'w-32';
-                          default:
-                            return 'w-32';
-                        }
-                      };
-                      return (
-                        <div key={column.id} className={`${getColumnWidth(column.name)} p-2 border-r border-gray-200`}>
-                          {column.type === 'status' ? (
-                            <StatusButton
-                              currentStatus={(item as any)[column.id] || ''}
-                              statuses={statuses}
-                              onStatusChange={(statusId) => updateItemStatus(item.id, column.id, statusId)}
-                            />
-                          ) : (
-                            <Input
-                              value={(item as any)[column.id] || ''}
-                              onChange={(e) => updateClient(item.id, { [column.id]: e.target.value })}
-                              className="border-0 bg-transparent p-0 h-auto"
-                              placeholder="..."
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                    <div className="w-20 p-2 flex space-x-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmDelete({ type: 'client', id: item.id })}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              )}
             </div>
           ))}
         </div>

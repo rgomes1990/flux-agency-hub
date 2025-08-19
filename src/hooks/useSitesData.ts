@@ -699,6 +699,7 @@ export const useSitesData = () => {
     }));
   };
 
+
   return {
     groups,
     columns,
@@ -715,6 +716,7 @@ export const useSitesData = () => {
         throw error;
       }
     },
+    updateClient,
     createMonth,
     addClient,
     addColumn,
@@ -725,7 +727,6 @@ export const useSitesData = () => {
     deleteColumn,
     updateItemStatus,
     deleteClient,
-    updateClient,
     getClientFiles,
     updateMonth: async (groupId: string, newName: string) => {
       try {
