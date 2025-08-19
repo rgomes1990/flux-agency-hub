@@ -18,7 +18,7 @@ interface SortableGMBRowProps {
   onUpdateItemStatus: (itemId: string, field: string, statusId: string) => void;
   onUpdateClientField: (itemId: string, updates: any) => void;
   onDeleteClient: (clientId: string) => void;
-  getClientFiles: (clientId: string) => File[];
+  getClientFiles: (clientId: string) => any[];
   statuses: any[];
 }
 

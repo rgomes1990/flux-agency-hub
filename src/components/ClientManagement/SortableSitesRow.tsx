@@ -18,8 +18,8 @@ interface SortableSitesRowProps {
   onUpdateItemStatus: (itemId: string, field: string, statusId: string) => void;
   onUpdateClientField: (itemId: string, updates: any) => void;
   onDeleteClient: (clientId: string) => void;
-  getClientAttachments: (clientId: string) => File[];
-  openFilePreview: (file: File) => void;
+  getClientAttachments: (clientId: string) => any[];
+  openFilePreview: (file: any) => void;
   statuses: any[];
 }
 
