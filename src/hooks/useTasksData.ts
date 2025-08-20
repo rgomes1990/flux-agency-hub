@@ -189,21 +189,10 @@ export const useTasksData = () => {
     }
   };
 
-  // Salvar tarefas no Supabase
+  // Salvar tarefas no Supabase de forma segura
   const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
     try {
       console.log('DEBUG: Iniciando salvamento de tarefas como dados globais');
-
-      // Deletar tarefas antigas primeiro
-      const { error: deleteError } = await supabase
-        .from('tasks_data')
-        .delete()
-        .is('user_id', null); // Deletar dados globais
-
-      if (deleteError) {
-        console.error('DEBUG: Erro ao deletar tarefas antigas:', deleteError);
-        throw deleteError;
-      }
 
       // Inserir novas tarefas como dados globais
       const taskInserts: any[] = [];
@@ -221,6 +210,7 @@ export const useTasksData = () => {
 
       console.log('DEBUG: Tarefas para inserir:', taskInserts);
 
+      // PRIMEIRO inserir as novas tarefas
       if (taskInserts.length > 0) {
         const { data: insertData, error: insertError } = await supabase
           .from('tasks_data')
@@ -232,6 +222,32 @@ export const useTasksData = () => {
         if (insertError) {
           console.error('DEBUG: Erro ao inserir tarefas:', insertError);
           throw insertError;
+        }
+
+        // SÓ DEPOIS deletar as tarefas antigas (exceto as recém inseridas)
+        const newTaskIds = insertData?.map(task => task.id) || [];
+        if (newTaskIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('tasks_data')
+            .delete()
+            .is('user_id', null)
+            .not('id', 'in', `(${newTaskIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('DEBUG: Erro ao deletar tarefas antigas:', deleteError);
+            // Não fazer throw aqui pois as novas tarefas já foram salvas
+          }
+        }
+      } else {
+        // Se não há tarefas para inserir, deletar todas as existentes
+        const { error: deleteError } = await supabase
+          .from('tasks_data')
+          .delete()
+          .is('user_id', null);
+
+        if (deleteError) {
+          console.error('DEBUG: Erro ao deletar todas as tarefas:', deleteError);
+          throw deleteError;
         }
       }
 
