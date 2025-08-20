@@ -147,62 +147,75 @@ const useRSGAvaliacoesData = () => {
       for (const group of groups) {
         console.log(`🔄 RSG Avaliações: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        // Deletar dados existentes do grupo
-        const { error: deleteError } = await (supabase as any)
-          .from('rsg_avaliacoes_data')
-          .delete()
-          .eq('group_id', group.id);
+        // Filtrar itens únicos baseado no nome do cliente e serviços
+        const processedClients = new Set<string>();
+        const uniqueItems = group.items.filter(item => {
+          const clientKey = `${item.elemento?.trim()}-${item.servicos?.trim()}`;
+          
+          // Pular se cliente está vazio ou já foi processado
+          if (!item.elemento?.trim() || processedClients.has(clientKey)) {
+            console.log(`⚠️ RSG Avaliações: Cliente duplicado ou vazio ignorado: ${item.elemento}`);
+            return false;
+          }
+          
+          processedClients.add(clientKey);
+          return true;
+        });
 
-        if (deleteError) {
-          console.error('❌ RSG Avaliações: Erro ao deletar dados do grupo:', deleteError);
-          throw deleteError;
-        }
+        const insertData = uniqueItems.map(item => ({
+          user_id: null,
+          group_id: group.id,
+          group_name: group.name,
+          group_color: group.color,
+          is_expanded: group.isExpanded,
+          item_data: item
+        }));
 
-        // Inserir novos dados se houver itens, com proteção anti-duplicação
-        if (group.items.length > 0) {
-          // Filtrar itens únicos baseado no nome do cliente e serviços
-          const processedClients = new Set<string>();
-          const uniqueItems = group.items.filter(item => {
-            const clientKey = `${item.elemento?.trim()}-${item.servicos?.trim()}`;
-            
-            // Pular se cliente está vazio ou já foi processado
-            if (!item.elemento?.trim() || processedClients.has(clientKey)) {
-              console.log(`⚠️ RSG Avaliações: Cliente duplicado ou vazio ignorado: ${item.elemento}`);
-              return false;
-            }
-            
-            processedClients.add(clientKey);
-            return true;
-          });
+        console.log('📥 RSG Avaliações: Inserindo dados únicos:', {
+          groupId: group.id,
+          groupName: group.name,
+          originalCount: group.items.length,
+          uniqueCount: insertData.length
+        });
 
-          const insertData = uniqueItems.map(item => ({
-            user_id: null,
-            group_id: group.id,
-            group_name: group.name,
-            group_color: group.color,
-            is_expanded: group.isExpanded,
-            item_data: item
-          }));
+        // PRIMEIRO inserir os novos dados se houver itens
+        if (insertData.length > 0) {
+          const { data: insertResult, error: insertError } = await (supabase as any)
+            .from('rsg_avaliacoes_data')
+            .insert(insertData)
+            .select('id');
 
-          console.log('📥 RSG Avaliações: Inserindo dados únicos:', {
-            groupId: group.id,
-            groupName: group.name,
-            originalCount: group.items.length,
-            uniqueCount: insertData.length
-          });
+          if (insertError) {
+            console.error('❌ RSG Avaliações: Erro ao inserir dados:', insertError);
+            throw insertError;
+          }
 
-          if (insertData.length > 0) {
-            const { data: insertResult, error: insertError } = await (supabase as any)
+          console.log('✅ RSG Avaliações: Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
+
+          // SÓ DEPOIS deletar os dados antigos do grupo (exceto os recém inseridos)
+          const newRecordIds = insertResult?.map(record => record.id) || [];
+          if (newRecordIds.length > 0) {
+            const { error: deleteError } = await (supabase as any)
               .from('rsg_avaliacoes_data')
-              .insert(insertData)
-              .select('id');
+              .delete()
+              .eq('group_id', group.id)
+              .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
 
-            if (insertError) {
-              console.error('❌ RSG Avaliações: Erro ao inserir dados:', insertError);
-              throw insertError;
+            if (deleteError) {
+              console.error('❌ RSG Avaliações: Erro ao deletar dados antigos:', deleteError);
+              // Não fazer throw aqui pois os novos dados já foram salvos
             }
+          }
+        } else {
+          // Se não há itens para inserir, deletar todos os dados existentes do grupo
+          const { error: deleteError } = await (supabase as any)
+            .from('rsg_avaliacoes_data')
+            .delete()
+            .eq('group_id', group.id);
 
-            console.log('✅ RSG Avaliações: Dados inseridos com sucesso:', insertResult?.length || 0, 'registros');
+          if (deleteError) {
+            console.error('❌ RSG Avaliações: Erro ao deletar todos os dados do grupo:', deleteError);
+            throw deleteError;
           }
         }
       }

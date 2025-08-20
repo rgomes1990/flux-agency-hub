@@ -137,22 +137,11 @@ export const useTasksData = () => {
     }
   };
 
-  // Salvar configurações de colunas no Supabase
+  // Salvar configurações de colunas no Supabase de forma segura
   const saveColumnsToDatabase = async (newColumns: TaskColumn[]) => {
     try {
       console.log('DEBUG: Iniciando salvamento de colunas como dados globais');
       console.log('DEBUG: Colunas a salvar:', newColumns);
-
-      // Deletar configurações antigas primeiro
-      const { error: deleteError } = await supabase
-        .from('task_columns')
-        .delete()
-        .is('user_id', null); // Deletar dados globais
-
-      if (deleteError) {
-        console.error('DEBUG: Erro ao deletar colunas antigas:', deleteError);
-        throw deleteError;
-      }
 
       // Inserir novas configurações como dados globais
       const columnInserts = newColumns.map(col => ({
@@ -165,6 +154,7 @@ export const useTasksData = () => {
 
       console.log('DEBUG: Dados para inserir:', columnInserts);
 
+      // PRIMEIRO inserir as novas colunas
       if (columnInserts.length > 0) {
         const { data: insertData, error: insertError } = await supabase
           .from('task_columns')
@@ -178,9 +168,35 @@ export const useTasksData = () => {
           throw insertError;
         }
 
+        // SÓ DEPOIS deletar as colunas antigas (exceto as recém inseridas)
+        const newColumnIds = insertData?.map(col => col.id) || [];
+        if (newColumnIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('task_columns')
+            .delete()
+            .is('user_id', null)
+            .not('id', 'in', `(${newColumnIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('DEBUG: Erro ao deletar colunas antigas:', deleteError);
+            // Não fazer throw aqui pois as novas colunas já foram salvas
+          }
+        }
+
         console.log('DEBUG: Colunas salvas como dados globais com sucesso');
         if (user?.id) {
           await logAudit('task_columns', user.id, 'UPDATE', null, columnInserts);
+        }
+      } else {
+        // Se não há colunas para inserir, deletar todas as existentes
+        const { error: deleteError } = await supabase
+          .from('task_columns')
+          .delete()
+          .is('user_id', null);
+
+        if (deleteError) {
+          console.error('DEBUG: Erro ao deletar todas as colunas:', deleteError);
+          throw deleteError;
         }
       }
     } catch (error) {

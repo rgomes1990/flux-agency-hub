@@ -198,16 +198,6 @@ export const useSitesData = () => {
       for (const group of newGroups) {
         console.log(`🔄 SITES: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        const { error: deleteError } = await supabase
-          .from('sites_data')
-          .delete()
-          .eq('group_id', group.id);
-
-        if (deleteError) {
-          console.error('❌ SITES: Erro ao deletar:', deleteError);
-          throw deleteError;
-        }
-
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
               console.log(`📝 SITES: Preparando item ${index + 1}:`, {
@@ -217,7 +207,7 @@ export const useSitesData = () => {
               });
 
               return {
-        user_id: user.id,
+                user_id: user.id,
                 group_id: group.id,
                 group_name: group.name,
                 group_color: group.color,
@@ -247,6 +237,7 @@ export const useSitesData = () => {
           userId: user.id
         });
 
+        // PRIMEIRO inserir os novos dados
         const { data: insertResult, error: insertError } = await supabase
           .from('sites_data')
           .insert(insertData)
@@ -258,6 +249,21 @@ export const useSitesData = () => {
         }
 
         console.log('✅ SITES: Dados inseridos:', insertResult?.length || 0);
+
+        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('sites_data')
+            .delete()
+            .eq('group_id', group.id)
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ SITES: Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          }
+        }
       }
       
       console.log('🎉 SITES: Salvamento completo!');

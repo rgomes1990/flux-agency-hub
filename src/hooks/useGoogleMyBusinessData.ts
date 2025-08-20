@@ -197,17 +197,6 @@ export const useGoogleMyBusinessData = () => {
       for (const group of newGroups) {
         console.log(`🔄 GMB: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        // Deletar dados existentes do grupo
-        const { error: deleteError } = await (supabase as any)
-          .from('google_my_business_data')
-          .delete()
-          .eq('group_id', group.id);
-
-        if (deleteError) {
-          console.error('❌ GMB: Erro ao deletar:', deleteError);
-          throw deleteError;
-        }
-
         // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
@@ -241,11 +230,7 @@ export const useGoogleMyBusinessData = () => {
               user_id: null // Sempre null para tornar global
             }];
 
-        console.log('📝 GMB: Dados para inserir:', {
-          groupId: group.id,
-          itemCount: insertData.length
-        });
-
+        // PRIMEIRO inserir os novos dados
         const { data: insertResult, error: insertError } = await (supabase as any)
           .from('google_my_business_data')
           .insert(insertData)
@@ -257,6 +242,21 @@ export const useGoogleMyBusinessData = () => {
         }
 
         console.log('✅ GMB: Dados inseridos:', insertResult?.length || 0);
+
+        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await (supabase as any)
+            .from('google_my_business_data')
+            .delete()
+            .eq('group_id', group.id)
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ GMB: Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          }
+        }
       }
       
       console.log('🎉 GMB: Salvamento completo!');

@@ -222,18 +222,6 @@ export function useVideosData() {
       for (const group of newGroups) {
         console.log(`🔄 VIDEOS: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        // Deletar dados existentes do grupo específico
-        const { error: deleteError } = await supabase
-          .from('videos_data')
-          .delete()
-          .eq('group_id', group.id)
-          .is('user_id', null);
-
-        if (deleteError) {
-          console.error('❌ VIDEOS: Erro ao deletar:', deleteError);
-          throw deleteError;
-        }
-
         // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
@@ -264,6 +252,7 @@ export function useVideosData() {
               }
             }];
 
+        // PRIMEIRO inserir os novos dados
         const { data: insertResult, error: insertError } = await supabase
           .from('videos_data')
           .insert(insertData)
@@ -275,8 +264,25 @@ export function useVideosData() {
         }
 
         console.log('✅ VIDEOS: Dados inseridos:', insertResult?.length || 0);
-      }
 
+        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('videos_data')
+            .delete()
+            .eq('group_id', group.id)
+            .is('user_id', null)
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ VIDEOS: Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          }
+        }
+      }
+      
+      console.log('🎉 VIDEOS: Salvamento completo!');
       toast({
         title: "Sucesso",
         description: "Dados dos vídeos salvos com sucesso!",

@@ -218,17 +218,6 @@ export const useContentData = () => {
       for (const group of newGroups) {
         console.log(`🔄 CONTENT: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        // Deletar dados existentes do grupo
-        const { error: deleteError } = await supabase
-          .from('content_data')
-          .delete()
-          .eq('group_id', group.id);
-
-        if (deleteError) {
-          console.error('❌ CONTENT: Erro ao deletar:', deleteError);
-          throw deleteError;
-        }
-
         // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
@@ -263,6 +252,7 @@ export const useContentData = () => {
               }
             }];
 
+        // PRIMEIRO inserir os novos dados
         const { data: insertResult, error: insertError } = await supabase
           .from('content_data')
           .insert(insertData)
@@ -274,6 +264,21 @@ export const useContentData = () => {
         }
 
         console.log('✅ CONTENT: Dados inseridos:', insertResult?.length || 0);
+
+        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('content_data')
+            .delete()
+            .eq('group_id', group.id)
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ CONTENT: Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          }
+        }
       }
       
       console.log('🎉 CONTENT: Salvamento completo!');

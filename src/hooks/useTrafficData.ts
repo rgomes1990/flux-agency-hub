@@ -197,17 +197,6 @@ export const useTrafficData = () => {
       for (const group of newGroups) {
         console.log(`🔄 TRAFFIC: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        // Deletar dados existentes do grupo
-        const { error: deleteError } = await supabase
-          .from('traffic_data')
-          .delete()
-          .eq('group_id', group.id);
-
-        if (deleteError) {
-          console.error('❌ TRAFFIC: Erro ao deletar:', deleteError);
-          throw deleteError;
-        }
-
         // Sempre inserir dados do grupo
         const insertData = group.items.length > 0 
           ? group.items.map((item, index) => {
@@ -246,6 +235,7 @@ export const useTrafficData = () => {
           itemCount: insertData.length
         });
 
+        // PRIMEIRO inserir os novos dados
         const { data: insertResult, error: insertError } = await supabase
           .from('traffic_data')
           .insert(insertData)
@@ -257,6 +247,21 @@ export const useTrafficData = () => {
         }
 
         console.log('✅ TRAFFIC: Dados inseridos:', insertResult?.length || 0);
+
+        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('traffic_data')
+            .delete()
+            .eq('group_id', group.id)
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ TRAFFIC: Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          }
+        }
       }
       
       console.log('🎉 TRAFFIC: Salvamento completo!');

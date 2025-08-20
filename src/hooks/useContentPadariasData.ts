@@ -176,20 +176,10 @@ export function useContentPadariasData() {
     console.log('💾 saveContentPadariasToDatabase: Iniciando salvamento de', newGroups.length, 'grupos');
     
     try {
-      console.log('💾 Deletando dados antigos...');
-      const { error: deleteError } = await supabase
-        .from('content_padarias_data')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (deleteError) {
-        console.error('❌ Erro ao deletar dados antigos:', deleteError);
-        throw deleteError;
-      }
-      console.log('✅ Dados antigos deletados com sucesso');
-
-      // Para cada grupo, se não tiver itens, ainda precisa ser salvo
-      const dataToInsert = newGroups.flatMap(group => {
+      // Para cada grupo, primeiro inserir os novos dados, depois deletar os antigos
+      const allDataToInsert: any[] = [];
+      
+      for (const group of newGroups) {
         console.log('💾 Processando grupo:', group.name, 'com', group.items.length, 'itens');
         
         if (group.items.length === 0) {
@@ -205,48 +195,71 @@ export function useContentPadariasData() {
             item_data: null as any
           };
           console.log('💾 Criando placeholder para grupo vazio:', placeholder);
-          return [placeholder];
-        }
-        
-        return group.items.map(item => ({
-          group_id: group.id,
-          group_name: group.name,
-          group_color: group.color,
-          elemento: item.elemento,
-          servicos: item.servicos || null,
-          observacoes: item.observacoes || null,
-          attachments: item.attachments || null,
-          item_data: {
-            id: item.id,
+          allDataToInsert.push(placeholder);
+        } else {
+          const groupData = group.items.map(item => ({
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
             elemento: item.elemento,
-            servicos: item.servicos,
-            observacoes: item.observacoes,
-            attachments: item.attachments,
-            ...Object.fromEntries(
-              customColumns.map(col => [col.name, item[col.name] || ''])
-            )
-          }
-        }));
-      });
+            servicos: item.servicos || null,
+            observacoes: item.observacoes || null,
+            attachments: item.attachments || null,
+            item_data: {
+              id: item.id,
+              elemento: item.elemento,
+              servicos: item.servicos,
+              observacoes: item.observacoes,
+              attachments: item.attachments
+            }
+          }));
+          allDataToInsert.push(...groupData);
+        }
+      }
 
-      console.log('💾 Dados para inserir:', dataToInsert.length, 'registros');
-      console.log('💾 Dados completos:', JSON.stringify(dataToInsert, null, 2));
+      console.log('💾 Total de itens para inserir:', allDataToInsert.length);
 
-      if (dataToInsert.length > 0) {
-        console.log('💾 Inserindo dados no banco...');
-        const { data: insertedData, error: insertError } = await supabase
+      // PRIMEIRO inserir todos os novos dados
+      if (allDataToInsert.length > 0) {
+        const { data: insertResult, error: insertError } = await supabase
           .from('content_padarias_data')
-          .insert(dataToInsert)
-          .select();
+          .insert(allDataToInsert)
+          .select('id');
 
         if (insertError) {
-          console.error('❌ Erro ao inserir dados:', insertError);
+          console.error('❌ Erro ao inserir novos dados:', insertError);
           throw insertError;
         }
-        
-        console.log('✅ Dados inseridos com sucesso:', insertedData?.length || 0, 'registros');
+
+        console.log('✅ Novos dados inseridos:', insertResult?.length || 0);
+
+        // SÓ DEPOIS deletar todos os dados antigos (exceto os recém inseridos)
+        const newRecordIds = insertResult?.map(record => record.id) || [];
+        if (newRecordIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('content_padarias_data')
+            .delete()
+            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+
+          if (deleteError) {
+            console.error('❌ Erro ao deletar dados antigos:', deleteError);
+            // Não fazer throw aqui pois os novos dados já foram salvos
+          } else {
+            console.log('✅ Dados antigos deletados com sucesso');
+          }
+        }
       } else {
-        console.log('⚠️ Nenhum dado para inserir');
+        // Se não há dados para inserir, deletar todos os existentes
+        const { error: deleteError } = await supabase
+          .from('content_padarias_data')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (deleteError) {
+          console.error('❌ Erro ao deletar todos os dados:', deleteError);
+          throw deleteError;
+        }
+        console.log('✅ Todos os dados deletados');
       }
 
       console.log('✅ Content padarias data saved successfully');
