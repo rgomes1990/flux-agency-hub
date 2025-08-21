@@ -409,6 +409,26 @@ const useRSGAvaliacoesData = () => {
     }
   }, [queryClient]);
 
+  const deleteMonth = useCallback(async (groupId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('rsg_avaliacoes_data')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (error) throw error;
+
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const updatedGroups = currentGroups.filter(group => group.id !== groupId);
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      
+      toast.success('Mês deletado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao deletar mês:', error);
+      toast.error('Erro ao deletar mês');
+    }
+  }, [queryClient]);
+
   const duplicateMonth = useCallback(async (sourceGroupId: string, newName: string) => {
     try {
       const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];

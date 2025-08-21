@@ -493,16 +493,13 @@ export default function GoogleMyBusiness() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      onSelectItem={(itemId, checked) => {
-                        if (checked) {
-                          setSelectedItems([...selectedItems, itemId]);
-                        } else {
-                          setSelectedItems(selectedItems.filter(id => id !== itemId));
-                        }
-                      }}
+                      columns={customColumns}
+                      onSelectItem={handleSelectItem}
                       onOpenClientDetails={openClientDetails}
                       onUpdateItemStatus={updateItemStatus}
+                      onUpdateClientField={updateClient}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      getClientFiles={() => []}
                       statuses={statuses}
                     />
                   ))}
@@ -689,7 +686,7 @@ export default function GoogleMyBusiness() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={addStatus}
+        onAddStatus={(status) => addStatus(status.name, status.color)}
         onUpdateStatus={updateStatus}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}

@@ -531,16 +531,14 @@ export default function Sites() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      onSelectItem={(itemId, checked) => {
-                        if (checked) {
-                          setSelectedItems([...selectedItems, itemId]);
-                        } else {
-                          setSelectedItems(selectedItems.filter(id => id !== itemId));
-                        }
-                      }}
+                      columns={customColumns}
+                      onSelectItem={handleSelectItem}
                       onOpenClientDetails={openClientDetails}
                       onUpdateItemStatus={updateItemStatus}
+                      onUpdateClientField={updateClient}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      getClientAttachments={() => clientAttachments}
+                      openFilePreview={(file) => console.log('Preview file:', file)}
                       statuses={statuses}
                     />
                   ))}

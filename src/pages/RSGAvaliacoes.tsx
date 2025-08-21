@@ -487,10 +487,13 @@ export default function RSGAvaliacoes() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
+                      columns={customColumns}
                       onSelectItem={handleSelectItem}
                       onOpenClientDetails={openClientDetails}
                       onUpdateItemStatus={updateItemStatus}
+                      onUpdateClientField={updateClient}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      getClientFiles={() => []}
                       statuses={statuses}
                     />
                   ))}
@@ -672,7 +675,7 @@ export default function RSGAvaliacoes() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={addStatus}
+        onAddStatus={(status) => addStatus(status.name, status.color)}
         onUpdateStatus={updateStatus}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
