@@ -64,7 +64,7 @@ export default function GoogleMyBusiness() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles: () => [],
+    getClientFiles,
     applyDefaultObservationsToAllClients
   } = useGoogleMyBusinessData();
   
@@ -490,7 +490,7 @@ export default function GoogleMyBusiness() {
                       onUpdateItemStatus={updateItemStatus}
                       onUpdateClientField={updateClient}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                      getClientFiles={() => []}
+                      getClientFiles={getClientFiles}
                       statuses={statuses}
                     />
                   ))}
@@ -678,7 +678,7 @@ export default function GoogleMyBusiness() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={(status) => addStatus({ id: status.id || crypto.randomUUID(), name: status.name, color: status.color })}
-        onUpdateStatus={updateStatus}
+        onUpdateStatus={(statusId, updates) => updateStatus(statusId, updates)}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />
