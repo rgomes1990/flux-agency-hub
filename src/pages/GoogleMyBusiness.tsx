@@ -13,7 +13,8 @@ import {
   Trash2,
   Menu,
   ChevronUp,
-  ChevronDown as ChevronDownIcon
+  ChevronDown as ChevronDownIcon,
+  Move
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -57,12 +58,14 @@ export default function GoogleMyBusiness() {
     addColumn,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     addClient,
     deleteClient,
     updateClient,
-    moveColumnUp,
-    moveColumnDown
+    getClientFiles: () => [],
+    applyDefaultObservationsToAllClients
   } = useGoogleMyBusinessData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);

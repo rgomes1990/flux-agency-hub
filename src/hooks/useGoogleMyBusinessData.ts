@@ -5,6 +5,7 @@ export interface Status {
   id: string;
   name: string;
   color: string;
+  [key: string]: any;
 }
 
 export interface GoogleMyBusinessItem {
@@ -147,10 +148,17 @@ export function useGoogleMyBusinessData() {
         for (const item of group.items) {
           const { id, elemento, servicos, informacoes, observacoes, status, ...itemData } = item;
 
+          // Convert status to plain object for JSON compatibility
+          const statusObj = {
+            id: status.id,
+            name: status.name,
+            color: status.color
+          };
+
           const { error } = await supabase
             .from('google_my_business_data')
             .update({
-              item_data: { elemento, servicos, informacoes, observacoes, status, ...itemData },
+              item_data: { elemento, servicos, informacoes, observacoes, status: statusObj, ...itemData },
               updated_at: new Date().toISOString()
             })
             .eq('id', id);
@@ -188,6 +196,12 @@ export function useGoogleMyBusinessData() {
       ];
 
       for (const group of defaultGroups) {
+        const statusObj = {
+          id: crypto.randomUUID(),
+          name: 'Pendente',
+          color: 'bg-gray-500'
+        };
+
         const { error } = await supabase
           .from('google_my_business_data')
           .insert({
@@ -198,11 +212,7 @@ export function useGoogleMyBusinessData() {
               elemento: 'Novo Cliente',
               servicos: 'Serviço Padrão',
               informacoes: 'Informações Padrão',
-              status: {
-                id: crypto.randomUUID(),
-                name: 'Pendente',
-                color: 'bg-gray-500'
-              }
+              status: statusObj
             }
           });
 
@@ -231,6 +241,12 @@ export function useGoogleMyBusinessData() {
     try {
       const newGroupId = crypto.randomUUID();
       
+      const statusObj = {
+        id: crypto.randomUUID(),
+        name: 'Pendente',
+        color: 'bg-gray-500'
+      };
+
       const { error } = await supabase
         .from('google_my_business_data')
         .insert({
@@ -241,11 +257,7 @@ export function useGoogleMyBusinessData() {
             elemento: 'Novo Cliente',
             servicos: 'Serviço Padrão',
             informacoes: 'Informações Padrão',
-            status: {
-              id: crypto.randomUUID(),
-              name: 'Pendente',
-              color: 'bg-gray-500'
-            }
+            status: statusObj
           }
         });
 
@@ -335,6 +347,12 @@ export function useGoogleMyBusinessData() {
       const newGroupId = crypto.randomUUID();
 
       for (const item of groupToDuplicate.items) {
+        const statusObj = {
+          id: item.status.id,
+          name: item.status.name,
+          color: item.status.color
+        };
+
         const { error } = await supabase
           .from('google_my_business_data')
           .insert({
@@ -346,7 +364,7 @@ export function useGoogleMyBusinessData() {
               servicos: item.servicos,
               informacoes: item.informacoes,
               observacoes: item.observacoes,
-              status: item.status
+              status: statusObj
             }
           });
 
@@ -390,17 +408,17 @@ export function useGoogleMyBusinessData() {
     }
   };
 
-  const updateStatus = async (status: Status) => {
-    console.log('📝 Atualizando status:', status);
+  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
+    console.log('📝 Atualizando status:', statusId, updates);
     
     try {
       const { error } = await supabase
         .from('status_config')
         .update({
-          status_name: status.name,
-          status_color: status.color
+          status_name: updates.name,
+          status_color: updates.color
         })
-        .eq('status_id', status.id)
+        .eq('status_id', statusId)
         .eq('module', 'google_my_business');
 
       if (error) {
@@ -439,127 +457,13 @@ export function useGoogleMyBusinessData() {
     }
   };
 
-  const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
-    console.log('➕ Adicionando coluna:', columnName, columnType);
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    console.log('📝 Atualizando status do item:', itemId, field, statusId);
     
     try {
-      const { error } = await supabase
-        .from('column_config')
-        .insert({
-          column_id: crypto.randomUUID(),
-          column_name: columnName,
-          column_type: columnType,
-          module: 'google_my_business'
-        });
+      const status = statuses.find(s => s.id === statusId);
+      if (!status) return;
 
-      if (error) {
-        console.error('❌ Erro ao adicionar coluna:', error);
-        throw error;
-      }
-
-      console.log('✅ Coluna adicionada com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao adicionar coluna:', error);
-    }
-  };
-
-  const updateColumn = async (column: Column) => {
-    console.log('📝 Atualizando coluna:', column);
-    
-    try {
-      const { error } = await supabase
-        .from('column_config')
-        .update({
-          column_name: column.name,
-          column_type: column.type
-        })
-        .eq('column_id', column.id)
-        .eq('module', 'google_my_business');
-
-      if (error) {
-        console.error('❌ Erro ao atualizar coluna:', error);
-        throw error;
-      }
-
-      console.log('✅ Coluna atualizada com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao atualizar coluna:', error);
-    }
-  };
-
-  const deleteColumn = async (columnId: string) => {
-    console.log('🗑️ Deletando coluna:', columnId);
-    
-    try {
-      const { error } = await supabase
-        .from('column_config')
-        .delete()
-        .eq('column_id', columnId)
-        .eq('module', 'google_my_business');
-
-      if (error) {
-        console.error('❌ Erro ao deletar coluna:', error);
-        throw error;
-      }
-
-      console.log('✅ Coluna deletada com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao deletar coluna:', error);
-    }
-  };
-
-  const moveColumnUp = async (columnId: string) => {
-    console.log('⬆️ Movendo coluna para cima:', columnId);
-    
-    try {
-      const columnIndex = customColumns.findIndex(column => column.id === columnId);
-      if (columnIndex <= 0) return;
-
-      const newColumns = [...customColumns];
-      const columnToMove = newColumns.splice(columnIndex, 1)[0];
-      newColumns.splice(columnIndex - 1, 0, columnToMove);
-
-      setCustomColumns(newColumns);
-      setColumns(newColumns);
-
-      console.log('✅ Coluna movida para cima com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao mover coluna para cima:', error);
-    }
-  };
-
-  const moveColumnDown = async (columnId: string) => {
-    console.log('⬇️ Movendo coluna para baixo:', columnId);
-    
-    try {
-      const columnIndex = customColumns.findIndex(column => column.id === columnId);
-      if (columnIndex >= customColumns.length - 1) return;
-
-      const newColumns = [...customColumns];
-      const columnToMove = newColumns.splice(columnIndex, 1)[0];
-      newColumns.splice(columnIndex + 1, 0, columnToMove);
-
-      setCustomColumns(newColumns);
-      setColumns(newColumns);
-
-      console.log('✅ Coluna movida para baixo com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao mover coluna para baixo:', error);
-    }
-  };
-
-  const updateItemStatus = async (itemId: string, status: Status) => {
-    console.log('📝 Atualizando status do item:', itemId, status);
-    
-    try {
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item =>
@@ -567,7 +471,7 @@ export function useGoogleMyBusinessData() {
         )
       }));
 
-      updateGroups(updatedGroups);
+      setGroups(updatedGroups);
       await saveGoogleMyBusinessToDatabase(updatedGroups);
 
       console.log('✅ Status do item atualizado com sucesso');
@@ -584,6 +488,12 @@ export function useGoogleMyBusinessData() {
       const newClientId = crypto.randomUUID();
       const group = groups.find(g => g.id === groupId);
       
+      const statusObj = {
+        id: crypto.randomUUID(),
+        name: 'Pendente',
+        color: 'bg-gray-500'
+      };
+
       const { error } = await supabase
         .from('google_my_business_data')
         .insert({
@@ -595,11 +505,7 @@ export function useGoogleMyBusinessData() {
             servicos: client.servicos,
             informacoes: client.informacoes,
             observacoes: client.observacoes,
-            status: {
-              id: crypto.randomUUID(),
-              name: 'Pendente',
-              color: 'bg-gray-500'
-            }
+            status: statusObj
           }
         });
 
@@ -698,17 +604,226 @@ export function useGoogleMyBusinessData() {
     statuses,
     updateGroups,
     createMonth,
-    updateMonth,
-    deleteMonth,
-    duplicateMonth,
+    updateMonth: async (groupId: string, newMonthName: string) => {
+      console.log('📝 Atualizando mês:', groupId, 'para:', newMonthName);
+      
+      try {
+        const updatedGroups = groups.map(group =>
+          group.id === groupId ? { ...group, name: newMonthName + ' - Google My Business' } : group
+        );
+        
+        updateGroups(updatedGroups);
+        await saveGoogleMyBusinessToDatabase(updatedGroups);
+
+        for (const item of updatedGroups.find(g => g.id === groupId)!.items) {
+          const { error } = await supabase
+            .from('google_my_business_data')
+            .update({
+              group_name: newMonthName
+            })
+            .eq('id', item.id);
+
+          if (error) {
+            console.error('❌ Erro ao atualizar nome do grupo nos itens:', error);
+            throw error;
+          }
+        }
+
+        console.log('✅ Mês atualizado com sucesso');
+        await loadGoogleMyBusinessData();
+
+      } catch (error) {
+        console.error('❌ Erro ao atualizar mês:', error);
+      }
+    },
+    deleteMonth: async (groupId: string) => {
+      console.log('🗑️ Deletando mês:', groupId);
+      
+      try {
+        const groupToDelete = groups.find(group => group.id === groupId);
+        if (groupToDelete) {
+          for (const item of groupToDelete.items) {
+            const { error: itemError } = await supabase
+              .from('google_my_business_data')
+              .delete()
+              .eq('id', item.id);
+
+            if (itemError) {
+              console.error('❌ Erro ao deletar item:', item.id, itemError);
+              throw itemError;
+            }
+          }
+        }
+
+        await loadGoogleMyBusinessData();
+        console.log('✅ Mês deletado com sucesso');
+
+      } catch (error) {
+        console.error('❌ Erro ao deletar mês:', error);
+      }
+    },
+    duplicateMonth: async (groupId: string, newMonthName: string) => {
+      console.log(`📄 Duplicando mês ${groupId} para ${newMonthName}`);
+      
+      try {
+        const groupToDuplicate = groups.find(group => group.id === groupId);
+        if (!groupToDuplicate) {
+          console.warn(`⚠️ Grupo ${groupId} não encontrado`);
+          return;
+        }
+
+        const newGroupId = crypto.randomUUID();
+
+        for (const item of groupToDuplicate.items) {
+          const statusObj = {
+            id: item.status.id,
+            name: item.status.name,
+            color: item.status.color
+          };
+
+          const { error } = await supabase
+            .from('google_my_business_data')
+            .insert({
+              group_id: newGroupId,
+              group_name: newMonthName,
+              group_color: groupToDuplicate.color,
+              item_data: {
+                elemento: item.elemento,
+                servicos: item.servicos,
+                informacoes: item.informacoes,
+                observacoes: item.observacoes,
+                status: statusObj
+              }
+            });
+
+          if (error) {
+            console.error('❌ Erro ao duplicar item:', item, error);
+            throw error;
+          }
+        }
+
+        await loadGoogleMyBusinessData();
+        console.log('✅ Mês duplicado com sucesso');
+
+      } catch (error) {
+        console.error('❌ Erro ao duplicar mês:', error);
+      }
+    },
     addStatus,
     updateStatus,
     deleteStatus,
-    addColumn,
-    updateColumn,
-    deleteColumn,
-    moveColumnUp,
-    moveColumnDown,
+    addColumn: async (columnName: string, columnType: 'status' | 'text') => {
+      console.log('➕ Adicionando coluna:', columnName, columnType);
+      
+      try {
+        const { error } = await supabase
+          .from('column_config')
+          .insert({
+            column_id: crypto.randomUUID(),
+            column_name: columnName,
+            column_type: columnType,
+            module: 'google_my_business'
+          });
+
+        if (error) {
+          console.error('❌ Erro ao adicionar coluna:', error);
+          throw error;
+        }
+
+        console.log('✅ Coluna adicionada com sucesso');
+        await loadGoogleMyBusinessData();
+
+      } catch (error) {
+        console.error('❌ Erro ao adicionar coluna:', error);
+      }
+    },
+    updateColumn: async (column: Column) => {
+      console.log('📝 Atualizando coluna:', column);
+      
+      try {
+        const { error } = await supabase
+          .from('column_config')
+          .update({
+            column_name: column.name,
+            column_type: column.type
+          })
+          .eq('column_id', column.id)
+          .eq('module', 'google_my_business');
+
+        if (error) {
+          console.error('❌ Erro ao atualizar coluna:', error);
+          throw error;
+        }
+
+        console.log('✅ Coluna atualizada com sucesso');
+        await loadGoogleMyBusinessData();
+
+      } catch (error) {
+        console.error('❌ Erro ao atualizar coluna:', error);
+      }
+    },
+    deleteColumn: async (columnId: string) => {
+      console.log('🗑️ Deletando coluna:', columnId);
+      
+      try {
+        const { error } = await supabase
+          .from('column_config')
+          .delete()
+          .eq('column_id', columnId)
+          .eq('module', 'google_my_business');
+
+        if (error) {
+          console.error('❌ Erro ao deletar coluna:', error);
+          throw error;
+        }
+
+        console.log('✅ Coluna deletada com sucesso');
+        await loadGoogleMyBusinessData();
+
+      } catch (error) {
+        console.error('❌ Erro ao deletar coluna:', error);
+      }
+    },
+    moveColumnUp: async (columnId: string) => {
+      console.log('⬆️ Movendo coluna para cima:', columnId);
+      
+      try {
+        const columnIndex = customColumns.findIndex(column => column.id === columnId);
+        if (columnIndex <= 0) return;
+
+        const newColumns = [...customColumns];
+        const columnToMove = newColumns.splice(columnIndex, 1)[0];
+        newColumns.splice(columnIndex - 1, 0, columnToMove);
+
+        setCustomColumns(newColumns);
+        setColumns(newColumns);
+
+        console.log('✅ Coluna movida para cima com sucesso');
+
+      } catch (error) {
+        console.error('❌ Erro ao mover coluna para cima:', error);
+      }
+    },
+    moveColumnDown: async (columnId: string) => {
+      console.log('⬇️ Movendo coluna para baixo:', columnId);
+      
+      try {
+        const columnIndex = customColumns.findIndex(column => column.id === columnId);
+        if (columnIndex >= customColumns.length - 1) return;
+
+        const newColumns = [...customColumns];
+        const columnToMove = newColumns.splice(columnIndex, 1)[0];
+        newColumns.splice(columnIndex + 1, 0, columnToMove);
+
+        setCustomColumns(newColumns);
+        setColumns(newColumns);
+
+        console.log('✅ Coluna movida para baixo com sucesso');
+
+      } catch (error) {
+        console.error('❌ Erro ao mover coluna para baixo:', error);
+      }
+    },
     updateItemStatus,
     addClient,
     deleteClient,
