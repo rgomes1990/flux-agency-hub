@@ -95,7 +95,8 @@ export default function ContentPadarias() {
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  
+  const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
+
   const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
@@ -213,8 +214,6 @@ export default function ContentPadarias() {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client) {
       setClientNotes(client.observacoes || '');
-      const files = getClientFiles(clientId);
-      setClientFile(files[0] || null);
       
       // Parse existing observations from client notes
       try {
@@ -227,37 +226,21 @@ export default function ContentPadarias() {
       } catch {
         setClientObservations([]);
       }
+
+      // Parse existing attachments
+      try {
+        const parsedAttachments = JSON.parse(client.attachments || '[]');
+        if (Array.isArray(parsedAttachments)) {
+          setClientAttachments(parsedAttachments);
+        } else {
+          setClientAttachments([]);
+        }
+      } catch {
+        setClientAttachments([]);
+      }
       
       setShowClientDetails(clientId);
     }
-  };
-
-  const saveClientDetails = async () => {
-    if (showClientDetails) {
-      console.log('💾 Salvando detalhes do cliente:', showClientDetails);
-      console.log('📝 Observações a salvar:', clientObservations);
-      console.log('📎 Arquivo a salvar:', clientFile);
-
-      const updates: any = { 
-        observacoes: JSON.stringify(clientObservations) 
-      };
-      
-      if (clientFile) {
-        updates.attachments = [clientFile];
-      }
-      
-      console.log('💾 Updates preparados:', updates);
-      
-      try {
-        await updateClient(showClientDetails, updates);
-        console.log('✅ Cliente salvo com sucesso');
-      } catch (error) {
-        console.error('❌ Erro ao salvar cliente:', error);
-      }
-    }
-    setShowClientDetails(null);
-    setClientObservations([]);
-    setClientFile(null);
   };
 
   const handleMoveClient = (clientId: string, newGroupId: string) => {
@@ -285,7 +268,33 @@ export default function ContentPadarias() {
     setShowFilePreview(true);
   };
 
-  // Drag and drop sensors
+  const handleClientDetailsClose = async (open: boolean) => {
+    if (!open && showClientDetails) {
+      console.log('💾 Salvando detalhes do cliente:', showClientDetails);
+      console.log('📝 Observações a salvar:', clientObservations);
+      console.log('📎 Anexos a salvar:', clientAttachments);
+
+      const updates: any = { 
+        observacoes: JSON.stringify(clientObservations),
+        attachments: JSON.stringify(clientAttachments)
+      };
+      
+      console.log('💾 Updates preparados:', updates);
+      
+      try {
+        await updateClient(showClientDetails, updates);
+        console.log('✅ Cliente salvo com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao salvar cliente:', error);
+      }
+
+      setShowClientDetails(null);
+      setClientObservations([]);
+      setClientAttachments([]);
+      setClientFile(null);
+    }
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -719,12 +728,7 @@ export default function ContentPadarias() {
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
-          onOpenChange={(open) => {
-            if (!open) {
-              console.log('🔄 Fechando modal, salvando dados...');
-              saveClientDetails();
-            }
-          }}
+          onOpenChange={handleClientDetailsClose}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
           onUpdateObservations={(newObservations) => {
@@ -740,7 +744,11 @@ export default function ContentPadarias() {
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
           onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
-          onSave={saveClientDetails}
+          clientAttachments={clientAttachments}
+          onUpdateAttachments={(attachments) => {
+            console.log('📎 Atualizando anexos:', attachments);
+            setClientAttachments(attachments);
+          }}
         />
       )}
 
