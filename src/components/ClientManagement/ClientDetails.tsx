@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Move, Paperclip, Eye, Upload, Edit } from 'lucide-react';
 import { ClientAttachments } from './ClientAttachments';
 import { AttachmentViewer } from '@/components/AttachmentViewer';
+import { FormattedObservation } from './FormattedObservation';
 
 interface Observation {
   id: string;
@@ -210,14 +210,15 @@ export function ClientDetails({
                             </div>
                           </div>
                         ) : (
-                          <p 
-                            className={`text-sm break-words cursor-pointer hover:text-blue-600 ${
-                              obs.completed ? 'line-through text-gray-500' : 'text-gray-700'
-                            }`}
+                          <div 
+                            className="cursor-pointer hover:text-blue-600"
                             onClick={() => startEditingObservation(obs.id, obs.text)}
                           >
-                            {obs.text}
-                          </p>
+                            <FormattedObservation 
+                              text={obs.text} 
+                              completed={obs.completed}
+                            />
+                          </div>
                         )}
                       </div>
                       <Button
@@ -242,23 +243,25 @@ export function ClientDetails({
               </div>
             </div>
 
-            {/* Anexos */}
-            <div className="bg-white border rounded-lg">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h4 className="font-medium text-gray-900 flex items-center">
-                  <Paperclip className="h-4 w-4 mr-2 text-blue-600" />
-                  Anexos ({clientAttachments.length})
-                </h4>
+            {/* Anexos - Only show if clientAttachments is not undefined */}
+            {clientAttachments !== undefined && (
+              <div className="bg-white border rounded-lg">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h4 className="font-medium text-gray-900 flex items-center">
+                    <Paperclip className="h-4 w-4 mr-2 text-blue-600" />
+                    Anexos ({clientAttachments.length})
+                  </h4>
+                </div>
+                
+                <div className="p-4">
+                  <ClientAttachments
+                    attachments={clientAttachments}
+                    onUpdateAttachments={onUpdateAttachments}
+                    onFileChange={onFileChange}
+                  />
+                </div>
               </div>
-              
-              <div className="p-4">
-                <ClientAttachments
-                  attachments={clientAttachments}
-                  onUpdateAttachments={onUpdateAttachments}
-                  onFileChange={onFileChange}
-                />
-              </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

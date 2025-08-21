@@ -235,18 +235,8 @@ export default function GoogleMyBusiness() {
         setClientObservations([]);
       }
 
-      try {
-        let attachmentsToSet = [];
-        if (typeof client.attachments === 'string') {
-          const parsed = JSON.parse(client.attachments);
-          attachmentsToSet = Array.isArray(parsed) ? parsed : [];
-        } else if (Array.isArray(client.attachments)) {
-          attachmentsToSet = client.attachments;
-        }
-        setClientAttachments(attachmentsToSet);
-      } catch {
-        setClientAttachments([]);
-      }
+      // Não definir anexos para GMB
+      setClientAttachments([]);
       
       setShowClientDetails(clientId);
     }
@@ -259,9 +249,7 @@ export default function GoogleMyBusiness() {
           observacoes: JSON.stringify(clientObservations)
         };
 
-        if (clientAttachments && clientAttachments.length > 0) {
-          updates.attachments = clientAttachments;
-        }
+        // Não incluir attachments para GMB
         
         await updateClient(showClientDetails, updates);
       } catch (error) {
@@ -692,22 +680,116 @@ export default function GoogleMyBusiness() {
         existingStatuses={statuses}
       />
 
-      {/* Client Details Modal */}
+      {/* Client Details Modal - Modified to exclude attachments */}
       {showClientDetails && (
-        <ClientDetails
-          open={!!showClientDetails}
-          onOpenChange={handleClientDetailsClose}
-          clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
-          observations={clientObservations}
-          onUpdateObservations={setClientObservations}
-          clientFile={clientFile}
-          onFileChange={setClientFile}
-          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
-          currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails, newGroupId)}
-          clientAttachments={clientAttachments}
-          onUpdateAttachments={setClientAttachments}
-        />
+        <Dialog open={!!showClientDetails} onOpenChange={handleClientDetailsClose}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold text-gray-900">
+                Detalhes do Cliente: {groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6 mt-6">
+              {/* Mover Cliente */}
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-700 flex items-center">
+                    <Move className="h-4 w-4 mr-2 text-blue-600" />
+                    Mover para outro mês
+                  </label>
+                  <select
+                    value={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
+                    onChange={(e) => handleMoveClient(showClientDetails, e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div className="bg-white border rounded-lg">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h4 className="font-medium text-gray-900 flex items-center">
+                    <Edit className="h-4 w-4 mr-2 text-blue-600" />
+                    Observações ({clientObservations.length})
+                  </h4>
+                </div>
+                
+                <div className="p-4 space-y-4">
+                  {/* Adicionar Nova Observação */}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Nova observação..."
+                      value=""
+                      onChange={() => {}}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={() => {}} 
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Lista de Observações */}
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {clientObservations.map((obs) => (
+                      <div 
+                        key={obs.id} 
+                        className="flex items-start space-x-3 p-3 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+                      >
+                        <Checkbox
+                          checked={obs.completed}
+                          onCheckedChange={() => {
+                            const updated = clientObservations.map(o => 
+                              o.id === obs.id ? { ...o, completed: !o.completed } : o
+                            );
+                            setClientObservations(updated);
+                          }}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm break-words ${
+                            obs.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                          }`}>
+                            {obs.text}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            const updated = clientObservations.filter(o => o.id !== obs.id);
+                            setClientObservations(updated);
+                          }}
+                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {clientObservations.length === 0 && (
+                    <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                      <Edit className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">Nenhuma observação adicionada</p>
+                      <p className="text-xs text-gray-400">Adicione observações para acompanhar o progresso</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Confirmation Dialogs */}
