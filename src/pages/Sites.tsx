@@ -1,57 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import { useSitesData } from '@/hooks/useSitesData';
+import { SortableSitesRow } from '@/components/ClientManagement/SortableSitesRow';
+import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
+import { AddServiceModal } from '@/components/ServiceManagement/AddServiceModal';
+import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Plus, 
-  ChevronDown, 
-  ChevronRight,
-  Settings,
-  Edit,
-  Trash2,
-  Paperclip,
-  Eye,
-  Menu,
-  RefreshCw
-} from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableSitesRow } from '@/components/ClientManagement/SortableSitesRow';
+import { Plus, Settings } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useSitesData } from '@/hooks/useSitesData';
-import { StatusButton } from '@/components/ServiceManagement/StatusButton';
-import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
-import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { FilePreview } from '@/components/FilePreview';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
-import { useUndo } from '@/contexts/UndoContext';
+interface SitesData {
+  id: string;
+  elemento: string;
+  status: string;
+  responsavel: string;
+  link: string;
+  login: string;
+  senha: string;
+  observacoes: string;
+  groupId: string;
+  attachments?: Array<{
+    name: string;
+    path?: string;
+    size?: number;
+    type: string;
+    data?: string;
+  }>;
+}
 
 export default function Sites() {
-  const isMobile = useIsMobile();
-  const { 
-    groups, 
-    columns,
-    customColumns, // Use customColumns for management interface
+  const {
+    groups,
     statuses,
-    updateGroups, 
-    createMonth, 
+    isLoading,
+    addClient,
+    updateClient,
+    deleteClient,
+    updateItemStatus,
+    updateGroups,
     updateMonth,
     deleteMonth,
-    addStatus,
-    updateStatus,
-    deleteStatus,
-    addColumn,
-    updateColumn,
-    deleteColumn,
-    updateItemStatus,
-    addClient,
-    deleteClient,
-    updateClient,
-    getClientFiles
+    duplicateMonth
   } = useSitesData();
+
+  const [selectedClient, setSelectedClient] = useState<SitesData | null>(null);
+  const [clientObservations, setClientObservations] = useState<{ id: string; text: string; completed: boolean; }[]>([]);
+  const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
+  const [isCustomStatusModalOpen, setIsCustomStatusModalOpen] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [clientFile, setClientFile] = useState<File | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -59,605 +58,193 @@ export default function Sites() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-  
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [newMonthName, setNewMonthName] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showClientDialog, setShowClientDialog] = useState(false);
-  const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
-  const [showColumnDialog, setShowColumnDialog] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientServices, setNewClientServices] = useState('');
-  const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
-  const [clientNotes, setClientNotes] = useState('');
-  const [clientFile, setClientFile] = useState<File | { name: string; data: string; type: string; size?: number } | null>(null);
-  const [newColumnName, setNewColumnName] = useState('');
-  const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [showFilePreview, setShowFilePreview] = useState(false);
-  const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
-  const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
-  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
-  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  
-  const { addUndoAction } = useUndo();
 
-  const toggleGroup = (groupId: string) => {
-    updateGroups(groups.map(group => 
-      group.id === groupId 
-        ? { ...group, isExpanded: !group.isExpanded }
-        : group
-    ));
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = groups.flatMap(group => group.items.map(item => item.id));
-      setSelectedItems(allIds);
+  useEffect(() => {
+    if (selectedClient) {
+      setClientObservations(selectedClient.observacoes ? JSON.parse(selectedClient.observacoes) : []);
     } else {
-      setSelectedItems([]);
+      setClientObservations([]);
     }
-  };
+  }, [selectedClient]);
 
-  const handleSelectItem = (itemId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedItems([...selectedItems, itemId]);
-    } else {
-      setSelectedItems(selectedItems.filter(id => id !== itemId));
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const activeId = active.id as string;
+      const overId = over.id as string;
+
+      const activeGroup = groups.find(group => group.items.some(item => item.id === activeId));
+      const overGroup = groups.find(group => group.items.some(item => item.id === overId));
+
+      if (!activeGroup || !overGroup) return;
+
+      if (activeGroup.id === overGroup.id) {
+        const newItems = arrayMove(activeGroup.items, activeGroup.items.findIndex(item => item.id === activeId), activeGroup.items.findIndex(item => item.id === overId));
+
+        const newGroups = groups.map(group =>
+          group.id === activeGroup.id ? { ...group, items: newItems } : group
+        );
+
+        updateGroups(newGroups);
+      } else {
+        const activeItem = activeGroup.items.find(item => item.id === activeId);
+        const overItem = overGroup.items.find(item => item.id === overId);
+
+        if (!activeItem || !overItem) return;
+
+        const newActiveGroupItems = activeGroup.items.filter(item => item.id !== activeId);
+        const newOverGroupItems = [...overGroup.items.slice(0, overGroup.items.findIndex(item => item.id === overId)), activeItem, ...overGroup.items.slice(overGroup.items.findIndex(item => item.id === overId))];
+
+        const newGroups = groups.map(group => {
+          if (group.id === activeGroup.id) {
+            return { ...group, items: newActiveGroupItems };
+          } else if (group.id === overGroup.id) {
+            return { ...group, items: newOverGroupItems };
+          }
+          return group;
+        });
+
+        updateGroups(newGroups);
+      }
     }
   };
 
   const handleCreateMonth = () => {
-    if (!newMonthName.trim()) return;
-    
-    const monthName = newMonthName;
-    createMonth(monthName);
-    
-    console.log('Creating month:', monthName, 'Adding undo action');
-    addUndoAction(`Criação do tipo de projeto "${monthName}"`, () => {
-      console.log('Executing undo for month creation:', monthName);
-      // Actually undo the month creation by deleting it
-      deleteMonth(groups.find(g => g.name === monthName)?.id || '');
-    });
-    
-    setNewMonthName('');
-    setShowCreateDialog(false);
-  };
-
-
-  const handleCreateClient = () => {
-    if (!newClientName.trim() || !selectedGroupForClient) return;
-    
-    addClient(selectedGroupForClient, {
-      elemento: newClientName,
-      servicos: newClientServices
-    });
-    
-    setNewClientName('');
-    setNewClientServices('');
-    setSelectedGroupForClient('');
-    setShowClientDialog(false);
-  };
-
-  const handleCreateColumn = () => {
-    if (!newColumnName.trim()) return;
-    
-    addColumn(newColumnName, newColumnType);
-    setNewColumnName('');
-    setNewColumnType('status');
-    setShowColumnDialog(false);
-  };
-
-  const handleDeleteClient = (clientId: string) => {
-    deleteClient(clientId);
-    setConfirmDelete(null);
-  };
-
-  const handleDeleteColumn = (columnId: string) => {
-    deleteColumn(columnId);
-    setConfirmDelete(null);
-  };
-
-  const handleEditMonth = (groupId: string) => {
-    const group = groups.find(g => g.id === groupId);
-    if (group) {
-      const nameWithoutSuffix = group.name.replace(' - SITES', '').replace('SITES - ', '');
-      setEditingMonth({ id: groupId, name: nameWithoutSuffix });
-      setShowEditMonthDialog(true);
+    const monthName = prompt('Digite o nome do novo mês:');
+    if (monthName) {
+      // createMonth(monthName);
     }
   };
 
-  const handleUpdateMonth = () => {
-    if (editingMonth && editingMonth.name.trim()) {
-      updateMonth(editingMonth.id, editingMonth.name);
-      setEditingMonth(null);
-      setShowEditMonthDialog(false);
+  const handleDuplicateMonth = (groupId: string) => {
+    const newMonthName = prompt('Digite o nome para o novo mês (cópia):');
+    if (newMonthName) {
+      duplicateMonth(groupId, newMonthName);
     }
   };
 
-  const handleDeleteMonth = (groupId: string) => {
-    deleteMonth(groupId);
-    setConfirmDelete(null);
-  };
-
-  const openClientDetails = (clientId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    if (client) {
-      setClientNotes(client.observacoes || '');
-      const files = getClientFiles(clientId);
-      setClientFile(files[0] || null);
-      
-      // Parse existing observations from client notes
-      try {
-        const parsed = JSON.parse(client.observacoes || '[]');
-        if (Array.isArray(parsed)) {
-          setClientObservations(parsed);
-        } else {
-          setClientObservations([]);
-        }
-      } catch {
-        setClientObservations([]);
-      }
-      
-      setShowClientDetails(clientId);
-    }
-  };
-
-  const saveClientDetails = async () => {
-    if (showClientDetails) {
-      const updates: any = { 
-        observacoes: JSON.stringify(clientObservations) 
-      };
-      
-      if (clientFile) {
-        updates.attachments = [clientFile];
-      }
-      
-      await updateClient(showClientDetails, updates);
-    }
-    setShowClientDetails(null);
-    setClientObservations([]);
-    setClientFile(null);
-  };
-
-  const handleMoveClient = async (clientId: string, newGroupId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
-    
-    if (client && oldGroup) {
-      const originalGroupId = oldGroup.id; // Store the original group ID for undo
-      
-      try {
-        console.log(`🔄 Movendo cliente ${client.elemento} de ${oldGroup.name} para grupo ${newGroupId}`);
-        
-        // Create updated groups by moving the client (preserving original ID and all data)
-        const newGroups = groups.map(group => {
-          if (group.id === oldGroup.id) {
-            // Remove from old group
-            return {
-              ...group,
-              items: group.items.filter(item => item.id !== clientId)
-            };
-          } else if (group.id === newGroupId) {
-            // Add to new group with original ID and all data preserved
-            return {
-              ...group,
-              items: [...group.items.filter(item => item.id !== clientId), { ...client }]
-            };
-          }
-          return group;
-        });
-        
-        // Update state and save to database
-        await updateGroups(newGroups);
-        
-        addUndoAction(`Moveu cliente "${client.elemento}" para outro tipo de projeto`, async () => {
-          // Actually undo the client move by moving it back
-          await handleMoveClient(clientId, originalGroupId);
-        });
-        
-        setShowClientDetails(null);
-        console.log(`✅ Cliente ${client.elemento} movido com sucesso, preservando ID ${clientId} e todos os status`);
-      } catch (error) {
-        console.error('❌ Erro ao mover cliente:', error);
+  const handleAddClient = () => {
+    if (newClientName.trim() !== '') {
+      const selectedGroupId = prompt('Digite o ID do grupo (mês) para adicionar este cliente:');
+      if (selectedGroupId) {
+        addClient(selectedGroupId, { elemento: newClientName });
+        setNewClientName('');
       }
     }
   };
 
-  const openFilePreview = (file: File) => {
-    setPreviewFile(file);
-    setShowFilePreview(true);
+  const handleDeleteClient = (itemId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
+      deleteClient(itemId);
+    }
   };
 
-  const getClientAttachments = (clientId: string) => {
-    return getClientFiles(clientId);
+  const handleUpdateStatus = (itemId: string, statusId: string) => {
+    updateItemStatus(itemId, 'status', statusId);
   };
 
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+  const handleMoveClient = (newGroupId: string) => {
+    if (selectedClient) {
+      updateClient(selectedClient.id, { groupId: newGroupId });
+      setSelectedClient(null);
+    }
+  };
 
-    const activeGroupId = active.data.current?.groupId;
-    if (!activeGroupId) return;
+  const handleFileChange = (file: File | null) => {
+    setClientFile(file);
+  };
 
-    const newGroups = [...groups];
-    const activeGroupIndex = newGroups.findIndex(g => g.id === activeGroupId);
-    if (activeGroupIndex === -1) return;
-
-    const activeGroup = newGroups[activeGroupIndex];
-    const activeItemIndex = activeGroup.items.findIndex(item => item.id === active.id);
-    if (activeItemIndex === -1) return;
-
-    const [movedItem] = activeGroup.items.splice(activeItemIndex, 1);
-    const overItemIndex = activeGroup.items.findIndex(item => item.id === over.id);
-    const insertIndex = overItemIndex === -1 ? activeGroup.items.length : overItemIndex;
-    activeGroup.items.splice(insertIndex, 0, movedItem);
-
-    updateGroups(newGroups);
+  const handleUpdateAttachments = (attachments: any[]) => {
+    if (selectedClient) {
+      updateClient(selectedClient.id, { attachments });
+    }
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-gray-900">Criação de Sites</h1>
-            <div className="text-xs text-gray-500">
-              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
-            </div>
-          </div>
-          {isMobile && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowMobileToolbar(!showMobileToolbar)}
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.reload()}
-            className="ml-2"
-          >
-            <RefreshCw className="h-4 w-4" />
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold">Sites</h1>
+        <div className="space-x-2">
+          <Button onClick={() => setIsAddServiceModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Serviço
           </Button>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className={`bg-white border-b border-gray-200 px-4 py-2 ${isMobile && !showMobileToolbar ? 'hidden' : ''}`}>
-        <div className={`${isMobile ? 'flex flex-col space-y-2' : 'flex items-center space-x-2'}`}>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className={isMobile ? 'w-full' : ''}>
-                <Plus className="h-4 w-4 mr-1" />
-                Tipo de Projeto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
-              <DialogHeader>
-                <DialogTitle>Criar Novo Tipo de Projeto</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Nome do tipo de projeto"
-                  value={newMonthName}
-                  onChange={(e) => setNewMonthName(e.target.value)}
-                />
-                <div className="flex space-x-2">
-                  <Button onClick={handleCreateMonth} className="bg-green-600 hover:bg-green-700 flex-1">
-                    Criar
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setShowClientDialog(true)}
-            className={isMobile ? 'w-full' : ''}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Novo Cliente
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setShowColumnDialog(true)}
-            className={isMobile ? 'w-full' : ''}
-          >
-            <Settings className="h-4 w-4 mr-1" />
-            Gerenciar Colunas
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setShowStatusModal(true)}
-            className={isMobile ? 'w-full' : ''}
-          >
-            <Settings className="h-4 w-4 mr-1" />
+          <Button onClick={() => setIsCustomStatusModalOpen(true)}>
+            <Settings className="h-4 w-4 mr-2" />
             Gerenciar Status
           </Button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
-          {/* Table Header */}
-          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-            <div className="flex items-center min-w-max">
-              <div className="w-8 flex items-center justify-center p-2">
-                <Checkbox
-                  checked={selectedItems.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </div>
-              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              
-              {columns.map((column) => (
-                <div key={column.id} className="w-32 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
-                  {column.name}
-                </div>
-              ))}
-              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
-            </div>
-          </div>
+      <div className="flex items-center space-x-4 mb-4">
+        <Input
+          type="text"
+          placeholder="Nome do novo cliente"
+          value={newClientName}
+          onChange={(e) => setNewClientName(e.target.value)}
+        />
+        <Button onClick={handleAddClient}>Adicionar Cliente</Button>
+      </div>
 
-          {/* Table Body */}
+      <DndContext
+        modifiers={[restrictToVerticalAxis]}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="space-y-4">
           {groups.map((group) => (
-            <div key={group.id}>
-              {/* Group Header */}
-              <div className="bg-green-50 border-b border-gray-200 hover:bg-green-100 transition-colors">
-                <div className="flex items-center min-w-max">
-                  <div className="w-8 flex items-center justify-center p-2">
-                    <button onClick={() => toggleGroup(group.id)}>
-                      {group.isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex items-center space-x-2 p-2 flex-1">
-                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name.replace(' - SITES', '').replace('SITES - ', '')}</span>
-                  </div>
-                  <div className="flex items-center space-x-1 p-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditMonth(group.id)}
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+            <div key={group.id} className="border rounded-md p-4">
+              <h2 className="text-xl font-semibold mb-2">{group.name}</h2>
+              <SortableContext
+                id={group.id}
+                items={group.items.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="grid grid-cols-7 gap-4">
+                  <div className="font-semibold">Cliente</div>
+                  <div className="font-semibold">Status</div>
+                  <div className="font-semibold">Responsável</div>
+                  <div className="font-semibold">Link</div>
+                  <div className="font-semibold">Login</div>
+                  <div className="font-semibold">Senha</div>
+                  <div className="font-semibold">Ações</div>
+                  {group.items.map((item) => (
+                    <SortableSitesRow
+                      key={item.id}
+                      id={item.id}
+                      item={item}
+                      statuses={statuses}
+                      onUpdateStatus={handleUpdateStatus}
+                      onDelete={handleDeleteClient}
+                      onEdit={() => setSelectedClient({ ...item, groupId: group.id })}
+                    />
+                  ))}
                 </div>
-              </div>
-
-              {/* Group Items */}
-              {group.isExpanded && (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={group.items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                    {group.items.map((item, index) => (
-                      <SortableSitesRow
-                        key={item.id}
-                        item={item}
-                        groupId={group.id}
-                        index={index}
-                        selectedItems={selectedItems}
-                        columns={columns}
-                        onSelectItem={handleSelectItem}
-                        onOpenClientDetails={openClientDetails}
-                        onUpdateItemStatus={updateItemStatus}
-                        onUpdateClientField={updateClient}
-                        onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                        getClientAttachments={getClientAttachments}
-                        openFilePreview={openFilePreview}
-                        statuses={statuses}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              )}
+              </SortableContext>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Dialogs */}
-
-      <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
-        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
-          <DialogHeader>
-            <DialogTitle>Novo Cliente</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Nome do cliente"
-              value={newClientName}
-              onChange={(e) => setNewClientName(e.target.value)}
-            />
-            <select 
-              className="w-full p-2 border rounded-md text-sm"
-              value={selectedGroupForClient}
-              onChange={(e) => setSelectedGroupForClient(e.target.value)}
-            >
-              <option value="">Selecione um tipo de projeto</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex space-x-2">
-              <Button onClick={handleCreateClient} className="bg-green-600 hover:bg-green-700 flex-1">
-                Criar
-              </Button>
-              <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
-          <DialogHeader>
-            <DialogTitle>Gerenciar Colunas</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <Input
-                placeholder="Nome da coluna"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-              />
-              <select 
-                className="w-full p-2 border rounded-md text-sm"
-                value={newColumnType}
-                onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
-              >
-                <option value="status">Status</option>
-                <option value="text">Texto</option>
-              </select>
-              <Button onClick={handleCreateColumn} className="w-full bg-green-600 hover:bg-green-700">
-                Adicionar Coluna
-              </Button>
-            </div>
-            
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-2">Colunas Existentes</h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {customColumns.map((column) => (
-                  <div key={column.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm">{column.name} ({column.type})</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <Button variant="outline" onClick={() => setShowColumnDialog(false)} className="w-full">
-              Fechar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
-        <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
-          <DialogHeader>
-            <DialogTitle>Editar Tipo de Projeto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Nome do tipo de projeto"
-              value={editingMonth?.name || ''}
-              onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
-            />
-            <div className="flex space-x-2">
-              <Button onClick={handleUpdateMonth} className="bg-green-600 hover:bg-green-700 flex-1">
-                Atualizar
-              </Button>
-              <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      </DndContext>
 
       <ClientDetails
-        open={!!showClientDetails}
-        onOpenChange={() => setShowClientDetails(null)}
-        clientName={showClientDetails ? groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || '' : ''}
+        open={selectedClient !== null}
+        onOpenChange={(open) => !open && setSelectedClient(null)}
+        clientName={selectedClient?.elemento || ''}
         observations={clientObservations}
-        onUpdateObservations={(newObservations) => {
-          setClientObservations(newObservations);
-          // Save observations to database
-          if (showClientDetails) {
-            const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
-            if (clientItem) {
-              updateClient(showClientDetails, { observacoes: JSON.stringify(newObservations) });
-            }
-          }
-        }}
+        onUpdateObservations={setClientObservations}
         clientFile={clientFile}
-        onFileChange={setClientFile}
-        onFilePreview={openFilePreview}
-        availableGroups={groups}
-        currentGroupId={showClientDetails ? groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || '' : ''}
-        onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
-        clientAttachments={showClientDetails ? groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || [] : []}
-        onUpdateAttachments={(attachments) => {
-          // Save attachments automatically to database
-          if (showClientDetails) {
-            updateClient(showClientDetails, { attachments });
-          }
-        }}
+        onFileChange={handleFileChange}
+        availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
+        currentGroupId={selectedClient?.groupId || ''}
+        onMoveClient={handleMoveClient}
+        clientAttachments={selectedClient?.attachments || []}
+        onUpdateAttachments={handleUpdateAttachments}
       />
 
-      <CustomStatusModal
-        open={showStatusModal}
-        onOpenChange={(open) => setShowStatusModal(open)}
-        onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
-        onDeleteStatus={deleteStatus}
-        existingStatuses={statuses}
-      />
-
-      <ConfirmationDialog
-        open={!!confirmDelete}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
-        onConfirm={() => {
-          if (confirmDelete?.type === 'client') {
-            handleDeleteClient(confirmDelete.id);
-          } else if (confirmDelete?.type === 'column') {
-            handleDeleteColumn(confirmDelete.id);
-          } else if (confirmDelete?.type === 'month') {
-            handleDeleteMonth(confirmDelete.id);
-          }
-        }}
-        title={`Confirmar ${confirmDelete?.type === 'client' ? 'Exclusão de Cliente' : confirmDelete?.type === 'column' ? 'Exclusão de Coluna' : 'Exclusão de Tipo de Projeto'}`}
-        message={`Tem certeza que deseja excluir este ${confirmDelete?.type === 'client' ? 'cliente' : confirmDelete?.type === 'column' ? 'coluna' : 'tipo de projeto'}? Esta ação não pode ser desfeita.`}
-      />
-
-      <FilePreview
-        open={showFilePreview}
-        onOpenChange={(open) => setShowFilePreview(open)}
-        file={previewFile}
-      />
+      <AddServiceModal open={isAddServiceModalOpen} onOpenChange={setIsAddServiceModalOpen} />
+      <CustomStatusModal open={isCustomStatusModalOpen} onOpenChange={setIsCustomStatusModalOpen} />
     </div>
   );
 }
