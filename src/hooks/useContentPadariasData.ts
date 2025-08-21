@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -528,7 +529,7 @@ export function useContentPadariasData() {
               return fileName;
             }
             // Se é um objeto serializado (já existente)
-            else if (typeof attachment === 'object' && attachment.name) {
+            else if (typeof attachment === 'object' && attachment !== null && 'name' in attachment) {
               return attachment; // Manter como está
             }
             // Se é uma string (path do arquivo)
@@ -544,8 +545,8 @@ export function useContentPadariasData() {
         } catch (uploadError) {
           console.error('Erro no upload de arquivos:', uploadError);
           // Continuar sem os anexos se houver erro
-          processedAttachments = updates.attachments.filter(att => 
-            typeof att === 'string' || (typeof att === 'object' && att.name && !att instanceof File)
+          processedAttachments = (updates.attachments || []).filter((att: any) => 
+            typeof att === 'string' || (typeof att === 'object' && att !== null && 'name' in att && !(att instanceof File))
           );
         }
       }
