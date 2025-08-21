@@ -608,6 +608,46 @@ export const useGoogleMyBusinessData = () => {
     }
   };
 
+  const moveColumnUp = async (columnId: string) => {
+    try {
+      const currentIndex = customColumns.findIndex(col => col.id === columnId);
+      if (currentIndex > 0) {
+        const newColumns = [...customColumns];
+        [newColumns[currentIndex], newColumns[currentIndex - 1]] = 
+        [newColumns[currentIndex - 1], newColumns[currentIndex]];
+        
+        setCustomColumns(newColumns);
+        setColumns(newColumns);
+        
+        // Update order in database - this would need additional schema changes
+        console.log('Column moved up:', columnId);
+      }
+    } catch (error) {
+      console.error('❌ GMB: Erro ao mover coluna para cima:', error);
+      throw error;
+    }
+  };
+
+  const moveColumnDown = async (columnId: string) => {
+    try {
+      const currentIndex = customColumns.findIndex(col => col.id === columnId);
+      if (currentIndex < customColumns.length - 1) {
+        const newColumns = [...customColumns];
+        [newColumns[currentIndex], newColumns[currentIndex + 1]] = 
+        [newColumns[currentIndex + 1], newColumns[currentIndex]];
+        
+        setCustomColumns(newColumns);
+        setColumns(newColumns);
+        
+        // Update order in database - this would need additional schema changes
+        console.log('Column moved down:', columnId);
+      }
+    } catch (error) {
+      console.error('❌ GMB: Erro ao mover coluna para baixo:', error);
+      throw error;
+    }
+  };
+
   return {
     groups,
     columns,
@@ -629,6 +669,8 @@ export const useGoogleMyBusinessData = () => {
     addClient,
     addColumn,
     addStatus,
+    moveColumnUp,
+    moveColumnDown,
     updateMonth: async (groupId: string, newName: string) => {
       try {
         const newGroups = groups.map(group => 

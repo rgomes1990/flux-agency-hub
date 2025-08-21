@@ -686,7 +686,7 @@ export default function GoogleMyBusiness() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={(status) => addStatus(status.name, status.color)}
+        onAddStatus={(status) => addStatus({ id: status.id || crypto.randomUUID(), name: status.name, color: status.color })}
         onUpdateStatus={updateStatus}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
