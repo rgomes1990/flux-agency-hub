@@ -113,159 +113,6 @@ export const useGoogleMyBusinessData = () => {
     }
   };
 
-  // Carregar dados do Google My Business
-  const loadGoogleMyBusinessData = async () => {
-    try {
-      console.log('🔄 GMB: Carregando dados');
-      
-      const { data, error } = await (supabase as any)
-        .from('google_my_business_data')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      console.log('📊 GMB: Resposta dados:', { 
-        dataLength: data?.length || 0, 
-        error,
-        sampleData: data?.[0] 
-      });
-
-      if (error && error.code !== 'PGRST116') { // 116 = table doesn't exist
-        console.error('❌ GMB: Erro ao carregar dados:', error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const groupsMap = new Map<string, GoogleMyBusinessGroup>();
-
-        data.forEach((item: any, index: number) => {
-          console.log(`🔍 GMB: Processando item ${index + 1}:`, {
-            group_id: item.group_id,
-            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
-          });
-
-          let itemData;
-          try {
-            if (typeof item.item_data === 'string') {
-              itemData = JSON.parse(item.item_data);
-            } else {
-              itemData = item.item_data;
-            }
-          } catch (parseError) {
-            console.error('❌ GMB: Erro ao fazer parse do item_data:', parseError);
-            return;
-          }
-          
-          if (!groupsMap.has(item.group_id)) {
-            groupsMap.set(item.group_id, {
-              id: item.group_id,
-              name: item.group_name,
-              color: item.group_color || 'bg-blue-500',
-              isExpanded: item.is_expanded,
-              items: []
-            });
-          }
-
-          const group = groupsMap.get(item.group_id)!;
-          if (itemData && itemData.id && itemData.id !== `empty-${item.group_id}`) {
-            group.items.push(itemData);
-          }
-        });
-
-        const loadedGroups = Array.from(groupsMap.values());
-        console.log('✅ GMB: Grupos carregados:', {
-          totalGroups: loadedGroups.length,
-          groupDetails: loadedGroups.map(g => ({ name: g.name, itemCount: g.items.length }))
-        });
-        setGroups(loadedGroups);
-      } else {
-        setGroups([]);
-        console.log('ℹ️ GMB: Nenhum dado encontrado');
-      }
-    } catch (error) {
-      console.error('❌ GMB: Erro crítico ao carregar dados:', error);
-    }
-  };
-
-  // Salvar dados no Supabase
-  const saveGoogleMyBusinessToDatabase = async (newGroups: GoogleMyBusinessGroup[]) => {
-    try {
-      console.log('🔄 GMB: Iniciando salvamento:', {
-        groupCount: newGroups.length,
-        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
-      });
-      
-      for (const group of newGroups) {
-        console.log(`🔄 GMB: Processando grupo: ${group.name} (${group.items.length} itens)`);
-        
-        // Sempre inserir dados do grupo
-        const insertData = group.items.length > 0 
-          ? group.items.map((item, index) => {
-              console.log(`📝 GMB: Preparando item ${index + 1}:`, {
-                id: item.id,
-                elemento: item.elemento
-              });
-
-              return {
-                group_id: group.id,
-                group_name: group.name,
-                group_color: group.color,
-                is_expanded: group.isExpanded,
-                item_data: item,
-                user_id: null // Sempre null para tornar global
-              };
-            })
-          : [{
-              group_id: group.id,
-              group_name: group.name,
-              group_color: group.color,
-              is_expanded: group.isExpanded,
-              item_data: {
-                id: `empty-${group.id}`,
-                elemento: '',
-                servicos: '',
-                informacoes: '',
-                observacoes: '',
-                attachments: []
-              },
-              user_id: null // Sempre null para tornar global
-            }];
-
-        // PRIMEIRO inserir os novos dados
-        const { data: insertResult, error: insertError } = await (supabase as any)
-          .from('google_my_business_data')
-          .insert(insertData)
-          .select('id');
-
-        if (insertError) {
-          console.error('❌ GMB: Erro ao inserir:', insertError);
-          throw insertError;
-        }
-
-        console.log('✅ GMB: Dados inseridos:', insertResult?.length || 0);
-
-        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
-        const newRecordIds = insertResult?.map(record => record.id) || [];
-        if (newRecordIds.length > 0) {
-          const { error: deleteError } = await (supabase as any)
-            .from('google_my_business_data')
-            .delete()
-            .eq('group_id', group.id)
-            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
-
-          if (deleteError) {
-            console.error('❌ GMB: Erro ao deletar dados antigos:', deleteError);
-            // Não fazer throw aqui pois os novos dados já foram salvos
-          }
-        }
-      }
-      
-      console.log('🎉 GMB: Salvamento completo!');
-    } catch (error) {
-      console.error('❌ GMB: Erro crítico no salvamento:', error);
-      throw error;
-    }
-  };
-
   // Carregar observações padrão do Supabase
   const loadDefaultObservations = async () => {
     try {
@@ -299,6 +146,162 @@ export const useGoogleMyBusinessData = () => {
       }
     } catch (error) {
       console.error('❌ GMB: Erro crítico ao carregar observações padrão:', error);
+    }
+  };
+
+  // Carregar dados do Google My Business
+  const loadGoogleMyBusinessData = async () => {
+    try {
+      console.log('🔄 GMB: Carregando dados');
+      
+      const { data, error } = await (supabase as any)
+        .from('google_my_business_data')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      console.log('📊 GMB: Resposta dados:', { 
+        dataLength: data?.length || 0, 
+        error,
+        sampleData: data?.[0] 
+      });
+
+      if (error && error.code !== 'PGRST116') { // 116 = table doesn't exist
+        console.error('❌ GMB: Erro ao carregar dados:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const groupsMap = new Map<string, GoogleMyBusinessGroup>();
+        const processedItems = new Set<string>(); // Para evitar duplicações
+
+        data.forEach((item: any, index: number) => {
+          console.log(`🔍 GMB: Processando item ${index + 1}:`, {
+            group_id: item.group_id,
+            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
+          });
+
+          let itemData;
+          try {
+            if (typeof item.item_data === 'string') {
+              itemData = JSON.parse(item.item_data);
+            } else {
+              itemData = item.item_data;
+            }
+          } catch (parseError) {
+            console.error('❌ GMB: Erro ao fazer parse do item_data:', parseError);
+            return;
+          }
+          
+          if (!groupsMap.has(item.group_id)) {
+            groupsMap.set(item.group_id, {
+              id: item.group_id,
+              name: item.group_name,
+              color: item.group_color || 'bg-blue-500',
+              isExpanded: item.is_expanded,
+              items: []
+            });
+          }
+
+          const group = groupsMap.get(item.group_id)!;
+          
+          // Verificar se o item já foi processado para evitar duplicações
+          if (itemData && itemData.id && itemData.id !== `empty-${item.group_id}`) {
+            const itemKey = `${item.group_id}-${itemData.id}`;
+            if (!processedItems.has(itemKey)) {
+              group.items.push(itemData);
+              processedItems.add(itemKey);
+            } else {
+              console.warn('⚠️ GMB: Item duplicado ignorado:', itemKey);
+            }
+          }
+        });
+
+        const loadedGroups = Array.from(groupsMap.values());
+        console.log('✅ GMB: Grupos carregados:', {
+          totalGroups: loadedGroups.length,
+          groupDetails: loadedGroups.map(g => ({ name: g.name, itemCount: g.items.length }))
+        });
+        setGroups(loadedGroups);
+      } else {
+        setGroups([]);
+        console.log('ℹ️ GMB: Nenhum dado encontrado');
+      }
+    } catch (error) {
+      console.error('❌ GMB: Erro crítico ao carregar dados:', error);
+    }
+  };
+
+  // Salvar dados no Supabase com prevenção de duplicação
+  const saveGoogleMyBusinessToDatabase = async (newGroups: GoogleMyBusinessGroup[]) => {
+    try {
+      console.log('🔄 GMB: Iniciando salvamento:', {
+        groupCount: newGroups.length,
+        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
+      });
+      
+      // Primeiro, deletar todos os dados existentes para evitar duplicações
+      const { error: deleteError } = await (supabase as any)
+        .from('google_my_business_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (deleteError) {
+        console.error('❌ GMB: Erro ao limpar dados existentes:', deleteError);
+      }
+
+      // Agora inserir todos os dados novos
+      for (const group of newGroups) {
+        console.log(`🔄 GMB: Processando grupo: ${group.name} (${group.items.length} itens)`);
+        
+        const insertData = group.items.length > 0 
+          ? group.items.map((item, index) => {
+              console.log(`📝 GMB: Preparando item ${index + 1}:`, {
+                id: item.id,
+                elemento: item.elemento
+              });
+
+              return {
+                group_id: group.id,
+                group_name: group.name,
+                group_color: group.color,
+                is_expanded: group.isExpanded,
+                item_data: item,
+                user_id: null // Sempre null para tornar global
+              };
+            })
+          : [{
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: {
+                id: `empty-${group.id}`,
+                elemento: '',
+                servicos: '',
+                informacoes: '',
+                observacoes: '',
+                attachments: []
+              },
+              user_id: null // Sempre null para tornar global
+            }];
+
+        const { data: insertResult, error: insertError } = await (supabase as any)
+          .from('google_my_business_data')
+          .insert(insertData)
+          .select('id');
+
+        if (insertError) {
+          console.error('❌ GMB: Erro ao inserir:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ GMB: Dados inseridos:', insertResult?.length || 0);
+      }
+      
+      console.log('🎉 GMB: Salvamento completo sem duplicações!');
+    } catch (error) {
+      console.error('❌ GMB: Erro crítico no salvamento:', error);
+      throw error;
     }
   };
 
@@ -361,8 +364,11 @@ export const useGoogleMyBusinessData = () => {
         servicos: clientData.servicos
       });
       
+      // Gerar ID único para evitar duplicações
+      const clientId = `gmb-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       const newClient: GoogleMyBusinessItem = {
-        id: `gmb-client-${Date.now()}`,
+        id: clientId,
         elemento: clientData.elemento || 'Novo Cliente',
         servicos: clientData.servicos || '',
         informacoes: '',
@@ -381,7 +387,13 @@ export const useGoogleMyBusinessData = () => {
 
       const newGroups = groups.map(group => 
         group.id === groupId 
-          ? { ...group, items: group.items.filter(item => item.id !== `empty-${groupId}`).concat(newClient) }
+          ? { 
+              ...group, 
+              items: group.items
+                .filter(item => item.id !== `empty-${groupId}`) // Remove placeholder
+                .filter(item => item.id !== clientId) // Evita duplicação
+                .concat(newClient)
+            }
           : group
       );
       
