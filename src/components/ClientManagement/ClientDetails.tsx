@@ -4,9 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Move } from 'lucide-react';
+import { Plus, Trash2, Move, Paperclip, Eye, Upload, Edit } from 'lucide-react';
 import { ClientAttachments } from './ClientAttachments';
+import { AttachmentViewer } from '@/components/AttachmentViewer';
 
 interface Observation {
   id: string;
@@ -52,6 +54,10 @@ export function ClientDetails({
   onUpdateAttachments
 }: ClientDetailsProps) {
   const [newObservation, setNewObservation] = useState('');
+  const [editingObservation, setEditingObservation] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [selectedAttachment, setSelectedAttachment] = useState<any>(null);
+  const [showViewer, setShowViewer] = useState(false);
 
   const addObservation = () => {
     if (!newObservation.trim()) return;
@@ -78,96 +84,191 @@ export function ClientDetails({
     onUpdateObservations(updated);
   };
 
-  const updateObservationText = (id: string, newText: string) => {
+  const startEditingObservation = (id: string, text: string) => {
+    setEditingObservation(id);
+    setEditingText(text);
+  };
+
+  const saveObservationEdit = (id: string) => {
+    if (!editingText.trim()) return;
+    
     const updated = observations.map(obs => 
-      obs.id === id ? { ...obs, text: newText } : obs
+      obs.id === id ? { ...obs, text: editingText.trim() } : obs
     );
     onUpdateObservations(updated);
+    setEditingObservation(null);
+    setEditingText('');
+  };
+
+  const cancelObservationEdit = () => {
+    setEditingObservation(null);
+    setEditingText('');
+  };
+
+  const handleViewAttachment = (attachment: any) => {
+    setSelectedAttachment(attachment);
+    setShowViewer(true);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle>Detalhes do Cliente: {clientName}</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Detalhes do Cliente: {clientName}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Mover Cliente */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center">
-              <Move className="h-4 w-4 mr-2" />
-              Mover para outro mês
-            </label>
-            <Select value={currentGroupId} onValueChange={onMoveClient}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o mês" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Observações */}
-          <div className="space-y-4">
-            <h4 className="font-medium">Observações</h4>
-            
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Nova observação..."
-                value={newObservation}
-                onChange={(e) => setNewObservation(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addObservation()}
-              />
-              <Button onClick={addObservation} size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
+          <div className="space-y-6 mt-6">
+            {/* Mover Cliente */}
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-700 flex items-center">
+                  <Move className="h-4 w-4 mr-2 text-blue-600" />
+                  Mover para outro mês
+                </label>
+                <Select value={currentGroupId} onValueChange={onMoveClient}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione o mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {observations.map((obs) => (
-                <div key={obs.id} className="flex items-center space-x-2 p-2 border rounded">
-                  <Checkbox
-                    checked={obs.completed}
-                    onCheckedChange={() => toggleObservation(obs.id)}
-                  />
+            {/* Observações */}
+            <div className="bg-white border rounded-lg">
+              <div className="border-b border-gray-200 px-4 py-3">
+                <h4 className="font-medium text-gray-900 flex items-center">
+                  <Edit className="h-4 w-4 mr-2 text-blue-600" />
+                  Observações ({observations.length})
+                </h4>
+              </div>
+              
+              <div className="p-4 space-y-4">
+                {/* Adicionar Nova Observação */}
+                <div className="flex space-x-2">
                   <Input
-                    value={obs.text}
-                    onChange={(e) => updateObservationText(obs.id, e.target.value)}
-                    className={`flex-1 ${obs.completed ? 'line-through text-gray-500' : ''}`}
+                    placeholder="Nova observação..."
+                    value={newObservation}
+                    onChange={(e) => setNewObservation(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addObservation()}
+                    className="flex-1"
                   />
-                  <Button
+                  <Button 
+                    onClick={addObservation} 
                     size="sm"
-                    variant="ghost"
-                    onClick={() => removeObservation(obs.id)}
-                    className="text-red-600 hover:text-red-800"
+                    className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-              ))}
+
+                {/* Lista de Observações */}
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {observations.map((obs) => (
+                    <div 
+                      key={obs.id} 
+                      className="flex items-start space-x-3 p-3 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+                    >
+                      <Checkbox
+                        checked={obs.completed}
+                        onCheckedChange={() => toggleObservation(obs.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        {editingObservation === obs.id ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              className="w-full resize-none"
+                              rows={2}
+                            />
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => saveObservationEdit(obs.id)}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelObservationEdit}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p 
+                            className={`text-sm break-words cursor-pointer hover:text-blue-600 ${
+                              obs.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                            }`}
+                            onClick={() => startEditingObservation(obs.id, obs.text)}
+                          >
+                            {obs.text}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeObservation(obs.id)}
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                {observations.length === 0 && (
+                  <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <Edit className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Nenhuma observação adicionada</p>
+                    <p className="text-xs text-gray-400">Adicione observações para acompanhar o progresso</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {observations.length === 0 && (
-              <p className="text-gray-500 text-sm text-center py-4">
-                Nenhuma observação adicionada
-              </p>
-            )}
+            {/* Anexos */}
+            <div className="bg-white border rounded-lg">
+              <div className="border-b border-gray-200 px-4 py-3">
+                <h4 className="font-medium text-gray-900 flex items-center">
+                  <Paperclip className="h-4 w-4 mr-2 text-blue-600" />
+                  Anexos ({clientAttachments.length})
+                </h4>
+              </div>
+              
+              <div className="p-4">
+                <ClientAttachments
+                  attachments={clientAttachments}
+                  onUpdateAttachments={onUpdateAttachments}
+                  onFileChange={onFileChange}
+                />
+              </div>
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Anexos */}
-          <ClientAttachments
-            attachments={clientAttachments}
-            onUpdateAttachments={onUpdateAttachments}
-            onFileChange={onFileChange}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Attachment Viewer */}
+      <AttachmentViewer
+        attachment={selectedAttachment}
+        open={showViewer}
+        onOpenChange={setShowViewer}
+      />
+    </>
   );
 }
