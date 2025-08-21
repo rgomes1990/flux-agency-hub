@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -38,7 +39,7 @@ export interface ContentPadariasStatus {
 export function useContentPadariasData() {
   const [groups, setGroups] = useState<ContentPadariasGroup[]>([]);
   const [columns, setColumns] = useState<ContentPadariasColumn[]>([]);
-    const [customColumns, setCustomColumns] = useState<ContentPadariasColumn[]>([]);
+  const [customColumns, setCustomColumns] = useState<ContentPadariasColumn[]>([]);
   const [statuses, setStatuses] = useState<ContentPadariasStatus[]>([]);
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export function useContentPadariasData() {
       id: newGroupId,
       name: `${monthName} - PADARIAS`,
       color: 'bg-blue-500',
-      isExpanded: false,
+      isExpanded: true, // Changed to true to show by default
       items: []
     };
 
@@ -89,10 +90,13 @@ export function useContentPadariasData() {
       id: newGroupId,
       name: `${newMonthName} - PADARIAS`,
       color: groupToDuplicate.color,
-      isExpanded: false,
+      isExpanded: true, // Changed to true to show by default
       items: groupToDuplicate.items.map(item => ({
         ...item,
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
+        elemento: item.elemento || '',
+        servicos: item.servicos || '',
+        observacoes: item.observacoes || ''
       }))
     };
   
@@ -192,6 +196,9 @@ export function useContentPadariasData() {
     const newClientId = crypto.randomUUID();
     const newClient: ContentPadariasItem = {
       id: newClientId,
+      elemento: client.elemento || '',
+      servicos: client.servicos || '',
+      observacoes: client.observacoes || '',
       ...client
     };
 
@@ -236,14 +243,21 @@ export function useContentPadariasData() {
       }
 
       const groupsMap = new Map<string, ContentPadariasGroup>();
+      const processedItems = new Set<string>();
 
       data.forEach(item => {
+        // Skip if already processed
+        if (processedItems.has(item.id)) {
+          return;
+        }
+        processedItems.add(item.id);
+
         if (!groupsMap.has(item.group_name)) {
           groupsMap.set(item.group_name, {
             id: item.group_id,
             name: item.group_name,
             color: item.group_color || 'bg-blue-500',
-            isExpanded: true, // Abrir por padrão
+            isExpanded: true, // Changed to true to show by default
             items: []
           });
         }
@@ -265,14 +279,32 @@ export function useContentPadariasData() {
           }
         }
 
+        // Type-safe handling of item_data
+        let itemData: any = {};
+        let status: any = {};
+        
+        if (item.item_data) {
+          try {
+            if (typeof item.item_data === 'string') {
+              itemData = JSON.parse(item.item_data);
+            } else {
+              itemData = item.item_data as any;
+            }
+            status = itemData?.status || {};
+          } catch (error) {
+            console.warn('⚠️ Erro ao processar item_data:', error);
+            itemData = {};
+          }
+        }
+
         const clientItem: ContentPadariasItem = {
           id: item.id,
           elemento: item.elemento,
           servicos: item.servicos || '',
           observacoes: item.observacoes || '',
           attachments: attachments,
-          status: item.item_data?.status || {},
-          ...item.item_data
+          status: status,
+          ...itemData
         };
 
         group.items.push(clientItem);
@@ -311,17 +343,17 @@ export function useContentPadariasData() {
       if (clientToUpdate) {
         const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = clientToUpdate;
         
-        // Processar anexos corretamente
-        let processedAttachments = null;
+        // Processar anexos corretamente - convert to JSON string for database
+        let processedAttachments: string[] | null = null;
         if (attachments && Array.isArray(attachments) && attachments.length > 0) {
           processedAttachments = attachments.map(att => {
-            // Garantir que o anexo tenha todas as propriedades necessárias
-            return {
+            // Convert attachment objects to JSON strings
+            return JSON.stringify({
               name: att.name || 'Arquivo',
               type: att.type || 'application/octet-stream',
               data: att.data || '',
               size: att.size || 0
-            };
+            });
           });
         }
 
@@ -397,6 +429,20 @@ export function useContentPadariasData() {
       const formattedData = contentPadariasData.flatMap(group =>
         group.items.map(item => {
           const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = item;
+          
+          // Convert attachments to proper format
+          let processedAttachments: string[] | null = null;
+          if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+            processedAttachments = attachments.map(att => {
+              return JSON.stringify({
+                name: att.name || 'Arquivo',
+                type: att.type || 'application/octet-stream',
+                data: att.data || '',
+                size: att.size || 0
+              });
+            });
+          }
+          
           return {
             id: id,
             group_id: group.id,
@@ -405,7 +451,7 @@ export function useContentPadariasData() {
             elemento: elemento,
             servicos: servicos,
             observacoes: observacoes,
-            attachments: attachments,
+            attachments: processedAttachments,
             item_data: { status, ...itemData },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -425,13 +471,15 @@ export function useContentPadariasData() {
       }
   
       // Inserir os novos dados formatados
-      const { error: insertError } = await supabase
-        .from('content_padarias_data')
-        .insert(formattedData);
+      if (formattedData.length > 0) {
+        const { error: insertError } = await supabase
+          .from('content_padarias_data')
+          .insert(formattedData);
   
-      if (insertError) {
-        console.error('❌ Erro ao inserir dados:', insertError);
-        throw insertError;
+        if (insertError) {
+          console.error('❌ Erro ao inserir dados:', insertError);
+          throw insertError;
+        }
       }
   
       console.log('✅ Dados salvos com sucesso!');
@@ -446,21 +494,21 @@ export function useContentPadariasData() {
         id: crypto.randomUUID(),
         name: 'Janeiro - PADARIAS',
         color: 'bg-blue-500',
-        isExpanded: false,
+        isExpanded: true, // Changed to true to show by default
         items: []
       },
       {
         id: crypto.randomUUID(),
         name: 'Fevereiro - PADARIAS',
         color: 'bg-green-500',
-        isExpanded: false,
+        isExpanded: true, // Changed to true to show by default
         items: []
       },
       {
         id: crypto.randomUUID(),
         name: 'Março - PADARIAS',
         color: 'bg-red-500',
-        isExpanded: false,
+        isExpanded: true, // Changed to true to show by default
         items: []
       }
     ];
@@ -471,21 +519,23 @@ export function useContentPadariasData() {
 
   const loadColumns = useCallback(async () => {
     try {
+      // Use status_config table with proper filtering
       const { data, error } = await supabase
-        .from('content_padarias_columns')
+        .from('status_config')
         .select('*')
+        .eq('module', 'content_padarias')
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Erro ao carregar colunas:', error);
-        throw error;
+        return;
       }
 
       if (data) {
         const typedColumns = data.map(col => ({
-          id: col.id,
-          name: col.name,
-          type: col.type === 'status' ? 'status' : 'text'
+          id: col.status_id,
+          name: col.status_name,
+          type: 'status' as const
         }));
         setColumns(typedColumns);
         setCustomColumns(typedColumns);
@@ -497,21 +547,23 @@ export function useContentPadariasData() {
 
   const loadStatuses = useCallback(async () => {
     try {
+      // Use status_config table with proper filtering
       const { data, error } = await supabase
-        .from('content_padarias_status')
+        .from('status_config')
         .select('*')
+        .eq('module', 'content_padarias')
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Erro ao carregar status:', error);
-        throw error;
+        return;
       }
 
       if (data) {
         const typedStatuses = data.map(status => ({
-          id: status.id,
-          name: status.name,
-          color: status.color
+          id: status.status_id,
+          name: status.status_name,
+          color: status.status_color
         }));
         setStatuses(typedStatuses);
       }
@@ -524,31 +576,34 @@ export function useContentPadariasData() {
     console.log('💾 Salvando colunas no banco de dados...', columns);
 
     try {
-      // Deletar todas as colunas existentes
+      // Delete existing columns for this module
       const { error: deleteError } = await supabase
-        .from('content_padarias_columns')
+        .from('status_config')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('module', 'content_padarias');
 
       if (deleteError) {
         console.error('❌ Erro ao limpar colunas antigas:', deleteError);
         throw deleteError;
       }
 
-      // Mapear e inserir as novas colunas
+      // Insert new columns
       const formattedColumns = columns.map(column => ({
-        id: column.id,
-        name: column.name,
-        type: column.type
+        status_id: column.id,
+        status_name: column.name,
+        status_color: '#3b82f6',
+        module: 'content_padarias'
       }));
 
-      const { error: insertError } = await supabase
-        .from('content_padarias_columns')
-        .insert(formattedColumns);
+      if (formattedColumns.length > 0) {
+        const { error: insertError } = await supabase
+          .from('status_config')
+          .insert(formattedColumns);
 
-      if (insertError) {
-        console.error('❌ Erro ao inserir colunas:', insertError);
-        throw insertError;
+        if (insertError) {
+          console.error('❌ Erro ao inserir colunas:', insertError);
+          throw insertError;
+        }
       }
 
       console.log('✅ Colunas salvas com sucesso!');
@@ -561,31 +616,34 @@ export function useContentPadariasData() {
     console.log('💾 Salvando status no banco de dados...', statuses);
 
     try {
-      // Deletar todos os status existentes
+      // Delete existing statuses for this module
       const { error: deleteError } = await supabase
-        .from('content_padarias_status')
+        .from('status_config')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('module', 'content_padarias');
 
       if (deleteError) {
         console.error('❌ Erro ao limpar status antigos:', deleteError);
         throw deleteError;
       }
 
-      // Mapear e inserir os novos status
+      // Insert new statuses
       const formattedStatuses = statuses.map(status => ({
-        id: status.id,
-        name: status.name,
-        color: status.color
+        status_id: status.id,
+        status_name: status.name,
+        status_color: status.color,
+        module: 'content_padarias'
       }));
 
-      const { error: insertError } = await supabase
-        .from('content_padarias_status')
-        .insert(formattedStatuses);
+      if (formattedStatuses.length > 0) {
+        const { error: insertError } = await supabase
+          .from('status_config')
+          .insert(formattedStatuses);
 
-      if (insertError) {
-        console.error('❌ Erro ao inserir status:', insertError);
-        throw insertError;
+        if (insertError) {
+          console.error('❌ Erro ao inserir status:', insertError);
+          throw insertError;
+        }
       }
 
       console.log('✅ Status salvos com sucesso!');
