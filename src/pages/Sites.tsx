@@ -280,6 +280,16 @@ export default function Sites() {
     }
   };
 
+  const moveColumnUp = (columnId: string) => {
+    // Implementation for moving column up
+    console.log('Move column up:', columnId);
+  };
+
+  const moveColumnDown = (columnId: string) => {
+    // Implementation for moving column down
+    console.log('Move column down:', columnId);
+  };
+
   const openFilePreview = (file: File) => {
     setPreviewFile(file);
     setShowFilePreview(true);
@@ -521,8 +531,13 @@ export default function Sites() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      customColumns={customColumns}
-                      onSelectItem={handleSelectItem}
+                      onSelectItem={(itemId, checked) => {
+                        if (checked) {
+                          setSelectedItems([...selectedItems, itemId]);
+                        } else {
+                          setSelectedItems(selectedItems.filter(id => id !== itemId));
+                        }
+                      }}
                       onOpenClientDetails={openClientDetails}
                       onUpdateItemStatus={updateItemStatus}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
@@ -724,7 +739,7 @@ export default function Sites() {
           onFileChange={setClientFile}
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={handleMoveClient}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails, newGroupId)}
           clientAttachments={clientAttachments}
           onUpdateAttachments={setClientAttachments}
         />

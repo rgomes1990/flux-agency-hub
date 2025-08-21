@@ -335,89 +335,43 @@ const useRSGAvaliacoesData = () => {
     }
   });
 
-  const createColumn = useCallback((name: string, type: string) => {
-    createColumnMutation.mutate({ name, type });
-  }, [createColumnMutation]);
-
-  const deleteColumn = useCallback((columnId: string) => {
-    deleteColumnMutation.mutate(columnId);
-  }, [deleteColumnMutation]);
-
-  const createStatus = useCallback((name: string, color: string) => {
-    createStatusMutation.mutate({ name, color });
-  }, [createStatusMutation]);
-
-  const deleteStatus = useCallback((statusId: string) => {
-    deleteStatusMutation.mutate(statusId);
-  }, [deleteStatusMutation]);
-
-  const updateGroup = useCallback((groupId: string, updates: Partial<RSGAvaliacoesGroup>) => {
-    const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-    const updatedGroups = currentGroups.map(group => 
-      group.id === groupId ? { ...group, ...updates } : group
-    );
+  const updateGroups = useCallback((updatedGroups: RSGAvaliacoesGroup[]) => {
     queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
     saveData(updatedGroups);
   }, [queryClient, saveData]);
 
-  return {
-    // Dados
-    groups,
-    columns,
-    statuses,
-    
-    // Estados
-    isLoading: isLoading || isLoadingGroups || saveDataMutation.isPending,
-    
-    // Ações
-    saveData,
-    createColumn,
-    deleteColumn,
-    createStatus,
-    deleteStatus,
-    updateGroup,
-    refetch,
-    
-    // Mutations para controle externo
-    saveDataMutation,
-    createColumnMutation,
-    deleteColumnMutation,
-    createStatusMutation,
-    deleteStatusMutation,
-    
-    // Novos métodos específicos
-    createGroup: async (name: string, color: string = 'bg-purple-500') => {
-      try {
-        const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-        const newGroupId = `group_${Date.now()}`;
-        const newGroup: RSGAvaliacoesGroup = {
-          id: newGroupId,
-          name,
-          color,
-          isExpanded: true,
-          items: []
-        };
-        
-        // Criar um item vazio para o grupo
-        const emptyItem = {
-          id: `empty-${newGroupId}`,
-          elemento: '',
-          servicos: '',
-          attachments: [],
-          informacoes: '',
-          observacoes: ''
-        };
+  const createMonth = useCallback(async (name: string, color: string = 'bg-purple-500') => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const newGroupId = `group_${Date.now()}`;
+      const newGroup: RSGAvaliacoesGroup = {
+        id: newGroupId,
+        name,
+        color,
+        isExpanded: true,
+        items: []
+      };
+      
+      // Criar um item vazio para o grupo
+      const emptyItem = {
+        id: `empty-${newGroupId}`,
+        elemento: '',
+        servicos: '',
+        attachments: [],
+        informacoes: '',
+        observacoes: ''
+      };
 
-        // Inserir no banco de dados
-        const { error } = await (supabase as any)
-          .from('rsg_avaliacoes_data')
-          .insert({
-            group_id: newGroupId,
-            group_name: name,
-            group_color: color,
-            is_expanded: true,
-            item_data: emptyItem
-          });
+      // Inserir no banco de dados
+      const { error } = await (supabase as any)
+        .from('rsg_avaliacoes_data')
+        .insert({
+          group_id: newGroupId,
+          group_name: name,
+          group_color: color,
+          is_expanded: true,
+          item_data: emptyItem
+        });
 
         if (error) throw error;
 
@@ -430,79 +384,274 @@ const useRSGAvaliacoesData = () => {
         console.error('Erro ao criar mês:', error);
         toast.error('Erro ao criar mês');
       }
-    },
-    
-    duplicateGroup: async (sourceGroupId: string, newName: string) => {
-      try {
-        const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-        const sourceGroup = currentGroups.find(g => g.id === sourceGroupId);
-        
-        if (!sourceGroup) {
-          toast.error('Grupo não encontrado');
-          return;
-        }
+    }, [queryClient]);
 
-        const newGroupId = `group_${Date.now()}`;
-        
-        // Duplicar cada item do grupo com novos IDs para evitar conflitos
-        const duplicatedItems = sourceGroup.items.map(item => ({
-          ...item,
-          id: `rsg-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        }));
+  const updateMonth = useCallback(async (groupId: string, name: string) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const updatedGroups = currentGroups.map(group => 
+        group.id === groupId ? { ...group, name: `${name} - RSG AVALIACOES` } : group
+      );
+      
+      // Update in database
+      const { error } = await (supabase as any)
+        .from('rsg_avaliacoes_data')
+        .update({ group_name: `${name} - RSG AVALIACOES` })
+        .eq('group_id', groupId);
 
-        // Inserir todos os itens duplicados no banco
-        const insertPromises = duplicatedItems.map(item => 
-          (supabase as any)
-            .from('rsg_avaliacoes_data')
-            .insert({
-              group_id: newGroupId,
-              group_name: newName,
-              group_color: sourceGroup.color,
-              is_expanded: true,
-              item_data: item
-            })
-        );
+      if (error) throw error;
 
-        await Promise.all(insertPromises);
-
-        // Atualizar cache local
-        const newGroup: RSGAvaliacoesGroup = {
-          id: newGroupId,
-          name: newName,
-          color: sourceGroup.color,
-          isExpanded: true,
-          items: duplicatedItems
-        };
-        
-        const updatedGroups = [...currentGroups, newGroup];
-        queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
-        
-        toast.success('Mês duplicado com sucesso!');
-      } catch (error) {
-        console.error('Erro ao duplicar mês:', error);
-        toast.error('Erro ao duplicar mês');
-      }
-    },
-    
-    deleteMonth: async (groupId: string) => {
-      try {
-        const { error } = await (supabase as any)
-          .from('rsg_avaliacoes_data')
-          .delete()
-          .eq('group_id', groupId);
-
-        if (error) throw error;
-
-        const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
-        const updatedGroups = currentGroups.filter(group => group.id !== groupId);
-        queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
-        
-        toast.success('Mês deletado com sucesso!');
-      } catch (error) {
-        console.error('Erro ao deletar mês:', error);
-        toast.error('Erro ao deletar mês');
-      }
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      toast.success('Mês atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar mês:', error);
+      toast.error('Erro ao atualizar mês');
     }
+  }, [queryClient]);
+
+  const duplicateMonth = useCallback(async (sourceGroupId: string, newName: string) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const sourceGroup = currentGroups.find(g => g.id === sourceGroupId);
+      
+      if (!sourceGroup) {
+        toast.error('Grupo não encontrado');
+        return;
+      }
+
+      const newGroupId = `group_${Date.now()}`;
+      
+      // Duplicar cada item do grupo com novos IDs para evitar conflitos
+      const duplicatedItems = sourceGroup.items.map(item => ({
+        ...item,
+        id: `rsg-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }));
+
+      // Inserir todos os itens duplicados no banco
+      const insertPromises = duplicatedItems.map(item => 
+        (supabase as any)
+          .from('rsg_avaliacoes_data')
+          .insert({
+            group_id: newGroupId,
+            group_name: newName,
+            group_color: sourceGroup.color,
+            is_expanded: true,
+            item_data: item
+          })
+      );
+
+      await Promise.all(insertPromises);
+
+      // Atualizar cache local
+      const newGroup: RSGAvaliacoesGroup = {
+        id: newGroupId,
+        name: newName,
+        color: sourceGroup.color,
+        isExpanded: true,
+        items: duplicatedItems
+      };
+      
+      const updatedGroups = [...currentGroups, newGroup];
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      
+      toast.success('Mês duplicado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao duplicar mês:', error);
+      toast.error('Erro ao duplicar mês');
+    }
+  }, [queryClient]);
+
+  const addStatus = useCallback((name: string, color: string) => {
+    createStatusMutation.mutate({ name, color });
+  }, [createStatusMutation]);
+
+  const updateStatus = useCallback(async (statusId: string, updates: Partial<RSGAvaliacoesStatus>) => {
+    try {
+      const { error } = await supabase
+        .from('status_config')
+        .update({
+          status_name: updates.name,
+          status_color: updates.color
+        })
+        .eq('status_id', statusId)
+        .eq('module', MODULE_NAME);
+
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['status-config', MODULE_NAME] });
+      toast.success('Status atualizado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao atualizar status');
+    }
+  }, [queryClient]);
+
+  const deleteStatus = useCallback((statusId: string) => {
+    deleteStatusMutation.mutate(statusId);
+  }, [deleteStatusMutation]);
+
+  const addColumn = useCallback((name: string, type: string) => {
+    createColumnMutation.mutate({ name, type });
+  }, [createColumnMutation]);
+
+  const updateColumn = useCallback(async (columnId: string, updates: Partial<RSGAvaliacoesColumn>) => {
+    try {
+      const { error } = await supabase
+        .from('column_config')
+        .update({
+          column_name: updates.name,
+          column_type: updates.type
+        })
+        .eq('column_id', columnId)
+        .eq('module', MODULE_NAME);
+
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['column-config', MODULE_NAME] });
+      toast.success('Coluna atualizada com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao atualizar coluna');
+    }
+  }, [queryClient]);
+
+  const deleteColumn = useCallback((columnId: string) => {
+    deleteColumnMutation.mutate(columnId);
+  }, [deleteColumnMutation]);
+
+  const updateItemStatus = useCallback(async (itemId: string, field: string, statusId: string) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const updatedGroups = currentGroups.map(group => ({
+        ...group,
+        items: group.items.map(item => 
+          item.id === itemId ? { ...item, [field]: statusId } : item
+        )
+      }));
+
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      saveData(updatedGroups);
+    } catch (error) {
+      console.error('Erro ao atualizar status do item:', error);
+      toast.error('Erro ao atualizar status');
+    }
+  }, [queryClient, saveData]);
+
+  const addClient = useCallback(async (groupId: string, clientData: any) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const newClient = {
+        id: `rsg-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ...clientData
+      };
+
+      const updatedGroups = currentGroups.map(group => 
+        group.id === groupId 
+          ? { ...group, items: [...group.items, newClient] }
+          : group
+      );
+
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      saveData(updatedGroups);
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      toast.error('Erro ao adicionar cliente');
+    }
+  }, [queryClient, saveData]);
+
+  const deleteClient = useCallback(async (clientId: string) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const updatedGroups = currentGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => item.id !== clientId)
+      }));
+
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      saveData(updatedGroups);
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+      toast.error('Erro ao deletar cliente');
+    }
+  }, [queryClient, saveData]);
+
+  const updateClient = useCallback(async (clientId: string, updates: any) => {
+    try {
+      const currentGroups = queryClient.getQueryData(['rsg-avaliacoes-data']) as RSGAvaliacoesGroup[] || [];
+      const updatedGroups = currentGroups.map(group => ({
+        ...group,
+        items: group.items.map(item => 
+          item.id === clientId ? { ...item, ...updates } : item
+        )
+      }));
+
+      queryClient.setQueryData(['rsg-avaliacoes-data'], updatedGroups);
+      saveData(updatedGroups);
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+      toast.error('Erro ao atualizar cliente');
+    }
+  }, [queryClient, saveData]);
+
+  const moveColumnUp = useCallback((columnId: string) => {
+    const currentColumns = queryClient.getQueryData(['column-config', MODULE_NAME]) as RSGAvaliacoesColumn[] || [];
+    const index = currentColumns.findIndex(col => col.id === columnId);
+    
+    if (index > 0) {
+      const newColumns = [...currentColumns];
+      [newColumns[index], newColumns[index - 1]] = [newColumns[index - 1], newColumns[index]];
+      queryClient.setQueryData(['column-config', MODULE_NAME], newColumns);
+      // You might want to save this order to the database as well
+    }
+  }, [queryClient]);
+
+  const moveColumnDown = useCallback((columnId: string) => {
+    const currentColumns = queryClient.getQueryData(['column-config', MODULE_NAME]) as RSGAvaliacoesColumn[] || [];
+    const index = currentColumns.findIndex(col => col.id === columnId);
+    
+    if (index < currentColumns.length - 1 && index >= 0) {
+      const newColumns = [...currentColumns];
+      [newColumns[index], newColumns[index + 1]] = [newColumns[index + 1], newColumns[index]];
+      queryClient.setQueryData(['column-config', MODULE_NAME], newColumns);
+      // You might want to save this order to the database as well
+    }
+  }, [queryClient]);
+
+  return {
+    // Dados
+    groups,
+    columns,
+    customColumns: columns,
+    statuses,
+    
+    // Estados
+    isLoading: isLoading || isLoadingGroups || saveDataMutation.isPending,
+    
+    // Ações
+    saveData,
+    updateGroups,
+    createMonth,
+    updateMonth,
+    deleteMonth,
+    duplicateMonth,
+    addStatus,
+    updateStatus,
+    deleteStatus,
+    addColumn,
+    updateColumn,
+    deleteColumn,
+    updateItemStatus,
+    addClient,
+    deleteClient,
+    updateClient,
+    moveColumnUp,
+    moveColumnDown,
+    refetch,
+    
+    // Mutations para controle externo
+    saveDataMutation,
+    createColumnMutation,
+    deleteColumnMutation,
+    createStatusMutation,
+    deleteStatusMutation,
   };
 };
 

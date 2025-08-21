@@ -60,7 +60,9 @@ export default function RSGAvaliacoes() {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    moveColumnUp,
+    moveColumnDown
   } = useRSGAvaliacoesData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -485,7 +487,6 @@ export default function RSGAvaliacoes() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      customColumns={customColumns}
                       onSelectItem={handleSelectItem}
                       onOpenClientDetails={openClientDetails}
                       onUpdateItemStatus={updateItemStatus}
@@ -677,7 +678,7 @@ export default function RSGAvaliacoes() {
         existingStatuses={statuses}
       />
 
-      {/* Update the ClientDetails modal */}
+      {/* Client Details Modal */}
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
@@ -689,7 +690,7 @@ export default function RSGAvaliacoes() {
           onFileChange={setClientFile}
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={handleMoveClient}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails, newGroupId)}
           clientAttachments={clientAttachments}
           onUpdateAttachments={setClientAttachments}
         />

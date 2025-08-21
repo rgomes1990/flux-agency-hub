@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGoogleMyBusinessData } from '@/hooks/useGoogleMyBusinessData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, 
   ChevronDown, 
@@ -59,7 +60,9 @@ export default function GoogleMyBusiness() {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    moveColumnUp,
+    moveColumnDown
   } = useGoogleMyBusinessData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -490,7 +493,6 @@ export default function GoogleMyBusiness() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      customColumns={customColumns}
                       onSelectItem={(itemId, checked) => {
                         if (checked) {
                           setSelectedItems([...selectedItems, itemId]);
@@ -705,7 +707,7 @@ export default function GoogleMyBusiness() {
           onFileChange={setClientFile}
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={handleMoveClient}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails, newGroupId)}
           clientAttachments={clientAttachments}
           onUpdateAttachments={setClientAttachments}
         />
