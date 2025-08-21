@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -277,14 +276,18 @@ export default function ContentPadarias() {
       console.log('📝 Observações a salvar:', clientObservations);
       console.log('📎 Anexos a salvar:', clientAttachments);
 
-      const updates: any = { 
-        observacoes: JSON.stringify(clientObservations),
-        attachments: JSON.stringify(clientAttachments)
-      };
-      
-      console.log('💾 Updates preparados:', updates);
-      
       try {
+        const updates: any = { 
+          observacoes: JSON.stringify(clientObservations)
+        };
+
+        // Só incluir attachments se houver anexos para processar
+        if (clientAttachments && clientAttachments.length > 0) {
+          updates.attachments = clientAttachments;
+        }
+        
+        console.log('💾 Updates preparados:', updates);
+        
         await updateClient(showClientDetails, updates);
         console.log('✅ Cliente salvo com sucesso');
       } catch (error) {

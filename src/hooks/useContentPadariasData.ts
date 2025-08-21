@@ -504,15 +504,18 @@ export function useContentPadariasData() {
     try {
       console.log('🔄 Atualizando cliente:', itemId, updates);
 
-      // Se tem anexos para fazer upload
-      if (updates.attachments && updates.attachments.length > 0) {
+      // Processar anexos se existirem
+      let processedAttachments = updates.attachments;
+      
+      if (updates.attachments && Array.isArray(updates.attachments) && updates.attachments.length > 0) {
         try {
-          const uploadPromises = updates.attachments.map(async (file: any) => {
-            if (file instanceof File) {
-              const fileName = `${itemId}/${Date.now()}_${file.name}`;
+          const uploadPromises = updates.attachments.map(async (attachment: any) => {
+            // Se é um File (novo upload)
+            if (attachment instanceof File) {
+              const fileName = `${itemId}/${Date.now()}_${attachment.name}`;
               const { error: storageError } = await supabase.storage
                 .from('client-files')
-                .upload(fileName, file, {
+                .upload(fileName, attachment, {
                   cacheControl: '3600',
                   upsert: false
                 });
@@ -524,22 +527,39 @@ export function useContentPadariasData() {
               
               return fileName;
             }
-            return file; // Se já é uma string (URL), manter
+            // Se é um objeto serializado (já existente)
+            else if (typeof attachment === 'object' && attachment.name) {
+              return attachment; // Manter como está
+            }
+            // Se é uma string (path do arquivo)
+            else if (typeof attachment === 'string') {
+              return attachment;
+            }
+            
+            return attachment;
           });
 
-          const uploadedFiles = await Promise.all(uploadPromises);
-          updates.attachments = uploadedFiles;
+          processedAttachments = await Promise.all(uploadPromises);
+          console.log('📎 Anexos processados:', processedAttachments);
         } catch (uploadError) {
           console.error('Erro no upload de arquivos:', uploadError);
           // Continuar sem os anexos se houver erro
-          delete updates.attachments;
+          processedAttachments = updates.attachments.filter(att => 
+            typeof att === 'string' || (typeof att === 'object' && att.name && !att instanceof File)
+          );
         }
       }
+
+      // Criar o objeto de updates final
+      const finalUpdates = {
+        ...updates,
+        attachments: processedAttachments
+      };
 
       const newGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => 
-          item.id === itemId ? { ...item, ...updates } : item
+          item.id === itemId ? { ...item, ...finalUpdates } : item
         )
       }));
 
