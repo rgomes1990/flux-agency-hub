@@ -42,8 +42,9 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { data: columnsData, error: columnsError } = await supabase
-        .from('google_my_business_columns')
+        .from('column_config')
         .select('*')
+        .eq('module', 'google_my_business')
         .order('created_at', { ascending: true });
 
       if (columnsError) {
@@ -52,8 +53,9 @@ export function useGoogleMyBusinessData() {
       }
 
       const { data: statusesData, error: statusesError } = await supabase
-        .from('google_my_business_statuses')
+        .from('status_config')
         .select('*')
+        .eq('module', 'google_my_business')
         .order('created_at', { ascending: true });
 
       if (statusesError) {
@@ -94,14 +96,17 @@ export function useGoogleMyBusinessData() {
 
         const group = groupsMap.get(item.group_name)!;
         
+        // Parse item_data as JSON to access the properties
+        const itemData = typeof item.item_data === 'string' ? JSON.parse(item.item_data) : item.item_data || {};
+        
         const clientItem: GoogleMyBusinessItem = {
           id: item.id,
-          elemento: item.elemento,
-          servicos: item.servicos || '',
-          informacoes: item.informacoes || '',
-          observacoes: item.observacoes || '',
-          status: item.item_data?.status || {},
-          ...item.item_data
+          elemento: itemData.elemento || 'Novo Cliente',
+          servicos: itemData.servicos || '',
+          informacoes: itemData.informacoes || '',
+          observacoes: itemData.observacoes || '',
+          status: itemData.status || { id: crypto.randomUUID(), name: 'Pendente', color: 'bg-gray-500' },
+          ...itemData
         };
 
         group.items.push(clientItem);
@@ -110,9 +115,24 @@ export function useGoogleMyBusinessData() {
       const loadedGroups = Array.from(groupsMap.values());
       console.log('✅ Grupos carregados:', loadedGroups.length);
       setGroups(loadedGroups);
-      setColumns(columnsData as Column[]);
-      setCustomColumns(columnsData as Column[]);
-      setStatuses(statusesData as Status[]);
+      
+      // Transform column data to match expected format
+      const formattedColumns = (columnsData || []).map(col => ({
+        id: col.column_id,
+        name: col.column_name,
+        type: col.column_type as 'status' | 'text'
+      }));
+      
+      // Transform status data to match expected format  
+      const formattedStatuses = (statusesData || []).map(status => ({
+        id: status.status_id,
+        name: status.status_name,
+        color: status.status_color
+      }));
+      
+      setColumns(formattedColumns);
+      setCustomColumns(formattedColumns);
+      setStatuses(formattedStatuses);
 
     } catch (error) {
       console.error('❌ Erro ao carregar dados do Google My Business:', error);
@@ -130,11 +150,7 @@ export function useGoogleMyBusinessData() {
           const { error } = await supabase
             .from('google_my_business_data')
             .update({
-              elemento,
-              servicos,
-              informacoes,
-              observacoes,
-              item_data: { status, ...itemData },
+              item_data: { elemento, servicos, informacoes, observacoes, status, ...itemData },
               updated_at: new Date().toISOString()
             })
             .eq('id', id);
@@ -178,10 +194,10 @@ export function useGoogleMyBusinessData() {
             group_id: crypto.randomUUID(),
             group_name: group.name,
             group_color: group.color,
-            elemento: 'Novo Cliente',
-            servicos: 'Serviço Padrão',
-            informacoes: 'Informações Padrão',
             item_data: {
+              elemento: 'Novo Cliente',
+              servicos: 'Serviço Padrão',
+              informacoes: 'Informações Padrão',
               status: {
                 id: crypto.randomUUID(),
                 name: 'Pendente',
@@ -221,10 +237,10 @@ export function useGoogleMyBusinessData() {
           group_id: newGroupId,
           group_name: monthName,
           group_color: 'bg-blue-500',
-          elemento: 'Novo Cliente',
-          servicos: 'Serviço Padrão',
-          informacoes: 'Informações Padrão',
           item_data: {
+            elemento: 'Novo Cliente',
+            servicos: 'Serviço Padrão',
+            informacoes: 'Informações Padrão',
             status: {
               id: crypto.randomUUID(),
               name: 'Pendente',
@@ -283,7 +299,6 @@ export function useGoogleMyBusinessData() {
     console.log('🗑️ Deletando mês:', groupId);
     
     try {
-      // Delete all items in the group
       const groupToDelete = groups.find(group => group.id === groupId);
       if (groupToDelete) {
         for (const item of groupToDelete.items) {
@@ -299,7 +314,6 @@ export function useGoogleMyBusinessData() {
         }
       }
 
-      // After deleting items, reload data to update the UI
       await loadGoogleMyBusinessData();
       console.log('✅ Mês deletado com sucesso');
 
@@ -320,7 +334,6 @@ export function useGoogleMyBusinessData() {
 
       const newGroupId = crypto.randomUUID();
 
-      // Duplicate each item in the group
       for (const item of groupToDuplicate.items) {
         const { error } = await supabase
           .from('google_my_business_data')
@@ -328,11 +341,13 @@ export function useGoogleMyBusinessData() {
             group_id: newGroupId,
             group_name: newMonthName,
             group_color: groupToDuplicate.color,
-            elemento: item.elemento,
-            servicos: item.servicos,
-            informacoes: item.informacoes,
-            observacoes: item.observacoes,
-            item_data: item.item_data
+            item_data: {
+              elemento: item.elemento,
+              servicos: item.servicos,
+              informacoes: item.informacoes,
+              observacoes: item.observacoes,
+              status: item.status
+            }
           });
 
         if (error) {
@@ -341,7 +356,6 @@ export function useGoogleMyBusinessData() {
         }
       }
 
-      // After duplicating items, reload data to update the UI
       await loadGoogleMyBusinessData();
       console.log('✅ Mês duplicado com sucesso');
 
@@ -355,8 +369,13 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_statuses')
-        .insert(status);
+        .from('status_config')
+        .insert({
+          status_id: status.id,
+          status_name: status.name,
+          status_color: status.color,
+          module: 'google_my_business'
+        });
 
       if (error) {
         console.error('❌ Erro ao adicionar status:', error);
@@ -376,9 +395,13 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_statuses')
-        .update(status)
-        .eq('id', status.id);
+        .from('status_config')
+        .update({
+          status_name: status.name,
+          status_color: status.color
+        })
+        .eq('status_id', status.id)
+        .eq('module', 'google_my_business');
 
       if (error) {
         console.error('❌ Erro ao atualizar status:', error);
@@ -398,9 +421,10 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_statuses')
+        .from('status_config')
         .delete()
-        .eq('id', statusId);
+        .eq('status_id', statusId)
+        .eq('module', 'google_my_business');
 
       if (error) {
         console.error('❌ Erro ao deletar status:', error);
@@ -420,11 +444,12 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_columns')
+        .from('column_config')
         .insert({
-          id: crypto.randomUUID(),
-          name: columnName,
-          type: columnType
+          column_id: crypto.randomUUID(),
+          column_name: columnName,
+          column_type: columnType,
+          module: 'google_my_business'
         });
 
       if (error) {
@@ -445,9 +470,13 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_columns')
-        .update(column)
-        .eq('id', column.id);
+        .from('column_config')
+        .update({
+          column_name: column.name,
+          column_type: column.type
+        })
+        .eq('column_id', column.id)
+        .eq('module', 'google_my_business');
 
       if (error) {
         console.error('❌ Erro ao atualizar coluna:', error);
@@ -467,9 +496,10 @@ export function useGoogleMyBusinessData() {
     
     try {
       const { error } = await supabase
-        .from('google_my_business_columns')
+        .from('column_config')
         .delete()
-        .eq('id', columnId);
+        .eq('column_id', columnId)
+        .eq('module', 'google_my_business');
 
       if (error) {
         console.error('❌ Erro ao deletar coluna:', error);
@@ -552,18 +582,19 @@ export function useGoogleMyBusinessData() {
     
     try {
       const newClientId = crypto.randomUUID();
+      const group = groups.find(g => g.id === groupId);
       
       const { error } = await supabase
         .from('google_my_business_data')
         .insert({
           id: newClientId,
           group_id: groupId,
-          group_name: groups.find(group => group.id === groupId)?.name,
-          elemento: client.elemento,
-          servicos: client.servicos,
-          informacoes: client.informacoes,
-          observacoes: client.observacoes,
+          group_name: group?.name?.replace(' - Google My Business', '') || 'Novo Grupo',
           item_data: {
+            elemento: client.elemento,
+            servicos: client.servicos,
+            informacoes: client.informacoes,
+            observacoes: client.observacoes,
             status: {
               id: crypto.randomUUID(),
               name: 'Pendente',
@@ -615,7 +646,6 @@ export function useGoogleMyBusinessData() {
         ...group,
         items: group.items.map(item => {
           if (item.id === clientId) {
-            // Remove attachments from updates for GMB
             const { attachments, ...validUpdates } = updates;
             return { 
               ...item, 
@@ -683,7 +713,7 @@ export function useGoogleMyBusinessData() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles: () => [], // Return empty array since attachments are disabled
+    getClientFiles: () => [],
     applyDefaultObservationsToAllClients
   };
 }
