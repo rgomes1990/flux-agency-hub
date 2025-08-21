@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -132,7 +131,6 @@ export function useContentPadariasData() {
             };
           }
 
-          // Só adicionar item se não for um placeholder (elemento vazio) e se tem item_data
           if (item.elemento && item.elemento.trim() !== '' && item.item_data) {
             let itemData;
             try {
@@ -142,7 +140,6 @@ export function useContentPadariasData() {
                 itemData = item.item_data;
               }
               
-              // Garantir que observações e anexos estão corretos
               itemData.observacoes = item.observacoes;
               itemData.attachments = item.attachments || [];
               
@@ -176,7 +173,6 @@ export function useContentPadariasData() {
       
       for (const group of newGroups) {
         if (group.items.length === 0) {
-          // Se não há itens, criar um registro placeholder para o grupo
           const placeholder = {
             group_id: group.id,
             group_name: group.name,
@@ -216,7 +212,6 @@ export function useContentPadariasData() {
 
       console.log('💾 Total de itens para inserir:', allDataToInsert.length);
 
-      // Primeiro inserir todos os novos dados
       if (allDataToInsert.length > 0) {
         const { data: insertResult, error: insertError } = await supabase
           .from('content_padarias_data')
@@ -230,7 +225,6 @@ export function useContentPadariasData() {
 
         console.log('✅ Novos dados inseridos:', insertResult?.length || 0);
 
-        // Depois deletar todos os dados antigos (exceto os recém inseridos)
         if (insertResult && insertResult.length > 0) {
           const newRecordIds = insertResult.map(record => record.id);
           const { error: deleteError } = await supabase
@@ -245,7 +239,6 @@ export function useContentPadariasData() {
           }
         }
       } else {
-        // Se não há dados para inserir, deletar todos os existentes
         const { error: deleteError } = await supabase
           .from('content_padarias_data')
           .delete()
@@ -446,7 +439,6 @@ export function useContentPadariasData() {
     const newColumns = [...customColumns];
     [newColumns[currentIndex], newColumns[currentIndex - 1]] = [newColumns[currentIndex - 1], newColumns[currentIndex]];
     
-    // Update column orders in database
     const updatePromises = newColumns.map((col, index) => 
       supabase
         .from('column_config')
@@ -466,7 +458,6 @@ export function useContentPadariasData() {
     const newColumns = [...customColumns];
     [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
     
-    // Update column orders in database
     const updatePromises = newColumns.map((col, index) => 
       supabase
         .from('column_config')
@@ -505,13 +496,11 @@ export function useContentPadariasData() {
     try {
       console.log('🔄 Atualizando cliente:', itemId, updates);
 
-      // Processar anexos se existirem
       let processedAttachments = updates.attachments;
       
       if (updates.attachments && Array.isArray(updates.attachments) && updates.attachments.length > 0) {
         try {
           const uploadPromises = updates.attachments.map(async (attachment: any) => {
-            // Se é um File (novo upload)
             if (attachment instanceof File) {
               const fileName = `${itemId}/${Date.now()}_${attachment.name}`;
               const { error: storageError } = await supabase.storage
@@ -526,13 +515,17 @@ export function useContentPadariasData() {
                 throw storageError;
               }
               
-              return fileName;
+              // Retornar objeto com metadados completos
+              return {
+                name: attachment.name,
+                path: fileName,
+                type: attachment.type,
+                size: attachment.size
+              };
             }
-            // Se é um objeto serializado (já existente)
             else if (typeof attachment === 'object' && attachment !== null && 'name' in attachment) {
-              return attachment; // Manter como está
+              return attachment;
             }
-            // Se é uma string (path do arquivo)
             else if (typeof attachment === 'string') {
               return attachment;
             }
@@ -544,14 +537,12 @@ export function useContentPadariasData() {
           console.log('📎 Anexos processados:', processedAttachments);
         } catch (uploadError) {
           console.error('Erro no upload de arquivos:', uploadError);
-          // Continuar sem os anexos se houver erro
           processedAttachments = (updates.attachments || []).filter((att: any) => 
             typeof att === 'string' || (typeof att === 'object' && att !== null && 'name' in att && !(att instanceof File))
           );
         }
       }
 
-      // Criar o objeto de updates final
       const finalUpdates = {
         ...updates,
         attachments: processedAttachments
@@ -589,8 +580,10 @@ export function useContentPadariasData() {
             .createSignedUrl(`${clientId}/${file.name}`, 3600);
 
           return {
-            name: file.name,
-            url: urlData?.signedUrl || ''
+            name: file.name.replace(/^\d+_/, ''), // Remove timestamp prefix
+            url: urlData?.signedUrl || '',
+            size: file.metadata?.size || 0,
+            type: file.metadata?.mimetype || 'application/octet-stream'
           };
         })
       );
@@ -604,7 +597,6 @@ export function useContentPadariasData() {
 
   const updateGroups = (newGroups: ContentGroup[]) => {
     setGroups(newGroups);
-    // Save to database
     saveContentPadariasToDatabase(newGroups);
   };
 
