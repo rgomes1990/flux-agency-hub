@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -227,14 +228,16 @@ export default function ContentPadarias() {
         setClientObservations([]);
       }
 
-      // Parse existing attachments
+      // Parse existing attachments - handle both string and array types
       try {
-        const parsedAttachments = JSON.parse(client.attachments || '[]');
-        if (Array.isArray(parsedAttachments)) {
-          setClientAttachments(parsedAttachments);
-        } else {
-          setClientAttachments([]);
+        let attachmentsToSet = [];
+        if (typeof client.attachments === 'string') {
+          const parsed = JSON.parse(client.attachments);
+          attachmentsToSet = Array.isArray(parsed) ? parsed : [];
+        } else if (Array.isArray(client.attachments)) {
+          attachmentsToSet = client.attachments;
         }
+        setClientAttachments(attachmentsToSet);
       } catch {
         setClientAttachments([]);
       }
