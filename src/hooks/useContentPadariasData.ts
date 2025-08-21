@@ -113,7 +113,6 @@ export function useContentPadariasData() {
       }
 
       console.log('📂 Dados carregados do banco:', data?.length || 0, 'registros');
-      console.log('📂 Dados completos:', JSON.stringify(data, null, 2));
 
       if (data) {
         const groupedData: { [key: string]: ContentGroup } = {};
@@ -121,8 +120,6 @@ export function useContentPadariasData() {
         data.forEach(item => {
           const groupId = item.group_id;
           const groupName = item.group_name;
-          
-          console.log('📂 Processando item:', groupId, groupName, item.elemento);
           
           if (!groupedData[groupId]) {
             groupedData[groupId] = {
@@ -132,7 +129,6 @@ export function useContentPadariasData() {
               color: item.group_color || '#3b82f6',
               items: []
             };
-            console.log('📂 Grupo criado:', groupId, groupName);
           }
 
           // Só adicionar item se não for um placeholder (elemento vazio) e se tem item_data
@@ -144,6 +140,11 @@ export function useContentPadariasData() {
               } else {
                 itemData = item.item_data;
               }
+              
+              // Garantir que observações e anexos estão corretos
+              itemData.observacoes = item.observacoes;
+              itemData.attachments = item.attachments || [];
+              
             } catch (parseError) {
               console.error('❌ Erro ao fazer parse do item_data:', parseError);
               return;
@@ -152,17 +153,11 @@ export function useContentPadariasData() {
             const existingItem = groupedData[groupId].items.find(i => i.id === itemData.id);
             if (!existingItem) {
               groupedData[groupId].items.push(itemData as ContentItem);
-              console.log('📂 Item adicionado ao grupo:', item.elemento);
             }
-          } else {
-            console.log('📂 Placeholder ignorado para grupo:', groupName);
           }
         });
 
         const finalGroups = Object.values(groupedData);
-        console.log('📂 Grupos finais carregados:', finalGroups.length);
-        console.log('📂 Estrutura final:', JSON.stringify(finalGroups, null, 2));
-        
         setGroups(finalGroups);
       }
     } catch (error) {
@@ -176,25 +171,21 @@ export function useContentPadariasData() {
     console.log('💾 saveContentPadariasToDatabase: Iniciando salvamento de', newGroups.length, 'grupos');
     
     try {
-      // Para cada grupo, primeiro inserir os novos dados, depois deletar os antigos
       const allDataToInsert: any[] = [];
       
       for (const group of newGroups) {
-        console.log('💾 Processando grupo:', group.name, 'com', group.items.length, 'itens');
-        
         if (group.items.length === 0) {
           // Se não há itens, criar um registro placeholder para o grupo
           const placeholder = {
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
-            elemento: '', // Placeholder vazio
-            servicos: null as string | null,
-            observacoes: null as string | null,
-            attachments: null as string[] | null,
-            item_data: null as any
+            elemento: '',
+            servicos: null,
+            observacoes: null,
+            attachments: null,
+            item_data: null
           };
-          console.log('💾 Criando placeholder para grupo vazio:', placeholder);
           allDataToInsert.push(placeholder);
         } else {
           const groupData = group.items.map(item => ({
@@ -210,7 +201,12 @@ export function useContentPadariasData() {
               elemento: item.elemento,
               servicos: item.servicos,
               observacoes: item.observacoes,
-              attachments: item.attachments
+              attachments: item.attachments,
+              ...Object.fromEntries(
+                Object.entries(item).filter(([key]) => 
+                  !['id', 'elemento', 'servicos', 'observacoes', 'attachments'].includes(key)
+                )
+              )
             }
           }));
           allDataToInsert.push(...groupData);
@@ -219,7 +215,7 @@ export function useContentPadariasData() {
 
       console.log('💾 Total de itens para inserir:', allDataToInsert.length);
 
-      // PRIMEIRO inserir todos os novos dados
+      // Primeiro inserir todos os novos dados
       if (allDataToInsert.length > 0) {
         const { data: insertResult, error: insertError } = await supabase
           .from('content_padarias_data')
@@ -233,17 +229,16 @@ export function useContentPadariasData() {
 
         console.log('✅ Novos dados inseridos:', insertResult?.length || 0);
 
-        // SÓ DEPOIS deletar todos os dados antigos (exceto os recém inseridos)
-        const newRecordIds = insertResult?.map(record => record.id) || [];
-        if (newRecordIds.length > 0) {
+        // Depois deletar todos os dados antigos (exceto os recém inseridos)
+        if (insertResult && insertResult.length > 0) {
+          const newRecordIds = insertResult.map(record => record.id);
           const { error: deleteError } = await supabase
             .from('content_padarias_data')
             .delete()
-            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+            .not('id', 'in', `(${newRecordIds.join(',')})`);
 
           if (deleteError) {
             console.error('❌ Erro ao deletar dados antigos:', deleteError);
-            // Não fazer throw aqui pois os novos dados já foram salvos
           } else {
             console.log('✅ Dados antigos deletados com sucesso');
           }
@@ -259,7 +254,6 @@ export function useContentPadariasData() {
           console.error('❌ Erro ao deletar todos os dados:', deleteError);
           throw deleteError;
         }
-        console.log('✅ Todos os dados deletados');
       }
 
       console.log('✅ Content padarias data saved successfully');
@@ -309,7 +303,7 @@ export function useContentPadariasData() {
       id: crypto.randomUUID(),
       elemento: clientData.elemento || '',
       servicos: clientData.servicos || '',
-      observacoes: clientData.observacoes,
+      observacoes: clientData.observacoes || '',
       attachments: clientData.attachments || []
     };
 
@@ -508,12 +502,38 @@ export function useContentPadariasData() {
 
   const updateClient = async (itemId: string, updates: Partial<ContentItem>) => {
     try {
-      if (updates.attachments) {
-        const { error: storageError } = await supabase.storage
-          .from('client-files')
-          .upload(`${itemId}/${Date.now()}_${updates.attachments[0]}`, updates.attachments[0]);
+      console.log('🔄 Atualizando cliente:', itemId, updates);
 
-        if (storageError) throw storageError;
+      // Se tem anexos para fazer upload
+      if (updates.attachments && updates.attachments.length > 0) {
+        try {
+          const uploadPromises = updates.attachments.map(async (file: any) => {
+            if (file instanceof File) {
+              const fileName = `${itemId}/${Date.now()}_${file.name}`;
+              const { error: storageError } = await supabase.storage
+                .from('client-files')
+                .upload(fileName, file, {
+                  cacheControl: '3600',
+                  upsert: false
+                });
+
+              if (storageError) {
+                console.error('Erro ao fazer upload:', storageError);
+                throw storageError;
+              }
+              
+              return fileName;
+            }
+            return file; // Se já é uma string (URL), manter
+          });
+
+          const uploadedFiles = await Promise.all(uploadPromises);
+          updates.attachments = uploadedFiles;
+        } catch (uploadError) {
+          console.error('Erro no upload de arquivos:', uploadError);
+          // Continuar sem os anexos se houver erro
+          delete updates.attachments;
+        }
       }
 
       const newGroups = groups.map(group => ({
@@ -525,8 +545,10 @@ export function useContentPadariasData() {
 
       setGroups(newGroups);
       await saveContentPadariasToDatabase(newGroups);
+      
+      console.log('✅ Cliente atualizado com sucesso');
     } catch (error) {
-      console.error('Error updating client:', error);
+      console.error('❌ Error updating client:', error);
       throw error;
     }
   };

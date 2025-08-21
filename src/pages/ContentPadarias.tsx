@@ -234,6 +234,10 @@ export default function ContentPadarias() {
 
   const saveClientDetails = async () => {
     if (showClientDetails) {
+      console.log('💾 Salvando detalhes do cliente:', showClientDetails);
+      console.log('📝 Observações a salvar:', clientObservations);
+      console.log('📎 Arquivo a salvar:', clientFile);
+
       const updates: any = { 
         observacoes: JSON.stringify(clientObservations) 
       };
@@ -242,7 +246,14 @@ export default function ContentPadarias() {
         updates.attachments = [clientFile];
       }
       
-      await updateClient(showClientDetails, updates);
+      console.log('💾 Updates preparados:', updates);
+      
+      try {
+        await updateClient(showClientDetails, updates);
+        console.log('✅ Cliente salvo com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao salvar cliente:', error);
+      }
     }
     setShowClientDetails(null);
     setClientObservations([]);
@@ -308,7 +319,6 @@ export default function ContentPadarias() {
       updateGroups(updatedGroups);
     }
   };
-
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -709,16 +719,28 @@ export default function ContentPadarias() {
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
-          onOpenChange={(open) => !open && setShowClientDetails(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              console.log('🔄 Fechando modal, salvando dados...');
+              saveClientDetails();
+            }
+          }}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
-          onUpdateObservations={setClientObservations}
+          onUpdateObservations={(newObservations) => {
+            console.log('🔄 Atualizando observações:', newObservations);
+            setClientObservations(newObservations);
+          }}
           clientFile={clientFile}
-          onFileChange={setClientFile}
+          onFileChange={(file) => {
+            console.log('📎 Arquivo selecionado:', file?.name);
+            setClientFile(file);
+          }}
           onFilePreview={openFilePreview}
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
           onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+          onSave={saveClientDetails}
         />
       )}
 
