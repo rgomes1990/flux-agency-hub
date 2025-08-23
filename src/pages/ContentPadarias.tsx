@@ -725,7 +725,7 @@ export default function ContentPadarias() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
+        onUpdateStatus={(statusId, updates) => updateStatus({ id: statusId, name: updates.name, color: updates.color })}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />
