@@ -711,7 +711,7 @@ export default function Traffic() {
         onOpenChange={setShowStatusModal}
         onAddStatus={(status) => addStatus(status.name, status.color)}
         onUpdateStatus={(status) => updateStatus(status.id, { name: status.name, color: status.color })}
-        onDeleteStatus={deleteStatus}
+        onDeleteStatus={(statusId) => deleteStatus(statusId)}
         existingStatuses={statuses}
       />
 
