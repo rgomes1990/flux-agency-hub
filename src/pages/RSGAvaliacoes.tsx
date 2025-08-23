@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import useRSGAvaliacoesData from '@/hooks/useRSGAvaliacoesData';
 import { Button } from '@/components/ui/button';
@@ -676,7 +677,7 @@ export default function RSGAvaliacoes() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={(status) => addStatus(status.name, status.color)}
-        onUpdateStatus={updateStatus}
+        onUpdateStatus={(status) => updateStatus(status.id, { name: status.name, color: status.color })}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />

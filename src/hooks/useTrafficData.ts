@@ -345,9 +345,75 @@ export function useTrafficData() {
     }
   }, []);
 
+  const addStatus = async (name: string, color: string) => {
+    const newStatus: TrafficStatus = {
+      id: crypto.randomUUID(),
+      name,
+      color
+    };
+    setStatuses([...statuses, newStatus]);
+  };
+
+  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
+    const updatedStatuses = statuses.map(status =>
+      status.id === statusId ? { ...status, ...updates } : status
+    );
+    setStatuses(updatedStatuses);
+  };
+
+  const deleteStatus = async (statusId: string) => {
+    const updatedStatuses = statuses.filter(status => status.id !== statusId);
+    setStatuses(updatedStatuses);
+  };
+
+  const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
+    const newColumn = {
+      id: crypto.randomUUID(),
+      name: columnName,
+      type: columnType
+    };
+    setColumns([...columns, newColumn]);
+  };
+
+  const updateColumn = async (updatedColumn: TrafficColumn) => {
+    const updatedColumns = columns.map(column =>
+      column.id === updatedColumn.id ? updatedColumn : column
+    );
+    setColumns(updatedColumns);
+  };
+
+  const deleteColumn = async (columnId: string) => {
+    const updatedColumns = columns.filter(column => column.id !== columnId);
+    setColumns(updatedColumns);
+  };
+
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    const status = statuses.find(s => s.id === statusId);
+    if (!status) return;
+
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, [field]: status };
+        }
+        return item;
+      })
+    }));
+
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const getClientFiles = (clientId: string): File[] => {
+    // Implementation for getting client files
+    return [];
+  };
+
   return {
     groups,
     columns,
+    customColumns: columns, // Alias for compatibility
     statuses,
     updateGroups,
     createMonth,
@@ -356,6 +422,14 @@ export function useTrafficData() {
     duplicateMonth,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    addStatus,
+    updateStatus,
+    deleteStatus,
+    addColumn,
+    updateColumn,
+    deleteColumn,
+    updateItemStatus,
+    getClientFiles
   };
 }

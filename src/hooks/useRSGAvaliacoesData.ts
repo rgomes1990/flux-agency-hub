@@ -293,24 +293,25 @@ export default function useRSGAvaliacoesData() {
     await saveRSGAvaliacoesToDatabase(updatedGroups);
   };
 
-  const addStatus = async (status: RSGAvaliacoesStatus) => {
-    setStatuses([...statuses, status]);
-    // await saveStatusesToDatabase([...statuses, status]);
+  const addStatus = async (name: string, color: string) => {
+    const newStatus: RSGAvaliacoesStatus = {
+      id: crypto.randomUUID(),
+      name,
+      color
+    };
+    setStatuses([...statuses, newStatus]);
   };
 
-  const updateStatus = async (updatedStatus: RSGAvaliacoesStatus) => {
+  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
     const updatedStatuses = statuses.map(status =>
-      status.id === updatedStatus.id ? updatedStatus : status
+      status.id === statusId ? { ...status, ...updates } : status
     );
-
     setStatuses(updatedStatuses);
-    // await saveStatusesToDatabase(updatedStatuses);
   };
 
   const deleteStatus = async (statusId: string) => {
     const updatedStatuses = statuses.filter(status => status.id !== statusId);
     setStatuses(updatedStatuses);
-    // await saveStatusesToDatabase(updatedStatuses);
   };
 
   const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
@@ -319,24 +320,55 @@ export default function useRSGAvaliacoesData() {
       name: columnName,
       type: columnType
     };
-
     setColumns([...columns, newColumn]);
-    // await saveColumnsToDatabase([...columns, newColumn]);
   };
 
   const updateColumn = async (updatedColumn: RSGAvaliacoesColumn) => {
     const updatedColumns = columns.map(column =>
       column.id === updatedColumn.id ? updatedColumn : column
     );
-
     setColumns(updatedColumns);
-    // await saveColumnsToDatabase(updatedColumns);
   };
 
   const deleteColumn = async (columnId: string) => {
     const updatedColumns = columns.filter(column => column.id !== columnId);
     setColumns(updatedColumns);
-    // await saveColumnsToDatabase(updatedColumns);
+  };
+
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    const status = statuses.find(s => s.id === statusId);
+    if (!status) return;
+
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, [field]: status };
+        }
+        return item;
+      })
+    }));
+
+    setGroups(updatedGroups);
+    await saveRSGAvaliacoesToDatabase(updatedGroups);
+  };
+
+  const moveColumnUp = (columnId: string) => {
+    const currentIndex = columns.findIndex(col => col.id === columnId);
+    if (currentIndex > 0) {
+      const newColumns = [...columns];
+      [newColumns[currentIndex - 1], newColumns[currentIndex]] = [newColumns[currentIndex], newColumns[currentIndex - 1]];
+      setColumns(newColumns);
+    }
+  };
+
+  const moveColumnDown = (columnId: string) => {
+    const currentIndex = columns.findIndex(col => col.id === columnId);
+    if (currentIndex < columns.length - 1) {
+      const newColumns = [...columns];
+      [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
+      setColumns(newColumns);
+    }
   };
 
   const loadColumns = useCallback(async () => {
@@ -394,6 +426,7 @@ export default function useRSGAvaliacoesData() {
   return {
     groups,
     columns,
+    customColumns: columns,
     statuses,
     updateGroups,
     createMonth,
@@ -409,5 +442,8 @@ export default function useRSGAvaliacoesData() {
     addColumn,
     updateColumn,
     deleteColumn,
+    updateItemStatus,
+    moveColumnUp,
+    moveColumnDown,
   };
 }

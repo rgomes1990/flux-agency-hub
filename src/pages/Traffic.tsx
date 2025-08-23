@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,7 @@ export default function Traffic() {
   const { 
     groups, 
     columns,
-    customColumns, // Use customColumns for management interface
+    customColumns,
     statuses,
     updateGroups, 
     createMonth, 
@@ -708,8 +709,8 @@ export default function Traffic() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
+        onAddStatus={(status) => addStatus(status.name, status.color)}
+        onUpdateStatus={(status) => updateStatus(status.id, { name: status.name, color: status.color })}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />
