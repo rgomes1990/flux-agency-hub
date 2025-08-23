@@ -1,19 +1,21 @@
-
-import { useState, useEffect } from 'react';
-import { useAuth } from './useAuth';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface TrafficItem {
+export interface TrafficItem {
   id: string;
   elemento: string;
   servicos: string;
-  informacoes: string;
-  observacoes?: string;
-  attachments?: { name: string; data: string; type: string }[];
+  observacoes: string;
+  attachments?: Array<{ name: string; data: string; type: string; size?: number }>;
+  status?: {
+    id?: string;
+    name?: string;
+    color?: string;
+  };
   [key: string]: any;
 }
 
-interface TrafficGroup {
+export interface TrafficGroup {
   id: string;
   name: string;
   color: string;
@@ -21,706 +23,339 @@ interface TrafficGroup {
   items: TrafficItem[];
 }
 
-interface TrafficColumn {
+export interface TrafficColumn {
   id: string;
   name: string;
   type: 'status' | 'text';
-  isDefault?: boolean;
 }
 
-interface ServiceStatus {
+export interface TrafficStatus {
   id: string;
   name: string;
   color: string;
 }
 
-export const useTrafficData = () => {
+export function useTrafficData() {
   const [groups, setGroups] = useState<TrafficGroup[]>([]);
   const [columns, setColumns] = useState<TrafficColumn[]>([]);
-  const [customColumns, setCustomColumns] = useState<TrafficColumn[]>([]);
-  const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
+  const [statuses, setStatuses] = useState<TrafficStatus[]>([]);
 
-  const { user, logAudit } = useAuth();
+  useEffect(() => {
+    loadTrafficData();
+    loadColumns();
+    loadStatuses();
+  }, []);
 
-  // Carregar colunas personalizadas do Supabase
-  const loadColumns = async () => {
-    try {
-      console.log('🔄 TRAFFIC: Carregando colunas');
-      const { data, error } = await supabase
-        .from('column_config')
-        .select('*')
-        .eq('module', 'traffic');
-
-      console.log('📊 TRAFFIC: Resposta colunas:', { data, error });
-
-      if (error) {
-        console.error('❌ TRAFFIC: Erro ao carregar colunas:', error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const customColumnsFromDB = data.map(col => ({
-          id: col.column_id,
-          name: col.column_name,
-          type: col.column_type as 'status' | 'text',
-          isDefault: false
-        }));
-
-        setCustomColumns(customColumnsFromDB);
-        setColumns(customColumnsFromDB);
-        console.log('✅ TRAFFIC: Colunas carregadas:', customColumnsFromDB.length);
-      } else {
-        setCustomColumns([]);
-        setColumns([]);
-        console.log('ℹ️ TRAFFIC: Nenhuma coluna encontrada');
-      }
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro crítico ao carregar colunas:', error);
-    }
+  const updateGroups = (updatedGroups: TrafficGroup[]) => {
+    setGroups(updatedGroups);
   };
 
-  // Carregar status personalizados do Supabase
-  const loadStatuses = async () => {
+  const loadTrafficData = useCallback(async () => {
+    console.log('🔄 Carregando dados do Tráfego Pago...');
+    
     try {
-      console.log('🔄 TRAFFIC: Carregando status');
-      const { data, error } = await supabase
-        .from('status_config')
-        .select('*')
-        .eq('module', 'traffic');
-
-      console.log('📊 TRAFFIC: Resposta status:', { data, error });
-
-      if (error) {
-        console.error('❌ TRAFFIC: Erro ao carregar status:', error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const customStatuses = data.map(status => ({
-          id: status.status_id,
-          name: status.status_name,
-          color: status.status_color
-        }));
-
-        setStatuses(customStatuses);
-        console.log('✅ TRAFFIC: Status carregados:', customStatuses.length);
-      } else {
-        setStatuses([]);
-        console.log('ℹ️ TRAFFIC: Nenhum status encontrado');
-      }
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro crítico ao carregar status:', error);
-    }
-  };
-
-  // Carregar dados do Supabase
-  const loadTrafficData = async () => {
-    try {
-      console.log('🔄 TRAFFIC: Carregando dados');
-      
       const { data, error } = await supabase
         .from('traffic_data')
         .select('*')
-        .order('created_at', { ascending: true });
-
-      console.log('📊 TRAFFIC: Resposta dados:', { 
-        dataLength: data?.length || 0, 
-        error,
-        sampleData: data?.[0] 
-      });
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ TRAFFIC: Erro ao carregar dados:', error);
+        console.error('❌ Erro ao carregar dados:', error);
+        throw error;
+      }
+
+      console.log('📊 Dados carregados:', data?.length, 'registros');
+
+      if (!data || data.length === 0) {
+        console.log('📝 Nenhum dado encontrado, criando dados padrão...');
+        await createDefaultData();
         return;
       }
 
-      if (data && data.length > 0) {
-        const groupsMap = new Map<string, TrafficGroup>();
+      const groupsMap = new Map<string, TrafficGroup>();
+      const processedItems = new Set<string>();
 
-        data.forEach((item, index) => {
-          console.log(`🔍 TRAFFIC: Processando item ${index + 1}:`, {
-            group_id: item.group_id,
-            item_data_preview: JSON.stringify(item.item_data).substring(0, 100)
+      data.forEach(item => {
+        // Skip if already processed to avoid duplicates
+        if (processedItems.has(item.id)) {
+          console.log('⚠️ Item duplicado encontrado, pulando:', item.id);
+          return;
+        }
+        processedItems.add(item.id);
+
+        if (!groupsMap.has(item.group_name)) {
+          groupsMap.set(item.group_name, {
+            id: item.group_id,
+            name: item.group_name,
+            color: item.group_color || 'bg-red-500',
+            isExpanded: item.is_expanded !== false,
+            items: []
           });
+        }
 
-          let itemData;
+        const group = groupsMap.get(item.group_name)!;
+        
+        // Process item data safely
+        let itemData: any = {};
+        let status: any = {};
+        
+        if (item.item_data) {
           try {
             if (typeof item.item_data === 'string') {
               itemData = JSON.parse(item.item_data);
             } else {
-              itemData = item.item_data;
+              itemData = item.item_data as any;
             }
-          } catch (parseError) {
-            console.error('❌ TRAFFIC: Erro ao fazer parse do item_data:', parseError);
-            return;
+            status = itemData?.status || {};
+          } catch (error) {
+            console.warn('⚠️ Erro ao processar item_data:', error);
+            itemData = {};
           }
-          
-          if (!groupsMap.has(item.group_id)) {
-            groupsMap.set(item.group_id, {
-              id: item.group_id,
-              name: item.group_name,
-              color: item.group_color || 'bg-red-500',
-              isExpanded: item.is_expanded,
-              items: []
-            });
-          }
+        }
 
-          const group = groupsMap.get(item.group_id)!;
-          if (itemData && itemData.id && itemData.id !== `empty-${item.group_id}`) {
-            group.items.push(itemData);
-          }
-        });
+        const trafficItem: TrafficItem = {
+          id: item.id,
+          elemento: itemData.elemento || '',
+          servicos: itemData.servicos || '',
+          observacoes: itemData.observacoes || '',
+          attachments: itemData.attachments || [],
+          status: status,
+          ...itemData
+        };
 
-        const loadedGroups = Array.from(groupsMap.values());
-        console.log('✅ TRAFFIC: Grupos carregados:', {
-          totalGroups: loadedGroups.length,
-          groupDetails: loadedGroups.map(g => ({ name: g.name, itemCount: g.items.length }))
-        });
-        setGroups(loadedGroups);
-      } else {
-        setGroups([]);
-        console.log('ℹ️ TRAFFIC: Nenhum dado encontrado');
-      }
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro crítico ao carregar dados:', error);
-    }
-  };
-
-  // Salvar dados no Supabase
-  const saveTrafficToDatabase = async (newGroups: TrafficGroup[]) => {
-    try {
-      console.log('🔄 TRAFFIC: Iniciando salvamento:', {
-        groupCount: newGroups.length,
-        totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
+        group.items.push(trafficItem);
       });
-      
-      for (const group of newGroups) {
-        console.log(`🔄 TRAFFIC: Processando grupo: ${group.name} (${group.items.length} itens)`);
-        
-        // Sempre inserir dados do grupo
-        const insertData = group.items.length > 0 
-          ? group.items.map((item, index) => {
-              console.log(`📝 TRAFFIC: Preparando item ${index + 1}:`, {
-                id: item.id,
-                elemento: item.elemento
-              });
 
-              return {
-                group_id: group.id,
-                group_name: group.name,
-                group_color: group.color,
-                is_expanded: group.isExpanded,
-                item_data: item,
-                user_id: null // Sempre null para tornar global
-              };
-            })
-          : [{
-              group_id: group.id,
-              group_name: group.name,
-              group_color: group.color,
-              is_expanded: group.isExpanded,
-              item_data: {
-                id: `empty-${group.id}`,
-                elemento: '',
-                servicos: '',
-                informacoes: '',
-                observacoes: '',
-                attachments: []
-              },
-              user_id: null // Sempre null para tornar global
-            }];
+      const loadedGroups = Array.from(groupsMap.values());
+      console.log('✅ Grupos carregados:', loadedGroups.length);
+      updateGroups(loadedGroups);
 
-        console.log('📝 TRAFFIC: Dados para inserir:', {
-          groupId: group.id,
-          itemCount: insertData.length
-        });
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados do Tráfego Pago:', error);
+    }
+  }, []);
 
-        // PRIMEIRO inserir os novos dados
-        const { data: insertResult, error: insertError } = await supabase
+  const saveTrafficToDatabase = async (trafficData: TrafficGroup[]) => {
+    console.log('💾 Salvando dados no banco de dados...', trafficData);
+  
+    try {
+      // Delete existing data to prevent duplicates
+      const { error: deleteError } = await supabase
+        .from('traffic_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (deleteError) {
+        console.error('❌ Erro ao limpar dados antigos:', deleteError);
+        throw deleteError;
+      }
+
+      // Format data for database
+      const formattedData = trafficData.flatMap(group =>
+        group.items.map(item => ({
+          id: item.id,
+          group_id: group.id,
+          group_name: group.name,
+          group_color: group.color,
+          is_expanded: group.isExpanded,
+          item_data: item,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }))
+      );
+
+      // Insert new data
+      if (formattedData.length > 0) {
+        const { error: insertError } = await supabase
           .from('traffic_data')
-          .insert(insertData)
-          .select('id');
+          .insert(formattedData);
 
         if (insertError) {
-          console.error('❌ TRAFFIC: Erro ao inserir:', insertError);
+          console.error('❌ Erro ao inserir dados:', insertError);
           throw insertError;
         }
-
-        console.log('✅ TRAFFIC: Dados inseridos:', insertResult?.length || 0);
-
-        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
-        const newRecordIds = insertResult?.map(record => record.id) || [];
-        if (newRecordIds.length > 0) {
-          const { error: deleteError } = await supabase
-            .from('traffic_data')
-            .delete()
-            .eq('group_id', group.id)
-            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
-
-          if (deleteError) {
-            console.error('❌ TRAFFIC: Erro ao deletar dados antigos:', deleteError);
-            // Não fazer throw aqui pois os novos dados já foram salvos
-          }
-        }
       }
-      
-      console.log('🎉 TRAFFIC: Salvamento completo!');
+
+      console.log('✅ Dados salvos com sucesso!');
     } catch (error) {
-      console.error('❌ TRAFFIC: Erro crítico no salvamento:', error);
-      throw error;
+      console.error('❌ Erro ao salvar dados no banco de dados:', error);
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      console.log('Inicializando dados de tráfego globais para usuário:', user.username);
-      loadTrafficData();
-      loadColumns();
-      loadStatuses();
-    } else {
-      console.log('Usuário não logado, aguardando autenticação...');
-    }
-  }, [user]);
-
-  const createMonth = async (monthName: string) => {
-    try {
-      console.log('🆕 TRAFFIC: Criando mês:', monthName);
-      
-      const timestamp = Date.now();
-      const newGroup: TrafficGroup = {
-        id: `${monthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`,
-        name: monthName.toUpperCase() + ' - TRÁFEGO',
+  const createDefaultData = async () => {
+    const defaultGroups: TrafficGroup[] = [
+      {
+        id: crypto.randomUUID(),
+        name: 'Janeiro - TRÁFEGO PAGO',
         color: 'bg-red-500',
         isExpanded: true,
         items: []
-      };
-      
-      console.log('📊 TRAFFIC: Grupo criado:', {
-        groupId: newGroup.id,
-        groupName: newGroup.name
-      });
-
-      // Adicionar ao estado local
-      const newGroups = [...groups, newGroup];
-      setGroups(newGroups);
-      
-      // Salvar no banco
-      try {
-        await saveTrafficToDatabase(newGroups);
-        console.log('✅ TRAFFIC: Mês criado e salvo com sucesso');
-        return newGroup.id;
-      } catch (saveError) {
-        console.error('❌ TRAFFIC: Erro ao salvar no banco:', saveError);
-        // Reverter o estado se falhar
-        setGroups(groups);
-        throw saveError;
       }
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro ao criar mês:', error);
-      throw error;
-    }
+    ];
+
+    setGroups(defaultGroups);
+    await saveTrafficToDatabase(defaultGroups);
   };
 
-  const addClient = async (groupId: string, clientData: Partial<TrafficItem>) => {
-    try {
-      console.log('👤 TRAFFIC: Adicionando cliente:', {
-        groupId,
-        elemento: clientData.elemento,
-        servicos: clientData.servicos
-      });
-      
-      const newClient: TrafficItem = {
-        id: `traffic-client-${Date.now()}`,
-        elemento: clientData.elemento || 'Novo Cliente',
-        servicos: clientData.servicos || '',
-        informacoes: '',
-        attachments: []
-      };
+  const createMonth = async (monthName: string) => {
+    const newGroupId = crypto.randomUUID();
+    const newGroup: TrafficGroup = {
+      id: newGroupId,
+      name: `${monthName} - TRÁFEGO PAGO`,
+      color: 'bg-red-500',
+      isExpanded: true,
+      items: []
+    };
 
-      // Adicionar colunas customizadas
-      customColumns.forEach(column => {
-        newClient[column.id] = column.type === 'status' ? '' : '';
-      });
-
-      const newGroups = groups.map(group => 
-        group.id === groupId 
-          ? { ...group, items: group.items.filter(item => item.id !== `empty-${groupId}`).concat(newClient) }
-          : group
-      );
-      
-      console.log('📊 TRAFFIC: Salvando cliente no grupo:', {
-        clientId: newClient.id,
-        groupId,
-        totalItemsInGroup: newGroups.find(g => g.id === groupId)?.items.length
-      });
-      
-      setGroups(newGroups);
-      await saveTrafficToDatabase(newGroups);
-      
-      console.log('✅ TRAFFIC: Cliente adicionado com sucesso');
-      return newClient.id;
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro ao adicionar cliente:', error);
-      throw error;
-    }
+    setGroups([...groups, newGroup]);
+    await saveTrafficToDatabase([...groups, newGroup]);
   };
 
-  const addColumn = async (name: string, type: 'status' | 'text') => {
-    try {
-      console.log('🆕 TRAFFIC: Adicionando coluna:', { name, type });
-      
-      const newColumn: TrafficColumn = {
-        id: name.toLowerCase().replace(/\s+/g, '_'),
-        name,
-        type,
-        isDefault: false
-      };
-      
-      // Salvar no banco
-      const { data, error } = await supabase
-        .from('column_config')
-        .insert({
-          column_id: newColumn.id,
-          column_name: newColumn.name,
-          column_type: newColumn.type,
-          module: 'traffic',
-          is_default: false,
-          user_id: null // Sempre null para tornar global
-        })
-        .select();
+  const updateMonth = async (groupId: string, newMonthName: string) => {
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, name: `${newMonthName} - TRÁFEGO PAGO` } : group
+    );
 
-      console.log('📊 TRAFFIC: Resultado inserção coluna:', { data, error });
-
-      if (error) {
-        console.error('❌ TRAFFIC: Erro ao salvar coluna:', error);
-        throw error;
-      }
-      
-      setColumns(prev => [...prev, newColumn]);
-      setCustomColumns(prev => [...prev, newColumn]);
-      
-      // Adicionar a nova coluna a todos os itens existentes
-      const newGroups = groups.map(group => ({
-        ...group,
-        items: group.items.map(item => ({
-          ...item,
-          [newColumn.id]: type === 'status' ? '' : ''
-        }))
-      }));
-      
-      setGroups(newGroups);
-      await saveTrafficToDatabase(newGroups);
-      
-      console.log('✅ TRAFFIC: Coluna adicionada com sucesso');
-    } catch (error) {
-      console.error('❌ TRAFFIC: Erro ao adicionar coluna:', error);
-      throw error;
-    }
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
   };
 
-  const addStatus = async (status: ServiceStatus) => {
+  const deleteMonth = async (groupId: string) => {
+    const updatedGroups = groups.filter(group => group.id !== groupId);
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const duplicateMonth = async (groupId: string, newMonthName: string) => {
+    const groupToDuplicate = groups.find(group => group.id === groupId);
+    if (!groupToDuplicate) return;
+  
+    const newGroupId = crypto.randomUUID();
+    const duplicatedGroup: TrafficGroup = {
+      id: newGroupId,
+      name: `${newMonthName} - TRÁFEGO PAGO`,
+      color: groupToDuplicate.color,
+      isExpanded: true,
+      items: groupToDuplicate.items.map(item => ({
+        ...item,
+        id: crypto.randomUUID(),
+        elemento: item.elemento || '',
+        servicos: item.servicos || '',
+        observacoes: item.observacoes || ''
+      }))
+    };
+  
+    const updatedGroups = [...groups, duplicatedGroup];
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const addClient = async (groupId: string, client: Omit<TrafficItem, 'id'>) => {
+    const newClientId = crypto.randomUUID();
+    const newClient: TrafficItem = {
+      id: newClientId,
+      elemento: client.elemento || '',
+      servicos: client.servicos || '',
+      observacoes: client.observacoes || '',
+      ...client
+    };
+
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, items: [...group.items, newClient] } : group
+    );
+
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const deleteClient = async (clientId: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== clientId)
+    }));
+
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const updateClient = async (clientId: string, updates: any) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        if (item.id === clientId) {
+          return { ...item, ...updates };
+        }
+        return item;
+      })
+    }));
+
+    setGroups(updatedGroups);
+    await saveTrafficToDatabase(updatedGroups);
+  };
+
+  const loadColumns = useCallback(async () => {
     try {
-      console.log('🆕 TRAFFIC: Adicionando status:', status);
-      
-      // Salvar no banco
       const { data, error } = await supabase
         .from('status_config')
-        .insert({
-          status_id: status.id,
-          status_name: status.name,
-          status_color: status.color,
-          module: 'traffic',
-          user_id: null // Sempre null para tornar global
-        })
-        .select();
-
-      console.log('📊 TRAFFIC: Resultado inserção status:', { data, error });
+        .select('*')
+        .eq('module', 'traffic')
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ TRAFFIC: Erro ao salvar status:', error);
-        throw error;
+        console.error('❌ Erro ao carregar colunas:', error);
+        return;
       }
-      
-      setStatuses(prev => [...prev, status]);
-      console.log('✅ TRAFFIC: Status adicionado com sucesso');
+
+      if (data) {
+        const typedColumns = data.map(col => ({
+          id: col.status_id,
+          name: col.status_name,
+          type: 'status' as const
+        }));
+        setColumns(typedColumns);
+      }
     } catch (error) {
-      console.error('❌ TRAFFIC: Erro ao adicionar status:', error);
-      throw error;
+      console.error('❌ Erro ao carregar colunas:', error);
     }
-  };
+  }, []);
+
+  const loadStatuses = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('status_config')
+        .select('*')
+        .eq('module', 'traffic')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Erro ao carregar status:', error);
+        return;
+      }
+
+      if (data) {
+        const typedStatuses = data.map(status => ({
+          id: status.status_id,
+          name: status.status_name,
+          color: status.status_color
+        }));
+        setStatuses(typedStatuses);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar status:', error);
+    }
+  }, []);
 
   return {
     groups,
     columns,
-    customColumns,
     statuses,
-    updateGroups: async (newGroups: TrafficGroup[]) => {
-      console.log('🔄 TRAFFIC: Atualizando grupos:', newGroups.length);
-      try {
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        console.log('✅ TRAFFIC: Grupos atualizados');
-      } catch (error) {
-        console.error('❌ TRAFFIC: Erro ao atualizar grupos:', error);
-        throw error;
-      }
-    },
-    updateClient: async (itemId: string, updates: Partial<TrafficItem>) => {
-      try {
-        console.log('👤 TRAFFIC: Atualizando cliente:', { itemId, updates });
-        
-        const newGroups = groups.map(group => ({
-          ...group,
-          items: group.items.map(item => 
-            item.id === itemId ? { ...item, ...updates } : item
-          )
-        }));
-        
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        console.log('✅ TRAFFIC: Cliente atualizado com sucesso');
-      } catch (error) {
-        console.error('❌ TRAFFIC: Erro ao atualizar cliente:', error);
-        throw error;
-      }
-    },
+    updateGroups,
     createMonth,
+    updateMonth,
+    deleteMonth,
+    duplicateMonth,
     addClient,
-    addColumn,
-    addStatus,
-    updateMonth: async (groupId: string, newName: string) => {
-      try {
-        const newGroups = groups.map(group => 
-          group.id === groupId 
-            ? { ...group, name: newName.toUpperCase() + ' - TRÁFEGO' }
-            : group
-        );
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-      } catch (error) {
-        console.error('❌ TRAFFIC: Erro ao atualizar mês:', error);
-        throw error;
-      }
-    },
-    deleteMonth: async (groupId: string) => {
-      try {
-        const { error } = await supabase
-          .from('traffic_data')
-          .delete()
-          .eq('group_id', groupId);
-
-        if (error) throw error;
-        setGroups(groups.filter(group => group.id !== groupId));
-      } catch (error) {
-        console.error('❌ TRAFFIC: Erro ao deletar mês:', error);
-        throw error;
-      }
-    },
-    duplicateMonth: async (sourceGroupId: string, newMonthName: string) => {
-      try {
-        const groupToDuplicate = groups.find(g => g.id === sourceGroupId);
-        if (!groupToDuplicate) throw new Error('Grupo não encontrado');
-        
-        const timestamp = Date.now();
-        const newGroupId = `${newMonthName.toLowerCase().replace(/\s+/g, '-')}-trafego-${timestamp}`;
-        
-        const newGroup: TrafficGroup = {
-          id: newGroupId,
-          name: newMonthName.toUpperCase() + ' - TRÁFEGO',
-          color: groupToDuplicate.color,
-          isExpanded: true,
-          items: groupToDuplicate.items.map((item, index) => ({
-            ...item,
-            id: `traffic-${newMonthName.toLowerCase()}-${timestamp}-${index}`,
-            informacoes: '',
-            observacoes: '',
-            attachments: []
-          }))
-        };
-        
-        const newGroups = [...groups, newGroup];
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        return newGroupId;
-      } catch (error) {
-        console.error('❌ TRAFFIC: Erro ao duplicar mês:', error);
-        throw error;
-      }
-    },
-    updateStatus: async (statusId: string, updates: Partial<ServiceStatus>) => {
-      try {
-        console.log('Atualizando status:', { statusId, updates });
-        
-        setStatuses(prev => prev.map(status => 
-          status.id === statusId ? { ...status, ...updates } : status
-        ));
-
-        const { error } = await supabase
-          .from('status_config')
-          .update({
-            status_name: updates.name,
-            status_color: updates.color
-          })
-          .eq('status_id', statusId)
-          .eq('module', 'traffic');
-
-        if (error) {
-          console.error('Erro ao atualizar status:', error);
-          loadStatuses();
-          throw error;
-        }
-        
-        console.log('Status atualizado com sucesso');
-      } catch (error) {
-        console.error('Erro ao atualizar status:', error);
-        throw error;
-      }
-    },
-    deleteStatus: async (statusId: string) => {
-      try {
-        console.log('Deletando status:', { statusId });
-        
-        setStatuses(prev => prev.filter(status => status.id !== statusId));
-
-        const { error } = await supabase
-          .from('status_config')
-          .delete()
-          .eq('status_id', statusId)
-          .eq('module', 'traffic');
-
-        if (error) {
-          console.error('Erro ao deletar status:', error);
-          loadStatuses();
-          throw error;
-        }
-        
-        console.log('Status deletado com sucesso');
-      } catch (error) {
-        console.error('Erro ao deletar status:', error);
-        throw error;
-      }
-    },
-    updateColumn: async (id: string, updates: Partial<TrafficColumn>) => {
-      try {
-        console.log('Atualizando coluna:', { id, updates });
-        
-        setColumns(prev => prev.map(col => 
-          col.id === id ? { ...col, ...updates } : col
-        ));
-        
-        setCustomColumns(prev => prev.map(col => 
-          col.id === id ? { ...col, ...updates } : col
-        ));
-
-        const { error } = await supabase
-          .from('column_config')
-          .update({
-            column_name: updates.name,
-            column_type: updates.type
-          })
-          .eq('column_id', id)
-          .eq('module', 'traffic');
-
-        if (error) {
-          console.error('Erro ao atualizar coluna:', error);
-          loadColumns();
-          throw error;
-        }
-        
-        console.log('Coluna atualizada com sucesso');
-      } catch (error) {
-        console.error('Erro ao atualizar coluna:', error);
-        throw error;
-      }
-    },
-    deleteColumn: async (id: string) => {
-      try {
-        console.log('Deletando coluna:', { id });
-        
-        setColumns(prev => prev.filter(col => col.id !== id));
-        setCustomColumns(prev => prev.filter(col => col.id !== id));
-        
-        const { error } = await supabase
-          .from('column_config')
-          .delete()
-          .eq('column_id', id)
-          .eq('module', 'traffic');
-
-        if (error) {
-          console.error('Erro ao deletar coluna:', error);
-          loadColumns();
-          throw error;
-        }
-        
-        const newGroups = groups.map(group => ({
-          ...group,
-          items: group.items.map(item => {
-            const updatedItem = { ...item };
-            delete updatedItem[id];
-            return updatedItem;
-          })
-        }));
-        
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        
-        console.log('Coluna deletada com sucesso');
-      } catch (error) {
-        console.error('Erro ao deletar coluna:', error);
-        throw error;
-      }
-    },
-    updateItemStatus: async (itemId: string, field: string, statusId: string) => {
-      try {
-        console.log('Atualizando status do item:', { itemId, field, statusId });
-        
-        const newGroups = groups.map(group => ({
-          ...group,
-          items: group.items.map(item => 
-            item.id === itemId 
-              ? { ...item, [field]: statusId }
-              : item
-          )
-        }));
-        
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        
-        console.log('Status do item atualizado com sucesso');
-      } catch (error) {
-        console.error('Erro ao atualizar status do item:', error);
-      }
-    },
-    deleteClient: async (itemId: string) => {
-      try {
-        console.log('Deletando cliente:', itemId);
-        
-        const newGroups = groups.map(group => ({
-          ...group,
-          items: group.items.filter(item => item.id !== itemId)
-        }));
-        
-        setGroups(newGroups);
-        await saveTrafficToDatabase(newGroups);
-        
-        console.log('Cliente deletado com sucesso');
-      } catch (error) {
-        console.error('Erro ao deletar cliente:', error);
-      }
-    },
-    getClientFiles: (clientId: string): File[] => {
-      const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-      if (!client || !client.attachments) return [];
-      
-      return client.attachments.map(attachment => {
-        const byteCharacters = atob(attachment.data.split(',')[1]);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new File([byteArray], attachment.name, { type: attachment.type });
-      });
-    }
+    deleteClient,
+    updateClient
   };
-};
+}

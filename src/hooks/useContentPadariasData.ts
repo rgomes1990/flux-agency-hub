@@ -318,6 +318,93 @@ export function useContentPadariasData() {
     }
   }, []);
 
+  const getClientFiles = useCallback((clientId: string) => {
+    try {
+      // Find the client item
+      const clientItem = groups.flatMap(group => group.items).find(item => item.id === clientId);
+  
+      if (!clientItem || !clientItem.attachments) {
+        console.log(`No attachments found for client ${clientId}`);
+        return [];
+      }
+  
+      // Check if attachments is already an array of objects
+      if (Array.isArray(clientItem.attachments)) {
+        return clientItem.attachments.map(att => {
+          // Se o anexo é uma string JSON, parsear
+          if (typeof att === 'string') {
+            try {
+              const parsed = JSON.parse(att);
+              return {
+                name: parsed.name || 'Arquivo',
+                type: parsed.type || 'application/octet-stream',
+                data: parsed.data || '',
+                size: parsed.size || 0
+              };
+            } catch (error) {
+              console.error('Error parsing attachment JSON:', error);
+              return { name: 'Arquivo corrompido', type: 'unknown', data: '', size: 0 };
+            }
+          }
+          // Se já é um objeto, garantir que tem as propriedades necessárias
+          return {
+            name: att.name || 'Arquivo',
+            type: att.type || 'application/octet-stream',
+            data: att.data || '',
+            size: att.size || 0
+          };
+        });
+      }
+  
+      console.warn(`Unexpected format for attachments: ${clientItem.attachments}`);
+      return [];
+    } catch (error) {
+      console.error('Error getting client files:', error);
+      return [];
+    }
+  }, [groups]);
+
+  // Função para adicionar anexo
+  const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
+    console.log('🔄 Padarias: Adicionando anexo ao cliente:', clientId);
+    
+    try {
+      const clientFiles = getClientFiles(clientId);
+      const newAttachment = {
+        name: attachment.name,
+        type: attachment.type,
+        data: attachment.data,
+        size: attachment.size || 0
+      };
+      
+      const updatedAttachments = [...clientFiles, newAttachment];
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ Padarias: Anexo adicionado com sucesso');
+    } catch (error) {
+      console.error('❌ Padarias: Erro ao adicionar anexo:', error);
+      throw error;
+    }
+  };
+
+  // Função para remover anexo
+  const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
+    console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
+    
+    try {
+      const clientFiles = getClientFiles(clientId);
+      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ Padarias: Anexo removido com sucesso');
+    } catch (error) {
+      console.error('❌ Padarias: Erro ao remover anexo:', error);
+      throw error;
+    }
+  };
+
   const updateClient = async (clientId: string, updates: any) => {
     console.log('🔄 Padarias: Atualizando cliente:', clientId, 'com:', updates);
     
@@ -346,17 +433,28 @@ export function useContentPadariasData() {
         let processedAttachments: string[] | null = null;
         if (attachments && Array.isArray(attachments) && attachments.length > 0) {
           processedAttachments = attachments.map(att => {
-            // Se o anexo já é uma string JSON, manter como está
-            if (typeof att === 'string') {
-              return att;
-            }
-            // Se é um objeto, converter para JSON string
-            return JSON.stringify({
+            // Garantir que o anexo tenha todas as propriedades necessárias
+            const processedAtt = {
               name: att.name || 'Arquivo',
               type: att.type || 'application/octet-stream',
               data: att.data || '',
               size: att.size || 0
-            });
+            };
+            
+            // Se o anexo já é uma string JSON, manter como está
+            if (typeof att === 'string') {
+              try {
+                // Verificar se é um JSON válido
+                JSON.parse(att);
+                return att;
+              } catch {
+                // Se não é JSON válido, converter objeto processado
+                return JSON.stringify(processedAtt);
+              }
+            }
+            
+            // Se é um objeto, converter para JSON string
+            return JSON.stringify(processedAtt);
           });
         }
 
@@ -381,91 +479,6 @@ export function useContentPadariasData() {
       console.log('✅ Padarias: Cliente atualizado com sucesso');
     } catch (error) {
       console.error('❌ Padarias: Erro ao atualizar cliente:', error);
-      throw error;
-    }
-  };
-
-  const getClientFiles = useCallback(async (clientId: string) => {
-    try {
-      // Find the client item
-      const clientItem = groups.flatMap(group => group.items).find(item => item.id === clientId);
-  
-      if (!clientItem || !clientItem.attachments) {
-        console.log(`No attachments found for client ${clientId}`);
-        return [];
-      }
-  
-      // Check if attachments is already an array of objects
-      if (Array.isArray(clientItem.attachments)) {
-        return clientItem.attachments.map(att => {
-          // Se o anexo é uma string JSON, parsear
-          if (typeof att === 'string') {
-            try {
-              return JSON.parse(att);
-            } catch (error) {
-              console.error('Error parsing attachment JSON:', error);
-              return { name: 'Arquivo corrompido', type: 'unknown', data: '', size: 0 };
-            }
-          }
-          // Se já é um objeto, retornar como está
-          return att;
-        });
-      }
-  
-      // If attachments is a string, attempt to parse it as JSON
-      if (typeof clientItem.attachments === 'string') {
-        try {
-          const parsedAttachments = JSON.parse(clientItem.attachments);
-          if (Array.isArray(parsedAttachments)) {
-            return parsedAttachments;
-          } else {
-            console.warn(`Unexpected format for attachments string: ${clientItem.attachments}`);
-            return [];
-          }
-        } catch (error) {
-          console.error('Error parsing attachments JSON:', error);
-          return [];
-        }
-      }
-  
-      console.warn(`Unexpected format for attachments: ${clientItem.attachments}`);
-      return [];
-    } catch (error) {
-      console.error('Error getting client files:', error);
-      return [];
-    }
-  }, [groups]);
-
-  // Função para adicionar anexo
-  const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
-    console.log('🔄 Padarias: Adicionando anexo ao cliente:', clientId);
-    
-    try {
-      const clientFiles = await getClientFiles(clientId);
-      const updatedAttachments = [...clientFiles, attachment];
-      
-      await updateClient(clientId, { attachments: updatedAttachments });
-      
-      console.log('✅ Padarias: Anexo adicionado com sucesso');
-    } catch (error) {
-      console.error('❌ Padarias: Erro ao adicionar anexo:', error);
-      throw error;
-    }
-  };
-
-  // Função para remover anexo
-  const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
-    console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
-    
-    try {
-      const clientFiles = await getClientFiles(clientId);
-      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
-      
-      await updateClient(clientId, { attachments: updatedAttachments });
-      
-      console.log('✅ Padarias: Anexo removido com sucesso');
-    } catch (error) {
-      console.error('❌ Padarias: Erro ao remover anexo:', error);
       throw error;
     }
   };
