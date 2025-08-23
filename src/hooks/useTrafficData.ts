@@ -354,9 +354,9 @@ export function useTrafficData() {
     setStatuses([...statuses, newStatus]);
   };
 
-  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
+  const updateStatus = async (statusId: string, name: string, color: string) => {
     const updatedStatuses = statuses.map(status =>
-      status.id === statusId ? { ...status, ...updates } : status
+      status.id === statusId ? { ...status, name, color } : status
     );
     setStatuses(updatedStatuses);
   };

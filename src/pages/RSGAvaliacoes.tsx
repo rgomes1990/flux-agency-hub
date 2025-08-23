@@ -677,7 +677,7 @@ export default function RSGAvaliacoes() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={(status) => addStatus(status.name, status.color)}
-        onUpdateStatus={(status) => updateStatus(status.id, { name: status.name, color: status.color })}
+        onUpdateStatus={(status) => updateStatus(status.id, status.name, status.color)}
         onDeleteStatus={(statusId) => deleteStatus(statusId)}
         existingStatuses={statuses}
       />
