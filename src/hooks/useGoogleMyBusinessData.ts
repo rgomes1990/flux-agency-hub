@@ -5,7 +5,7 @@ export interface Status {
   id: string;
   name: string;
   color: string;
-  [key: string]: any;
+  [key: string]: any; // Index signature for Json compatibility
 }
 
 export interface GoogleMyBusinessItem {
@@ -13,8 +13,9 @@ export interface GoogleMyBusinessItem {
   elemento: string;
   servicos: string;
   informacoes: string;
-  observacoes?: string;
+  observacoes: string;
   status: Status;
+  attachments?: File[];
   [key: string]: any;
 }
 
@@ -26,7 +27,7 @@ export interface GoogleMyBusinessGroup {
   items: GoogleMyBusinessItem[];
 }
 
-export interface Column {
+export interface GoogleMyBusinessColumn {
   id: string;
   name: string;
   type: 'status' | 'text';
@@ -34,35 +35,85 @@ export interface Column {
 
 export function useGoogleMyBusinessData() {
   const [groups, setGroups] = useState<GoogleMyBusinessGroup[]>([]);
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [customColumns, setCustomColumns] = useState<Column[]>([]);
+  const [columns, setColumns] = useState<GoogleMyBusinessColumn[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadGoogleMyBusinessData();
+    loadColumns();
+    loadStatuses();
+  }, []);
+
+  const saveGoogleMyBusinessToDatabase = async (googleMyBusinessData: GoogleMyBusinessGroup[]) => {
+    console.log('💾 GMB: Salvando dados no banco de dados...', googleMyBusinessData);
+  
+    try {
+      setLoading(true);
+      
+      // Primeiro, deletar todos os dados existentes para evitar duplicação
+      const { error: deleteError } = await supabase
+        .from('google_my_business_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Condição que sempre será verdadeira
+  
+      if (deleteError) {
+        console.error('❌ GMB: Erro ao limpar dados antigos:', deleteError);
+        throw deleteError;
+      }
+
+      // Mapear os dados para o formato correto
+      const formattedData = googleMyBusinessData.flatMap(group =>
+        group.items.map(item => {
+          const { id, elemento, servicos, informacoes, observacoes, status, attachments, ...itemData } = item;
+          
+          return {
+            id: id,
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
+            is_expanded: group.isExpanded,
+            item_data: JSON.stringify({
+              elemento,
+              servicos,
+              informacoes,
+              observacoes,
+              status: JSON.parse(JSON.stringify(status)), // Ensure proper serialization
+              attachments: attachments || [],
+              ...itemData
+            }),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        })
+      );
+  
+      // Inserir os novos dados apenas se houver dados para inserir
+      if (formattedData.length > 0) {
+        const { error: insertError } = await supabase
+          .from('google_my_business_data')
+          .insert(formattedData);
+  
+        if (insertError) {
+          console.error('❌ GMB: Erro ao inserir dados:', insertError);
+          throw insertError;
+        }
+      }
+  
+      console.log('✅ GMB: Dados salvos com sucesso!');
+    } catch (error) {
+      console.error('❌ GMB: Erro ao salvar dados no banco de dados:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadGoogleMyBusinessData = useCallback(async () => {
-    console.log('🔄 Carregando dados do Google My Business...');
+    console.log('🔄 GMB: Carregando dados...');
     
     try {
-      const { data: columnsData, error: columnsError } = await supabase
-        .from('column_config')
-        .select('*')
-        .eq('module', 'google_my_business')
-        .order('created_at', { ascending: true });
-
-      if (columnsError) {
-        console.error('❌ Erro ao carregar colunas:', columnsError);
-        throw columnsError;
-      }
-
-      const { data: statusesData, error: statusesError } = await supabase
-        .from('status_config')
-        .select('*')
-        .eq('module', 'google_my_business')
-        .order('created_at', { ascending: true });
-
-      if (statusesError) {
-        console.error('❌ Erro ao carregar status:', statusesError);
-        throw statusesError;
-      }
+      setLoading(true);
 
       const { data, error } = await supabase
         .from('google_my_business_data')
@@ -70,478 +121,211 @@ export function useGoogleMyBusinessData() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Erro ao carregar dados:', error);
+        console.error('❌ GMB: Erro ao carregar dados:', error);
         throw error;
       }
 
-      console.log('📊 Dados carregados:', data?.length, 'registros');
+      console.log('📊 GMB: Dados carregados:', data?.length, 'registros');
 
       if (!data || data.length === 0) {
-        console.log('📝 Nenhum dado encontrado, criando dados padrão...');
+        console.log('📝 GMB: Nenhum dado encontrado, criando dados padrão...');
         await createDefaultData();
         return;
       }
 
       const groupsMap = new Map<string, GoogleMyBusinessGroup>();
+      const processedItems = new Set<string>(); // Para evitar duplicação
 
       data.forEach(item => {
+        // Evitar processamento de itens duplicados
+        if (processedItems.has(item.id)) {
+          console.warn('⚠️ GMB: Item duplicado detectado e ignorado:', item.id);
+          return;
+        }
+        processedItems.add(item.id);
+
         if (!groupsMap.has(item.group_name)) {
           groupsMap.set(item.group_name, {
             id: item.group_id,
-            name: item.group_name + ' - Google My Business',
+            name: item.group_name,
             color: item.group_color || 'bg-blue-500',
-            isExpanded: true,
+            isExpanded: item.is_expanded ?? true,
             items: []
           });
         }
 
         const group = groupsMap.get(item.group_name)!;
         
-        // Parse item_data as JSON to access the properties
-        const itemData = typeof item.item_data === 'string' ? JSON.parse(item.item_data) : item.item_data || {};
-        
-        const clientItem: GoogleMyBusinessItem = {
+        let itemData: any = {};
+        if (item.item_data) {
+          try {
+            if (typeof item.item_data === 'string') {
+              itemData = JSON.parse(item.item_data);
+            } else {
+              itemData = item.item_data as any;
+            }
+          } catch (error) {
+            console.warn('⚠️ GMB: Erro ao processar item_data:', error);
+            itemData = {};
+          }
+        }
+
+        const googleMyBusinessItem: GoogleMyBusinessItem = {
           id: item.id,
-          elemento: itemData.elemento || 'Novo Cliente',
+          elemento: itemData.elemento || '',
           servicos: itemData.servicos || '',
           informacoes: itemData.informacoes || '',
           observacoes: itemData.observacoes || '',
-          status: itemData.status || { id: crypto.randomUUID(), name: 'Pendente', color: 'bg-gray-500' },
+          status: itemData.status || { id: 'pending', name: 'Pendente', color: '#gray-500' },
+          attachments: itemData.attachments || [],
           ...itemData
         };
 
-        group.items.push(clientItem);
+        // Verificar se o item já existe no grupo antes de adicionar
+        const existingItemIndex = group.items.findIndex(existingItem => existingItem.id === googleMyBusinessItem.id);
+        if (existingItemIndex === -1) {
+          group.items.push(googleMyBusinessItem);
+        } else {
+          console.warn('⚠️ GMB: Item já existe no grupo, atualizando:', googleMyBusinessItem.id);
+          group.items[existingItemIndex] = googleMyBusinessItem;
+        }
       });
 
       const loadedGroups = Array.from(groupsMap.values());
-      console.log('✅ Grupos carregados:', loadedGroups.length);
+      console.log('✅ GMB: Grupos carregados:', loadedGroups.length);
       setGroups(loadedGroups);
-      
-      // Transform column data to match expected format
-      const formattedColumns = (columnsData || []).map(col => ({
-        id: col.column_id,
-        name: col.column_name,
-        type: col.column_type as 'status' | 'text'
-      }));
-      
-      // Transform status data to match expected format  
-      const formattedStatuses = (statusesData || []).map(status => ({
-        id: status.status_id,
-        name: status.status_name,
-        color: status.status_color
-      }));
-      
-      setColumns(formattedColumns);
-      setCustomColumns(formattedColumns);
-      setStatuses(formattedStatuses);
 
     } catch (error) {
-      console.error('❌ Erro ao carregar dados do Google My Business:', error);
+      console.error('❌ GMB: Erro ao carregar dados:', error);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const saveGoogleMyBusinessToDatabase = async (groups: GoogleMyBusinessGroup[]) => {
-    console.log('💾 Salvando dados no banco de dados...');
-
-    try {
-      for (const group of groups) {
-        for (const item of group.items) {
-          const { id, elemento, servicos, informacoes, observacoes, status, ...itemData } = item;
-
-          // Convert status to plain object for JSON compatibility
-          const statusObj = {
-            id: status.id,
-            name: status.name,
-            color: status.color
-          };
-
-          const { error } = await supabase
-            .from('google_my_business_data')
-            .update({
-              item_data: { elemento, servicos, informacoes, observacoes, status: statusObj, ...itemData },
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', id);
-
-          if (error) {
-            console.error('❌ Erro ao salvar no banco:', error);
-            throw error;
-          }
-        }
-      }
-
-      console.log('✅ Dados salvos com sucesso');
-    } catch (error) {
-      console.error('❌ Erro ao salvar dados no banco de dados:', error);
-    }
-  };
-
-  const createDefaultData = async () => {
-    console.log('📝 Criando dados padrão...');
-
-    try {
-      const defaultGroups = [
-        { name: 'Janeiro', color: 'bg-red-500' },
-        { name: 'Fevereiro', color: 'bg-orange-500' },
-        { name: 'Março', color: 'bg-amber-500' },
-        { name: 'Abril', color: 'bg-yellow-500' },
-        { name: 'Maio', color: 'bg-lime-500' },
-        { name: 'Junho', color: 'bg-green-500' },
-        { name: 'Julho', color: 'bg-emerald-500' },
-        { name: 'Agosto', color: 'bg-teal-500' },
-        { name: 'Setembro', color: 'bg-cyan-500' },
-        { name: 'Outubro', color: 'bg-sky-500' },
-        { name: 'Novembro', color: 'bg-blue-500' },
-        { name: 'Dezembro', color: 'bg-indigo-500' }
-      ];
-
-      for (const group of defaultGroups) {
-        const statusObj = {
-          id: crypto.randomUUID(),
-          name: 'Pendente',
-          color: 'bg-gray-500'
-        };
-
-        const { error } = await supabase
-          .from('google_my_business_data')
-          .insert({
-            group_id: crypto.randomUUID(),
-            group_name: group.name,
-            group_color: group.color,
-            item_data: {
-              elemento: 'Novo Cliente',
-              servicos: 'Serviço Padrão',
-              informacoes: 'Informações Padrão',
-              status: statusObj
-            }
-          });
-
-        if (error) {
-          console.error('❌ Erro ao criar dados padrão:', error);
-          throw error;
-        }
-      }
-
-      console.log('✅ Dados padrão criados com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao criar dados padrão:', error);
-    }
-  };
-
   const updateGroups = (updatedGroups: GoogleMyBusinessGroup[]) => {
     setGroups(updatedGroups);
-    saveGoogleMyBusinessToDatabase(updatedGroups);
   };
 
   const createMonth = async (monthName: string) => {
-    console.log('➕ Criando novo mês:', monthName);
-    
-    try {
-      const newGroupId = crypto.randomUUID();
-      
-      const statusObj = {
-        id: crypto.randomUUID(),
-        name: 'Pendente',
-        color: 'bg-gray-500'
-      };
+    const newGroupId = crypto.randomUUID();
+    const newGroup: GoogleMyBusinessGroup = {
+      id: newGroupId,
+      name: `${monthName} - GMB`,
+      color: 'bg-blue-500',
+      isExpanded: true,
+      items: []
+    };
 
-      const { error } = await supabase
-        .from('google_my_business_data')
-        .insert({
-          group_id: newGroupId,
-          group_name: monthName,
-          group_color: 'bg-blue-500',
-          item_data: {
-            elemento: 'Novo Cliente',
-            servicos: 'Serviço Padrão',
-            informacoes: 'Informações Padrão',
-            status: statusObj
-          }
-        });
-
-      if (error) {
-        console.error('❌ Erro ao criar mês:', error);
-        throw error;
-      }
-
-      console.log('✅ Mês criado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao criar mês:', error);
-    }
+    setGroups([...groups, newGroup]);
+    await saveGoogleMyBusinessToDatabase([...groups, newGroup]);
   };
 
   const updateMonth = async (groupId: string, newMonthName: string) => {
-    console.log('📝 Atualizando mês:', groupId, 'para:', newMonthName);
-    
-    try {
-      const updatedGroups = groups.map(group =>
-        group.id === groupId ? { ...group, name: newMonthName + ' - Google My Business' } : group
-      );
-      
-      updateGroups(updatedGroups);
-      await saveGoogleMyBusinessToDatabase(updatedGroups);
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, name: `${newMonthName} - GMB` } : group
+    );
 
-      for (const item of updatedGroups.find(g => g.id === groupId)!.items) {
-        const { error } = await supabase
-          .from('google_my_business_data')
-          .update({
-            group_name: newMonthName
-          })
-          .eq('id', item.id);
-
-        if (error) {
-          console.error('❌ Erro ao atualizar nome do grupo nos itens:', error);
-          throw error;
-        }
-      }
-
-      console.log('✅ Mês atualizado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao atualizar mês:', error);
-    }
+    setGroups(updatedGroups);
+    await saveGoogleMyBusinessToDatabase(updatedGroups);
   };
 
   const deleteMonth = async (groupId: string) => {
-    console.log('🗑️ Deletando mês:', groupId);
-    
-    try {
-      const groupToDelete = groups.find(group => group.id === groupId);
-      if (groupToDelete) {
-        for (const item of groupToDelete.items) {
-          const { error: itemError } = await supabase
-            .from('google_my_business_data')
-            .delete()
-            .eq('id', item.id);
-
-          if (itemError) {
-            console.error('❌ Erro ao deletar item:', item.id, itemError);
-            throw itemError;
-          }
-        }
-      }
-
-      await loadGoogleMyBusinessData();
-      console.log('✅ Mês deletado com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao deletar mês:', error);
-    }
+    const updatedGroups = groups.filter(group => group.id !== groupId);
+    setGroups(updatedGroups);
+    await saveGoogleMyBusinessToDatabase(updatedGroups);
   };
 
   const duplicateMonth = async (groupId: string, newMonthName: string) => {
-    console.log(`📄 Duplicando mês ${groupId} para ${newMonthName}`);
-    
-    try {
-      const groupToDuplicate = groups.find(group => group.id === groupId);
-      if (!groupToDuplicate) {
-        console.warn(`⚠️ Grupo ${groupId} não encontrado`);
-        return;
-      }
-
-      const newGroupId = crypto.randomUUID();
-
-      for (const item of groupToDuplicate.items) {
-        const statusObj = {
-          id: item.status.id,
-          name: item.status.name,
-          color: item.status.color
-        };
-
-        const { error } = await supabase
-          .from('google_my_business_data')
-          .insert({
-            group_id: newGroupId,
-            group_name: newMonthName,
-            group_color: groupToDuplicate.color,
-            item_data: {
-              elemento: item.elemento,
-              servicos: item.servicos,
-              informacoes: item.informacoes,
-              observacoes: item.observacoes,
-              status: statusObj
-            }
-          });
-
-        if (error) {
-          console.error('❌ Erro ao duplicar item:', item, error);
-          throw error;
-        }
-      }
-
-      await loadGoogleMyBusinessData();
-      console.log('✅ Mês duplicado com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao duplicar mês:', error);
-    }
+    const groupToDuplicate = groups.find(group => group.id === groupId);
+    if (!groupToDuplicate) return;
+  
+    const newGroupId = crypto.randomUUID();
+    const duplicatedGroup: GoogleMyBusinessGroup = {
+      id: newGroupId,
+      name: `${newMonthName} - GMB`,
+      color: groupToDuplicate.color,
+      isExpanded: true,
+      items: groupToDuplicate.items.map(item => ({
+        ...item,
+        id: crypto.randomUUID()
+      }))
+    };
+  
+    const updatedGroups = [...groups, duplicatedGroup];
+    setGroups(updatedGroups);
+    await saveGoogleMyBusinessToDatabase(updatedGroups);
   };
 
   const addStatus = async (status: Status) => {
-    console.log('➕ Adicionando status:', status);
-    
-    try {
-      const { error } = await supabase
-        .from('status_config')
-        .insert({
-          status_id: status.id,
-          status_name: status.name,
-          status_color: status.color,
-          module: 'google_my_business'
-        });
-
-      if (error) {
-        console.error('❌ Erro ao adicionar status:', error);
-        throw error;
-      }
-
-      console.log('✅ Status adicionado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao adicionar status:', error);
-    }
+    setStatuses([...statuses, status]);
+    await saveStatusesToDatabase([...statuses, status]);
   };
 
   const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
-    console.log('📝 Atualizando status:', statusId, updates);
-    
-    try {
-      const { error } = await supabase
-        .from('status_config')
-        .update({
-          status_name: updates.name,
-          status_color: updates.color
-        })
-        .eq('status_id', statusId)
-        .eq('module', 'google_my_business');
+    const updatedStatuses = statuses.map(status =>
+      status.id === statusId ? { ...status, ...updates } : status
+    );
 
-      if (error) {
-        console.error('❌ Erro ao atualizar status:', error);
-        throw error;
-      }
-
-      console.log('✅ Status atualizado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao atualizar status:', error);
-    }
+    setStatuses(updatedStatuses);
+    await saveStatusesToDatabase(updatedStatuses);
   };
 
   const deleteStatus = async (statusId: string) => {
-    console.log('🗑️ Deletando status:', statusId);
-    
-    try {
-      const { error } = await supabase
-        .from('status_config')
-        .delete()
-        .eq('status_id', statusId)
-        .eq('module', 'google_my_business');
-
-      if (error) {
-        console.error('❌ Erro ao deletar status:', error);
-        throw error;
-      }
-
-      console.log('✅ Status deletado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao deletar status:', error);
-    }
+    const updatedStatuses = statuses.filter(status => status.id !== statusId);
+    setStatuses(updatedStatuses);
+    await saveStatusesToDatabase(updatedStatuses);
   };
 
-  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
-    console.log('📝 Atualizando status do item:', itemId, field, statusId);
-    
-    try {
-      const status = statuses.find(s => s.id === statusId);
-      if (!status) return;
+  const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
+    const newColumn = {
+      id: crypto.randomUUID(),
+      name: columnName,
+      type: columnType
+    };
 
-      const updatedGroups = groups.map(group => ({
-        ...group,
-        items: group.items.map(item =>
-          item.id === itemId ? { ...item, status: status } : item
-        )
-      }));
-
-      setGroups(updatedGroups);
-      await saveGoogleMyBusinessToDatabase(updatedGroups);
-
-      console.log('✅ Status do item atualizado com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao atualizar status do item:', error);
-    }
+    setColumns([...columns, newColumn]);
+    await saveColumnsToDatabase([...columns, newColumn]);
   };
 
-  const addClient = async (groupId: string, client: Omit<GoogleMyBusinessItem, 'id' | 'status'>) => {
-    console.log('➕ Adicionando cliente:', client, 'ao grupo:', groupId);
-    
-    try {
-      const newClientId = crypto.randomUUID();
-      const group = groups.find(g => g.id === groupId);
-      
-      const statusObj = {
-        id: crypto.randomUUID(),
-        name: 'Pendente',
-        color: 'bg-gray-500'
-      };
+  const updateColumn = async (updatedColumn: GoogleMyBusinessColumn) => {
+    const updatedColumns = columns.map(column =>
+      column.id === updatedColumn.id ? updatedColumn : column
+    );
 
-      const { error } = await supabase
-        .from('google_my_business_data')
-        .insert({
-          id: newClientId,
-          group_id: groupId,
-          group_name: group?.name?.replace(' - Google My Business', '') || 'Novo Grupo',
-          item_data: {
-            elemento: client.elemento,
-            servicos: client.servicos,
-            informacoes: client.informacoes,
-            observacoes: client.observacoes,
-            status: statusObj
-          }
-        });
-
-      if (error) {
-        console.error('❌ Erro ao adicionar cliente:', error);
-        throw error;
-      }
-
-      console.log('✅ Cliente adicionado com sucesso');
-      await loadGoogleMyBusinessData();
-
-    } catch (error) {
-      console.error('❌ Erro ao adicionar cliente:', error);
-    }
+    setColumns(updatedColumns);
+    await saveColumnsToDatabase(updatedColumns);
   };
 
-  const deleteClient = async (clientId: string) => {
-    console.log('🗑️ Deletando cliente:', clientId);
-    
-    try {
-      const { error } = await supabase
-        .from('google_my_business_data')
-        .delete()
-        .eq('id', clientId);
+  const deleteColumn = async (columnId: string) => {
+    const updatedColumns = columns.filter(column => column.id !== columnId);
+    setColumns(updatedColumns);
+    await saveColumnsToDatabase(updatedColumns);
+  };
 
-      if (error) {
-        console.error('❌ Erro ao deletar cliente:', error);
-        throw error;
-      }
+  const moveColumnUp = async (columnId: string) => {
+    const columnIndex = columns.findIndex(column => column.id === columnId);
+    if (columnIndex <= 0) return;
 
-      console.log('✅ Cliente deletado com sucesso');
-      await loadGoogleMyBusinessData();
+    const newColumns = [...columns];
+    const temp = newColumns[columnIndex];
+    newColumns[columnIndex] = newColumns[columnIndex - 1];
+    newColumns[columnIndex - 1] = temp;
 
-    } catch (error) {
-      console.error('❌ Erro ao deletar cliente:', error);
-    }
+    setColumns(newColumns);
+    await saveColumnsToDatabase(newColumns);
+  };
+
+  const moveColumnDown = async (columnId: string) => {
+    const columnIndex = columns.findIndex(column => column.id === columnId);
+    if (columnIndex >= columns.length - 1) return;
+
+    const newColumns = [...columns];
+    const temp = newColumns[columnIndex];
+    newColumns[columnIndex] = newColumns[columnIndex + 1];
+    newColumns[columnIndex + 1] = temp;
+
+    setColumns(newColumns);
+    await saveColumnsToDatabase(newColumns);
   };
 
   const updateClient = async (clientId: string, updates: any) => {
@@ -552,17 +336,16 @@ export function useGoogleMyBusinessData() {
         ...group,
         items: group.items.map(item => {
           if (item.id === clientId) {
-            const { attachments, ...validUpdates } = updates;
             return { 
               ...item, 
-              ...validUpdates
+              ...updates
             };
           }
           return item;
         })
       }));
 
-      updateGroups(updatedGroups);
+      setGroups(updatedGroups);
       await saveGoogleMyBusinessToDatabase(updatedGroups);
       
       console.log('✅ GMB: Cliente atualizado com sucesso');
@@ -572,263 +355,346 @@ export function useGoogleMyBusinessData() {
     }
   };
 
-  const applyDefaultObservationsToAllClients = async (defaultObservations: string) => {
-    console.log('📝 Aplicando observações padrão a todos os clientes...');
-  
+  const addClient = async (groupId: string, client: Omit<GoogleMyBusinessItem, 'id'>) => {
+    const newClientId = crypto.randomUUID();
+    const newClient: GoogleMyBusinessItem = {
+      id: newClientId,
+      elemento: client.elemento || '',
+      servicos: client.servicos || '',
+      informacoes: client.informacoes || '',
+      observacoes: client.observacoes || '',
+      status: client.status || { id: 'pending', name: 'Pendente', color: '#gray-500' },
+      attachments: client.attachments || [],
+      ...client
+    };
+
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, items: [...group.items, newClient] } : group
+    );
+
+    setGroups(updatedGroups);
+    await saveGoogleMyBusinessToDatabase(updatedGroups);
+  };
+
+  const deleteClient = async (clientId: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== clientId)
+    }));
+
+    setGroups(updatedGroups);
+    await saveGoogleMyBusinessToDatabase(updatedGroups);
+  };
+
+  const updateItemStatus = async (itemId: string, status: Status) => {
+    console.log('🔄 GMB: Atualizando status do item:', itemId, 'para:', status);
+    
     try {
       const updatedGroups = groups.map(group => ({
         ...group,
-        items: group.items.map(item => ({
-          ...item,
-          observacoes: defaultObservations
-        }))
+        items: group.items.map(item => {
+          if (item.id === itemId) {
+            return { ...item, status: status };
+          }
+          return item;
+        })
       }));
-  
-      updateGroups(updatedGroups);
+
+      setGroups(updatedGroups);
       await saveGoogleMyBusinessToDatabase(updatedGroups);
-  
-      console.log('✅ Observações padrão aplicadas a todos os clientes com sucesso');
+      
+      console.log('✅ GMB: Status atualizado com sucesso');
     } catch (error) {
-      console.error('❌ Erro ao aplicar observações padrão a todos os clientes:', error);
+      console.error('❌ GMB: Erro ao atualizar status:', error);
+      throw error;
     }
   };
 
-  useEffect(() => {
-    loadGoogleMyBusinessData();
-  }, [loadGoogleMyBusinessData]);
+  const createDefaultData = async () => {
+    const defaultGroups: GoogleMyBusinessGroup[] = [
+      {
+        id: crypto.randomUUID(),
+        name: 'Janeiro - GMB',
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: []
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'Fevereiro - GMB',
+        color: 'bg-green-500',
+        isExpanded: true,
+        items: []
+      },
+      {
+        id: crypto.randomUUID(),
+        name: 'Março - GMB',
+        color: 'bg-red-500',
+        isExpanded: true,
+        items: []
+      }
+    ];
+
+    setGroups(defaultGroups);
+    await saveGoogleMyBusinessToDatabase(defaultGroups);
+  };
+
+  const loadColumns = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('status_config')
+        .select('*')
+        .eq('module', 'google_my_business')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Erro ao carregar colunas:', error);
+        return;
+      }
+
+      if (data) {
+        const typedColumns = data.map(col => ({
+          id: col.status_id,
+          name: col.status_name,
+          type: 'status' as const
+        }));
+        setColumns(typedColumns);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar colunas:', error);
+    }
+  }, []);
+
+  const loadStatuses = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('status_config')
+        .select('*')
+        .eq('module', 'google_my_business')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Erro ao carregar status:', error);
+        return;
+      }
+
+      if (data) {
+        const typedStatuses = data.map(status => ({
+          id: status.status_id,
+          name: status.status_name,
+          color: status.status_color
+        }));
+        setStatuses(typedStatuses);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar status:', error);
+    }
+  }, []);
+
+  const saveColumnsToDatabase = async (columns: GoogleMyBusinessColumn[]) => {
+    console.log('💾 Salvando colunas no banco de dados...', columns);
+
+    try {
+      // Delete existing columns for this module
+      const { error: deleteError } = await supabase
+        .from('status_config')
+        .delete()
+        .eq('module', 'google_my_business');
+
+      if (deleteError) {
+        console.error('❌ Erro ao limpar colunas antigas:', deleteError);
+        throw deleteError;
+      }
+
+      // Insert new columns
+      const formattedColumns = columns.map(column => ({
+        status_id: column.id,
+        status_name: column.name,
+        status_color: '#3b82f6',
+        module: 'google_my_business'
+      }));
+
+      if (formattedColumns.length > 0) {
+        const { error: insertError } = await supabase
+          .from('status_config')
+          .insert(formattedColumns);
+
+        if (insertError) {
+          console.error('❌ Erro ao inserir colunas:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log('✅ Colunas salvas com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar colunas no banco de dados:', error);
+    }
+  };
+
+  const saveStatusesToDatabase = async (statuses: Status[]) => {
+    console.log('💾 Salvando status no banco de dados...', statuses);
+
+    try {
+      // Delete existing statuses for this module
+      const { error: deleteError } = await supabase
+        .from('status_config')
+        .delete()
+        .eq('module', 'google_my_business');
+
+      if (deleteError) {
+        console.error('❌ Erro ao limpar status antigos:', deleteError);
+        throw deleteError;
+      }
+
+      // Insert new statuses
+      const formattedStatuses = statuses.map(status => ({
+        status_id: status.id,
+        status_name: status.name,
+        status_color: status.color,
+        module: 'google_my_business'
+      }));
+
+      if (formattedStatuses.length > 0) {
+        const { error: insertError } = await supabase
+          .from('status_config')
+          .insert(formattedStatuses);
+
+        if (insertError) {
+          console.error('❌ Erro ao inserir status:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log('✅ Status salvos com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar status no banco de dados:', error);
+    }
+  };
 
   return {
     groups,
     columns,
-    customColumns,
     statuses,
-    updateGroups,
-    createMonth,
+    loading,
+    updateGroups: setGroups,
+    createMonth: async (monthName: string) => {
+      const newGroupId = crypto.randomUUID();
+      const newGroup: GoogleMyBusinessGroup = {
+        id: newGroupId,
+        name: `${monthName} - GMB`,
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: []
+      };
+
+      const updatedGroups = [...groups, newGroup];
+      setGroups(updatedGroups);
+      await saveGoogleMyBusinessToDatabase(updatedGroups);
+    },
     updateMonth: async (groupId: string, newMonthName: string) => {
-      console.log('📝 Atualizando mês:', groupId, 'para:', newMonthName);
-      
-      try {
-        const updatedGroups = groups.map(group =>
-          group.id === groupId ? { ...group, name: newMonthName + ' - Google My Business' } : group
-        );
-        
-        updateGroups(updatedGroups);
-        await saveGoogleMyBusinessToDatabase(updatedGroups);
+      const updatedGroups = groups.map(group =>
+        group.id === groupId ? { ...group, name: `${newMonthName} - GMB` } : group
+      );
 
-        for (const item of updatedGroups.find(g => g.id === groupId)!.items) {
-          const { error } = await supabase
-            .from('google_my_business_data')
-            .update({
-              group_name: newMonthName
-            })
-            .eq('id', item.id);
-
-          if (error) {
-            console.error('❌ Erro ao atualizar nome do grupo nos itens:', error);
-            throw error;
-          }
-        }
-
-        console.log('✅ Mês atualizado com sucesso');
-        await loadGoogleMyBusinessData();
-
-      } catch (error) {
-        console.error('❌ Erro ao atualizar mês:', error);
-      }
+      setGroups(updatedGroups);
+      await saveGoogleMyBusinessToDatabase(updatedGroups);
     },
     deleteMonth: async (groupId: string) => {
-      console.log('🗑️ Deletando mês:', groupId);
-      
-      try {
-        const groupToDelete = groups.find(group => group.id === groupId);
-        if (groupToDelete) {
-          for (const item of groupToDelete.items) {
-            const { error: itemError } = await supabase
-              .from('google_my_business_data')
-              .delete()
-              .eq('id', item.id);
-
-            if (itemError) {
-              console.error('❌ Erro ao deletar item:', item.id, itemError);
-              throw itemError;
-            }
-          }
-        }
-
-        await loadGoogleMyBusinessData();
-        console.log('✅ Mês deletado com sucesso');
-
-      } catch (error) {
-        console.error('❌ Erro ao deletar mês:', error);
-      }
+      const updatedGroups = groups.filter(group => group.id !== groupId);
+      setGroups(updatedGroups);
+      await saveGoogleMyBusinessToDatabase(updatedGroups);
     },
     duplicateMonth: async (groupId: string, newMonthName: string) => {
-      console.log(`📄 Duplicando mês ${groupId} para ${newMonthName}`);
-      
-      try {
-        const groupToDuplicate = groups.find(group => group.id === groupId);
-        if (!groupToDuplicate) {
-          console.warn(`⚠️ Grupo ${groupId} não encontrado`);
-          return;
-        }
-
-        const newGroupId = crypto.randomUUID();
-
-        for (const item of groupToDuplicate.items) {
-          const statusObj = {
-            id: item.status.id,
-            name: item.status.name,
-            color: item.status.color
-          };
-
-          const { error } = await supabase
-            .from('google_my_business_data')
-            .insert({
-              group_id: newGroupId,
-              group_name: newMonthName,
-              group_color: groupToDuplicate.color,
-              item_data: {
-                elemento: item.elemento,
-                servicos: item.servicos,
-                informacoes: item.informacoes,
-                observacoes: item.observacoes,
-                status: statusObj
-              }
-            });
-
-          if (error) {
-            console.error('❌ Erro ao duplicar item:', item, error);
-            throw error;
-          }
-        }
-
-        await loadGoogleMyBusinessData();
-        console.log('✅ Mês duplicado com sucesso');
-
-      } catch (error) {
-        console.error('❌ Erro ao duplicar mês:', error);
-      }
+      const groupToDuplicate = groups.find(group => group.id === groupId);
+      if (!groupToDuplicate) return;
+    
+      const newGroupId = crypto.randomUUID();
+      const duplicatedGroup: GoogleMyBusinessGroup = {
+        id: newGroupId,
+        name: `${newMonthName} - GMB`,
+        color: groupToDuplicate.color,
+        isExpanded: true,
+        items: groupToDuplicate.items.map(item => ({
+          ...item,
+          id: crypto.randomUUID()
+        }))
+      };
+    
+      const updatedGroups = [...groups, duplicatedGroup];
+      setGroups(updatedGroups);
+      await saveGoogleMyBusinessToDatabase(updatedGroups);
     },
-    addStatus,
-    updateStatus,
-    deleteStatus,
+    addStatus: async (status: Status) => {
+      setStatuses([...statuses, status]);
+      await saveStatusesToDatabase([...statuses, status]);
+    },
+    updateStatus: async (statusId: string, updates: { name: string; color: string }) => {
+      const updatedStatuses = statuses.map(status =>
+        status.id === statusId ? { ...status, ...updates } : status
+      );
+
+      setStatuses(updatedStatuses);
+      await saveStatusesToDatabase(updatedStatuses);
+    },
+    deleteStatus: async (statusId: string) => {
+      const updatedStatuses = statuses.filter(status => status.id !== statusId);
+      setStatuses(updatedStatuses);
+      await saveStatusesToDatabase(updatedStatuses);
+    },
     addColumn: async (columnName: string, columnType: 'status' | 'text') => {
-      console.log('➕ Adicionando coluna:', columnName, columnType);
-      
-      try {
-        const { error } = await supabase
-          .from('column_config')
-          .insert({
-            column_id: crypto.randomUUID(),
-            column_name: columnName,
-            column_type: columnType,
-            module: 'google_my_business'
-          });
+      const newColumn = {
+        id: crypto.randomUUID(),
+        name: columnName,
+        type: columnType
+      };
 
-        if (error) {
-          console.error('❌ Erro ao adicionar coluna:', error);
-          throw error;
-        }
-
-        console.log('✅ Coluna adicionada com sucesso');
-        await loadGoogleMyBusinessData();
-
-      } catch (error) {
-        console.error('❌ Erro ao adicionar coluna:', error);
-      }
+      setColumns([...columns, newColumn]);
+      await saveColumnsToDatabase([...columns, newColumn]);
     },
-    updateColumn: async (column: Column) => {
-      console.log('📝 Atualizando coluna:', column);
-      
-      try {
-        const { error } = await supabase
-          .from('column_config')
-          .update({
-            column_name: column.name,
-            column_type: column.type
-          })
-          .eq('column_id', column.id)
-          .eq('module', 'google_my_business');
+    updateColumn: async (updatedColumn: GoogleMyBusinessColumn) => {
+      const updatedColumns = columns.map(column =>
+        column.id === updatedColumn.id ? updatedColumn : column
+      );
 
-        if (error) {
-          console.error('❌ Erro ao atualizar coluna:', error);
-          throw error;
-        }
-
-        console.log('✅ Coluna atualizada com sucesso');
-        await loadGoogleMyBusinessData();
-
-      } catch (error) {
-        console.error('❌ Erro ao atualizar coluna:', error);
-      }
+      setColumns(updatedColumns);
+      await saveColumnsToDatabase(updatedColumns);
     },
     deleteColumn: async (columnId: string) => {
-      console.log('🗑️ Deletando coluna:', columnId);
-      
-      try {
-        const { error } = await supabase
-          .from('column_config')
-          .delete()
-          .eq('column_id', columnId)
-          .eq('module', 'google_my_business');
-
-        if (error) {
-          console.error('❌ Erro ao deletar coluna:', error);
-          throw error;
-        }
-
-        console.log('✅ Coluna deletada com sucesso');
-        await loadGoogleMyBusinessData();
-
-      } catch (error) {
-        console.error('❌ Erro ao deletar coluna:', error);
-      }
+      const updatedColumns = columns.filter(column => column.id !== columnId);
+      setColumns(updatedColumns);
+      await saveColumnsToDatabase(updatedColumns);
     },
     moveColumnUp: async (columnId: string) => {
-      console.log('⬆️ Movendo coluna para cima:', columnId);
-      
-      try {
-        const columnIndex = customColumns.findIndex(column => column.id === columnId);
-        if (columnIndex <= 0) return;
+      const columnIndex = columns.findIndex(column => column.id === columnId);
+      if (columnIndex <= 0) return;
 
-        const newColumns = [...customColumns];
-        const columnToMove = newColumns.splice(columnIndex, 1)[0];
-        newColumns.splice(columnIndex - 1, 0, columnToMove);
+      const newColumns = [...columns];
+      const temp = newColumns[columnIndex];
+      newColumns[columnIndex] = newColumns[columnIndex - 1];
+      newColumns[columnIndex - 1] = temp;
 
-        setCustomColumns(newColumns);
-        setColumns(newColumns);
-
-        console.log('✅ Coluna movida para cima com sucesso');
-
-      } catch (error) {
-        console.error('❌ Erro ao mover coluna para cima:', error);
-      }
+      setColumns(newColumns);
+      await saveColumnsToDatabase(newColumns);
     },
     moveColumnDown: async (columnId: string) => {
-      console.log('⬇️ Movendo coluna para baixo:', columnId);
-      
-      try {
-        const columnIndex = customColumns.findIndex(column => column.id === columnId);
-        if (columnIndex >= customColumns.length - 1) return;
+      const columnIndex = columns.findIndex(column => column.id === columnId);
+      if (columnIndex >= columns.length - 1) return;
 
-        const newColumns = [...customColumns];
-        const columnToMove = newColumns.splice(columnIndex, 1)[0];
-        newColumns.splice(columnIndex + 1, 0, columnToMove);
+      const newColumns = [...columns];
+      const temp = newColumns[columnIndex];
+      newColumns[columnIndex] = newColumns[columnIndex + 1];
+      newColumns[columnIndex + 1] = temp;
 
-        setCustomColumns(newColumns);
-        setColumns(newColumns);
-
-        console.log('✅ Coluna movida para baixo com sucesso');
-
-      } catch (error) {
-        console.error('❌ Erro ao mover coluna para baixo:', error);
-      }
+      setColumns(newColumns);
+      await saveColumnsToDatabase(newColumns);
     },
     updateItemStatus,
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles: () => [],
-    applyDefaultObservationsToAllClients
+    getClientFiles: (clientId: string) => {
+      const client = groups.flatMap(group => group.items).find(item => item.id === clientId);
+      return client?.attachments || [];
+    }
   };
 }

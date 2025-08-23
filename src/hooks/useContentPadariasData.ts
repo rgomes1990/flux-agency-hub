@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -347,7 +346,11 @@ export function useContentPadariasData() {
         let processedAttachments: string[] | null = null;
         if (attachments && Array.isArray(attachments) && attachments.length > 0) {
           processedAttachments = attachments.map(att => {
-            // Convert attachment objects to JSON strings
+            // Se o anexo já é uma string JSON, manter como está
+            if (typeof att === 'string') {
+              return att;
+            }
+            // Se é um objeto, converter para JSON string
             return JSON.stringify({
               name: att.name || 'Arquivo',
               type: att.type || 'application/octet-stream',
@@ -394,7 +397,19 @@ export function useContentPadariasData() {
   
       // Check if attachments is already an array of objects
       if (Array.isArray(clientItem.attachments)) {
-        return clientItem.attachments;
+        return clientItem.attachments.map(att => {
+          // Se o anexo é uma string JSON, parsear
+          if (typeof att === 'string') {
+            try {
+              return JSON.parse(att);
+            } catch (error) {
+              console.error('Error parsing attachment JSON:', error);
+              return { name: 'Arquivo corrompido', type: 'unknown', data: '', size: 0 };
+            }
+          }
+          // Se já é um objeto, retornar como está
+          return att;
+        });
       }
   
       // If attachments is a string, attempt to parse it as JSON
@@ -420,6 +435,40 @@ export function useContentPadariasData() {
       return [];
     }
   }, [groups]);
+
+  // Função para adicionar anexo
+  const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
+    console.log('🔄 Padarias: Adicionando anexo ao cliente:', clientId);
+    
+    try {
+      const clientFiles = await getClientFiles(clientId);
+      const updatedAttachments = [...clientFiles, attachment];
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ Padarias: Anexo adicionado com sucesso');
+    } catch (error) {
+      console.error('❌ Padarias: Erro ao adicionar anexo:', error);
+      throw error;
+    }
+  };
+
+  // Função para remover anexo
+  const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
+    console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
+    
+    try {
+      const clientFiles = await getClientFiles(clientId);
+      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ Padarias: Anexo removido com sucesso');
+    } catch (error) {
+      console.error('❌ Padarias: Erro ao remover anexo:', error);
+      throw error;
+    }
+  };
 
   const saveContentPadariasToDatabase = async (contentPadariasData: ContentPadariasGroup[]) => {
     console.log('💾 Salvando dados no banco de dados...', contentPadariasData);
@@ -674,6 +723,8 @@ export function useContentPadariasData() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles
+    getClientFiles,
+    addClientAttachment,
+    removeClientAttachment
   };
 }

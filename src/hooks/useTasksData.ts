@@ -102,9 +102,17 @@ export const useTasksData = () => {
         });
       });
 
-      // Adicionar tarefas às colunas
+      // Adicionar tarefas às colunas - COM PROTEÇÃO CONTRA DUPLICAÇÃO
+      const processedTasks = new Set<string>();
       if (taskData && taskData.length > 0) {
         taskData.forEach(taskRow => {
+          // Evitar processamento de tarefas duplicadas
+          if (processedTasks.has(taskRow.id)) {
+            console.warn('⚠️ TASKS: Tarefa duplicada detectada e ignorada:', taskRow.id);
+            return;
+          }
+          processedTasks.add(taskRow.id);
+
           try {
             const taskInfo = typeof taskRow.task_data === 'string' 
               ? JSON.parse(taskRow.task_data) 
@@ -112,7 +120,14 @@ export const useTasksData = () => {
             
             const column = columnsMap.get(taskRow.column_id);
             if (column && taskInfo) {
-              column.tasks.push(taskInfo);
+              // Verificar se a tarefa já existe na coluna
+              const existingTaskIndex = column.tasks.findIndex(existingTask => existingTask.id === taskInfo.id);
+              if (existingTaskIndex === -1) {
+                column.tasks.push(taskInfo);
+              } else {
+                console.warn('⚠️ TASKS: Tarefa já existe na coluna, atualizando:', taskInfo.id);
+                column.tasks[existingTaskIndex] = taskInfo;
+              }
             }
           } catch (error) {
             console.error('DEBUG: Erro ao processar tarefa:', taskRow, error);
@@ -134,6 +149,66 @@ export const useTasksData = () => {
       setColumns(defaultColumns);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Salvar tarefas no Supabase de forma segura - COM PROTEÇÃO CONTRA DUPLICAÇÃO
+  const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
+    try {
+      console.log('DEBUG: Iniciando salvamento de tarefas como dados globais');
+
+      // PRIMEIRO: Deletar TODAS as tarefas existentes para evitar duplicação
+      const { error: deleteError } = await supabase
+        .from('tasks_data')
+        .delete()
+        .is('user_id', null);
+
+      if (deleteError) {
+        console.error('DEBUG: Erro ao limpar tarefas antigas:', deleteError);
+        throw deleteError;
+      }
+
+      // SEGUNDO: Inserir novas tarefas como dados globais
+      const taskInserts: any[] = [];
+      newColumns.forEach(column => {
+        column.tasks.forEach(task => {
+          // Garantir que cada tarefa tenha um ID único
+          const taskId = task.id || `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          taskInserts.push({
+            user_id: null, // Sempre null para dados globais
+            column_id: column.id,
+            column_title: column.title,
+            column_color: column.color,
+            task_data: JSON.stringify({
+              ...task,
+              id: taskId // Garantir ID único
+            })
+          });
+        });
+      });
+
+      console.log('DEBUG: Tarefas para inserir:', taskInserts.length);
+
+      // Inserir as novas tarefas apenas se houver dados
+      if (taskInserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('tasks_data')
+          .insert(taskInserts);
+
+        if (insertError) {
+          console.error('DEBUG: Erro ao inserir tarefas:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log('DEBUG: Tarefas salvas como dados globais com sucesso:', taskInserts.length, 'itens');
+      if (user?.id) {
+        await logAudit('tasks_data', user.id, 'UPDATE', null, taskInserts);
+      }
+    } catch (error) {
+      console.error('DEBUG: Erro no salvamento de tarefas:', error);
+      throw error;
     }
   };
 
@@ -201,78 +276,6 @@ export const useTasksData = () => {
       }
     } catch (error) {
       console.error('DEBUG: Erro no salvamento de colunas:', error);
-      throw error;
-    }
-  };
-
-  // Salvar tarefas no Supabase de forma segura
-  const saveTasksToDatabase = async (newColumns: TaskColumn[]) => {
-    try {
-      console.log('DEBUG: Iniciando salvamento de tarefas como dados globais');
-
-      // Inserir novas tarefas como dados globais
-      const taskInserts: any[] = [];
-      newColumns.forEach(column => {
-        column.tasks.forEach(task => {
-          taskInserts.push({
-            user_id: null, // Sempre null para dados globais
-            column_id: column.id,
-            column_title: column.title,
-            column_color: column.color,
-            task_data: JSON.stringify(task)
-          });
-        });
-      });
-
-      console.log('DEBUG: Tarefas para inserir:', taskInserts);
-
-      // PRIMEIRO inserir as novas tarefas
-      if (taskInserts.length > 0) {
-        const { data: insertData, error: insertError } = await supabase
-          .from('tasks_data')
-          .insert(taskInserts)
-          .select();
-
-        console.log('DEBUG: Resultado da inserção de tarefas:', { insertData, insertError });
-
-        if (insertError) {
-          console.error('DEBUG: Erro ao inserir tarefas:', insertError);
-          throw insertError;
-        }
-
-        // SÓ DEPOIS deletar as tarefas antigas (exceto as recém inseridas)
-        const newTaskIds = insertData?.map(task => task.id) || [];
-        if (newTaskIds.length > 0) {
-          const { error: deleteError } = await supabase
-            .from('tasks_data')
-            .delete()
-            .is('user_id', null)
-            .not('id', 'in', `(${newTaskIds.map(id => `'${id}'`).join(',')})`);
-
-          if (deleteError) {
-            console.error('DEBUG: Erro ao deletar tarefas antigas:', deleteError);
-            // Não fazer throw aqui pois as novas tarefas já foram salvas
-          }
-        }
-      } else {
-        // Se não há tarefas para inserir, deletar todas as existentes
-        const { error: deleteError } = await supabase
-          .from('tasks_data')
-          .delete()
-          .is('user_id', null);
-
-        if (deleteError) {
-          console.error('DEBUG: Erro ao deletar todas as tarefas:', deleteError);
-          throw deleteError;
-        }
-      }
-
-      console.log('DEBUG: Tarefas salvas como dados globais com sucesso:', taskInserts.length, 'itens');
-      if (user?.id) {
-        await logAudit('tasks_data', user.id, 'UPDATE', null, taskInserts);
-      }
-    } catch (error) {
-      console.error('DEBUG: Erro no salvamento de tarefas:', error);
       throw error;
     }
   };
@@ -435,6 +438,7 @@ export const useTasksData = () => {
     console.log('DEBUG: Coluna ID:', columnId);
     console.log('DEBUG: Tarefa:', task);
     
+    // Gerar ID único com timestamp para evitar duplicação
     const newTask: Task = {
       ...task,
       id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -442,11 +446,19 @@ export const useTasksData = () => {
 
     console.log('DEBUG: Nova tarefa criada:', newTask);
 
-    const newColumns = columns.map(col => 
-      col.id === columnId 
-        ? { ...col, tasks: [...col.tasks, newTask] }
-        : col
-    );
+    const newColumns = columns.map(col => {
+      if (col.id === columnId) {
+        // Verificar se a tarefa já existe antes de adicionar
+        const taskExists = col.tasks.some(existingTask => existingTask.id === newTask.id);
+        if (!taskExists) {
+          return { ...col, tasks: [...col.tasks, newTask] };
+        } else {
+          console.warn('⚠️ TASKS: Tentativa de adicionar tarefa duplicada bloqueada:', newTask.id);
+          return col;
+        }
+      }
+      return col;
+    });
 
     console.log('DEBUG: Colunas após adição da tarefa:', newColumns.find(c => c.id === columnId)?.tasks.length);
     await updateColumns(newColumns);
