@@ -45,7 +45,6 @@ export default function GoogleMyBusiness() {
   const { 
     groups, 
     columns,
-    customColumns,
     statuses,
     updateGroups, 
     createMonth, 
@@ -64,8 +63,7 @@ export default function GoogleMyBusiness() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles,
-    applyDefaultObservationsToAllClients
+    getClientFiles
   } = useGoogleMyBusinessData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -238,9 +236,7 @@ export default function GoogleMyBusiness() {
         setClientObservations([]);
       }
 
-      // Não definir anexos para GMB
       setClientAttachments([]);
-      
       setShowClientDetails(clientId);
     }
   };
@@ -252,7 +248,7 @@ export default function GoogleMyBusiness() {
           observacoes: JSON.stringify(clientObservations)
         };
 
-        // Não incluir attachments para GMB
+        
         
         await updateClient(showClientDetails, updates);
       } catch (error) {
@@ -422,7 +418,7 @@ export default function GoogleMyBusiness() {
                 <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
                 <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
                 <div className="w-64 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Informações</div>
-              {customColumns.map((column) => (
+              {columns.map((column) => (
                 <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
                 </div>
@@ -484,10 +480,12 @@ export default function GoogleMyBusiness() {
                       groupId={group.id}
                       index={index}
                       selectedItems={selectedItems}
-                      columns={customColumns}
+                      columns={columns}
                       onSelectItem={handleSelectItem}
                       onOpenClientDetails={openClientDetails}
-                      onUpdateItemStatus={updateItemStatus}
+                      onUpdateItemStatus={(itemId: string, field: string, statusId: string) => {
+                        updateItemStatus(itemId, { id: statusId, name: '', color: '' });
+                      }}
                       onUpdateClientField={updateClient}
                       onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
                       getClientFiles={getClientFiles}
@@ -585,7 +583,7 @@ export default function GoogleMyBusiness() {
           <div className="space-y-4">
             <div className="space-y-2">
               <h4 className="font-medium">Colunas Existentes:</h4>
-              {customColumns.map((column, index) => (
+              {columns.map((column, index) => (
                 <div key={column.id} className="flex items-center justify-between p-3 border rounded bg-gray-50">
                   <span className="text-sm font-medium">
                     {column.name} ({column.type})
@@ -605,7 +603,7 @@ export default function GoogleMyBusiness() {
                       size="sm"
                       variant="ghost"
                       onClick={() => moveColumnDown(column.id)}
-                      disabled={index === customColumns.length - 1}
+                      disabled={index === columns.length - 1}
                       className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
                       title="Mover para baixo"
                     >

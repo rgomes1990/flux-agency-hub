@@ -11,6 +11,8 @@ interface BackupData {
   user_id: string | null;
 }
 
+type TableName = 'content_data' | 'google_my_business_data' | 'traffic_data' | 'videos_data' | 'rsg_avaliacoes_data' | 'sites_data' | 'content_padarias_data' | 'tasks_data' | 'client_passwords';
+
 export const useDataProtection = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const { user, logAudit } = useAuth();
@@ -43,7 +45,7 @@ export const useDataProtection = () => {
   };
 
   // Função para verificar integridade dos dados
-  const verifyDataIntegrity = async (tableName: string) => {
+  const verifyDataIntegrity = async (tableName: TableName) => {
     try {
       console.log('🔍 DATA PROTECTION: Verificando integridade da tabela:', tableName);
 
@@ -97,7 +99,7 @@ export const useDataProtection = () => {
       const result = await operation();
       
       // Verificar integridade após a operação
-      const isIntact = await verifyDataIntegrity(tableName);
+      const isIntact = await verifyDataIntegrity(tableName as TableName);
       if (!isIntact) {
         console.warn('⚠️ DATA PROTECTION: Possível problema de integridade detectado');
       }

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasksData } from '@/hooks/useTasksData';
@@ -6,7 +5,7 @@ import { useContentData } from '@/hooks/useContentData';
 import { useContentPadariasData } from '@/hooks/useContentPadariasData';
 import { useTrafficData } from '@/hooks/useTrafficData';
 import { useGoogleMyBusinessData } from '@/hooks/useGoogleMyBusinessData';
-import { useRSGAvaliacoesData } from '@/hooks/useRSGAvaliacoesData';
+import useRSGAvaliacoesData from '@/hooks/useRSGAvaliacoesData';
 import { useVideosData } from '@/hooks/useVideosData';
 import { useSitesData } from '@/hooks/useSitesData';
 import { CheckSquare, Clock, AlertCircle, CheckCircle, Users, FileText, Building, Star, Video, Globe } from 'lucide-react';
