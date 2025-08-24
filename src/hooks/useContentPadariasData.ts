@@ -264,42 +264,44 @@ export function useContentPadariasData() {
         const group = groupsMap.get(item.group_name)!;
         
         // Processar anexos de forma mais robusta - FIXED
-        let attachments = [];
+        let attachments: Array<{ name: string; data: string; type: string; size?: number }> = [];
         if (item.attachments) {
           try {
             if (Array.isArray(item.attachments)) {
               // Se é um array, processar cada item
-              attachments = item.attachments.map(att => {
-                if (typeof att === 'string') {
-                  // Se é string JSON, fazer parse
-                  try {
-                    const parsed = JSON.parse(att);
+              attachments = item.attachments
+                .map((att: any) => {
+                  if (typeof att === 'string') {
+                    // Se é string JSON, fazer parse
+                    try {
+                      const parsed = JSON.parse(att);
+                      return {
+                        name: parsed.name || 'Arquivo',
+                        type: parsed.type || 'application/octet-stream',
+                        data: parsed.data || '',
+                        size: parsed.size || 0
+                      };
+                    } catch {
+                      console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
+                      return null;
+                    }
+                  } else if (typeof att === 'object' && att !== null) {
+                    // Se já é objeto, garantir propriedades
                     return {
-                      name: parsed.name || 'Arquivo',
-                      type: parsed.type || 'application/octet-stream',
-                      data: parsed.data || '',
-                      size: parsed.size || 0
+                      name: att.name || 'Arquivo',
+                      type: att.type || 'application/octet-stream',
+                      data: att.data || '',
+                      size: att.size || 0
                     };
-                  } catch {
-                    console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
-                    return null;
                   }
-                } else if (typeof att === 'object' && att !== null) {
-                  // Se já é objeto, garantir propriedades
-                  return {
-                    name: att.name || 'Arquivo',
-                    type: att.type || 'application/octet-stream',
-                    data: att.data || '',
-                    size: att.size || 0
-                  };
-                }
-                return null;
-              }).filter(Boolean); // Remove nulls
+                  return null;
+                })
+                .filter((att): att is { name: string; data: string; type: string; size?: number } => att !== null);
             } else if (typeof item.attachments === 'string') {
               // Se é string JSON completa
               const parsed = JSON.parse(item.attachments);
               if (Array.isArray(parsed)) {
-                attachments = parsed.map(att => ({
+                attachments = parsed.map((att: any) => ({
                   name: att.name || 'Arquivo',
                   type: att.type || 'application/octet-stream',
                   data: att.data || '',
@@ -400,7 +402,6 @@ export function useContentPadariasData() {
     }
   }, [groups]);
 
-  // Função para adicionar anexo
   const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
     console.log('🔄 Padarias: Adicionando anexo ao cliente:', clientId);
     
@@ -424,7 +425,6 @@ export function useContentPadariasData() {
     }
   };
 
-  // Função para remover anexo - CORRIGIDA
   const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
     console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
     
