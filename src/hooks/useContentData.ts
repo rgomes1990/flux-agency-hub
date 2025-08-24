@@ -7,8 +7,8 @@ export interface ContentItem {
   elemento: string;
   servicos: string;
   observacoes: string;
-  hasAttachments?: boolean; // Apenas indicador se tem anexos
-  attachments?: any[]; // Para quando carregados sob demanda
+  hasAttachments?: boolean;
+  attachments?: any[];
   status?: {
     id?: string;
     name?: string;
@@ -55,15 +55,15 @@ export function useContentData() {
     setGroups(updatedGroups);
   };
 
-  // Função otimizada para carregar dados SEM anexos
+  // Função otimizada para carregar dados sem duplicação
   const loadContentData = useCallback(async () => {
-    console.log('🔄 CONTENT: Carregando dados otimizados...');
+    console.log('🔄 CONTENT: Carregando dados...');
     setLoading(true);
     
     try {
       const { data, error } = await supabase
         .from('content_data')
-        .select('id, group_id, group_name, group_color, elemento, servicos, observacoes, item_data, attachments, created_at, updated_at')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -80,16 +80,21 @@ export function useContentData() {
       }
 
       const groupsMap = new Map<string, ContentGroup>();
+      
+      // Usar Set para evitar duplicação de itens
       const processedItems = new Set<string>();
 
       data.forEach(item => {
+        // Evitar duplicação baseada no ID
         if (processedItems.has(item.id)) {
+          console.log('⚠️ CONTENT: Item duplicado ignorado:', item.id);
           return;
         }
         processedItems.add(item.id);
 
-        if (!groupsMap.has(item.group_name)) {
-          groupsMap.set(item.group_name, {
+        // Criar ou obter grupo
+        if (!groupsMap.has(item.group_id)) {
+          groupsMap.set(item.group_id, {
             id: item.group_id,
             name: item.group_name,
             color: item.group_color || 'bg-blue-500',
@@ -98,24 +103,30 @@ export function useContentData() {
           });
         }
 
-        const group = groupsMap.get(item.group_name)!;
+        const group = groupsMap.get(item.group_id)!;
         
-        // Apenas verificar SE tem anexos, não carregar os dados
+        // Verificar se tem anexos
         const hasAttachments = item.attachments && 
           ((Array.isArray(item.attachments) && item.attachments.length > 0) || 
            (typeof item.attachments === 'string' && item.attachments.trim() !== ''));
 
+        // Processar item_data para extrair status corretamente
         let itemData: any = {};
-        let status: any = {};
+        let status: any = null;
         
         if (item.item_data) {
           try {
             if (typeof item.item_data === 'string') {
               itemData = JSON.parse(item.item_data);
             } else {
-              itemData = item.item_data as any;
+              itemData = item.item_data;
             }
-            status = itemData?.status || {};
+            
+            // Extrair status do item_data
+            if (itemData.status) {
+              status = itemData.status;
+              console.log('✅ CONTENT: Status encontrado para item:', item.elemento, status);
+            }
           } catch (error) {
             console.warn('⚠️ CONTENT: Erro ao processar item_data:', error);
             itemData = {};
@@ -127,17 +138,28 @@ export function useContentData() {
           elemento: item.elemento || '',
           servicos: item.servicos || '',
           observacoes: item.observacoes || '',
-          hasAttachments: !!hasAttachments, // Apenas indicador booleano
+          hasAttachments: !!hasAttachments,
           status: status,
-          ...itemData
+          ...itemData // Incluir outros dados do item_data
         };
 
-        console.log('📝 CONTENT: Item carregado:', contentItem.elemento, hasAttachments ? '(com anexos)' : '(sem anexos)');
+        console.log('📝 CONTENT: Item processado:', {
+          elemento: contentItem.elemento,
+          status: contentItem.status,
+          hasAttachments: contentItem.hasAttachments
+        });
+
         group.items.push(contentItem);
       });
 
       const loadedGroups = Array.from(groupsMap.values());
       console.log('✅ CONTENT: Grupos carregados:', loadedGroups.length);
+      
+      // Log dos itens por grupo
+      loadedGroups.forEach(group => {
+        console.log(`📋 CONTENT: Grupo ${group.name} tem ${group.items.length} itens`);
+      });
+      
       updateGroups(loadedGroups);
 
     } catch (error) {
@@ -147,7 +169,7 @@ export function useContentData() {
     }
   }, []);
 
-  // Função separada para carregar anexos de um cliente específico
+  // Função para carregar anexos de um cliente específico
   const loadClientAttachments = useCallback(async (clientId: string) => {
     console.log('📎 CONTENT: Carregando anexos do cliente:', clientId);
     
@@ -205,7 +227,7 @@ export function useContentData() {
     }
   }, []);
 
-  // Função para obter arquivos do cliente (compatibilidade)
+  // Função para obter arquivos do cliente
   const getClientFiles = useCallback((clientId: string) => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client?.attachments) {
@@ -341,11 +363,15 @@ export function useContentData() {
   };
 
   const updateItemStatus = async (itemId: string, status: any) => {
+    console.log('🔄 CONTENT: Atualizando status do item:', itemId, status);
+    
     const updatedGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => {
         if (item.id === itemId) {
-          return { ...item, status: status };
+          const updatedItem = { ...item, status: status };
+          console.log('✅ CONTENT: Item atualizado com status:', updatedItem);
+          return updatedItem;
         }
         return item;
       })
@@ -408,29 +434,39 @@ export function useContentData() {
     }, groups);
   };
 
+  // Função melhorada para salvar dados no banco
   const saveContentToDatabase = async (contentData: ContentGroup[]) => {
-    console.log('💾 Salvando dados no banco de dados...', contentData);
+    console.log('💾 CONTENT: Salvando dados no banco de dados...', contentData.length, 'grupos');
   
     try {
       // Mapear os dados para o formato correto antes de salvar
       const formattedData = contentData.flatMap(group =>
         group.items.map(item => {
           const { id, elemento, servicos, observacoes, hasAttachments, status, attachments, ...itemData } = item;
+          
+          // Preparar item_data com status e outros dados
+          const itemDataToSave = { 
+            status: status || null, 
+            ...itemData 
+          };
+          
           return {
             id: id,
             group_id: group.id,
             group_name: group.name,
             group_color: group.color,
-            elemento: elemento,
-            servicos: servicos,
-            observacoes: observacoes,
+            elemento: elemento || '',
+            servicos: servicos || '',
+            observacoes: observacoes || '',
             attachments: attachments || null,
-            item_data: { status, ...itemData },
+            item_data: itemDataToSave,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
         })
       );
+
+      console.log('💾 CONTENT: Dados formatados para salvar:', formattedData.length, 'itens');
   
       // Deletar todos os dados existentes
       const { error: deleteError } = await supabase
@@ -439,7 +475,7 @@ export function useContentData() {
         .neq('id', '00000000-0000-0000-0000-000000000000');
   
       if (deleteError) {
-        console.error('❌ Erro ao limpar dados antigos:', deleteError);
+        console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
         throw deleteError;
       }
   
@@ -450,14 +486,14 @@ export function useContentData() {
           .insert(formattedData);
   
         if (insertError) {
-          console.error('❌ Erro ao inserir dados:', insertError);
+          console.error('❌ CONTENT: Erro ao inserir dados:', insertError);
           throw insertError;
         }
       }
   
-      console.log('✅ Dados salvos com sucesso!');
+      console.log('✅ CONTENT: Dados salvos com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao salvar dados no banco de dados:', error);
+      console.error('❌ CONTENT: Erro ao salvar dados no banco de dados:', error);
     }
   };
 
@@ -492,7 +528,6 @@ export function useContentData() {
 
   const loadColumns = useCallback(async () => {
     try {
-      // Use status_config table with proper filtering
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -500,7 +535,7 @@ export function useContentData() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Erro ao carregar colunas:', error);
+        console.error('❌ CONTENT: Erro ao carregar colunas:', error);
         return;
       }
 
@@ -514,13 +549,12 @@ export function useContentData() {
         setCustomColumns(typedColumns);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar colunas:', error);
+      console.error('❌ CONTENT: Erro ao carregar colunas:', error);
     }
   }, []);
 
   const loadStatuses = useCallback(async () => {
     try {
-      // Use status_config table with proper filtering
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -528,7 +562,7 @@ export function useContentData() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Erro ao carregar status:', error);
+        console.error('❌ CONTENT: Erro ao carregar status:', error);
         return;
       }
 
@@ -538,29 +572,28 @@ export function useContentData() {
           name: status.status_name,
           color: status.status_color
         }));
+        console.log('✅ CONTENT: Status carregados:', typedStatuses.length);
         setStatuses(typedStatuses);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar status:', error);
+      console.error('❌ CONTENT: Erro ao carregar status:', error);
     }
   }, []);
 
   const saveColumnsToDatabase = async (columns: ContentColumn[]) => {
-    console.log('💾 Salvando colunas no banco de dados...', columns);
+    console.log('💾 CONTENT: Salvando colunas no banco de dados...', columns);
 
     try {
-      // Delete existing columns for this module
       const { error: deleteError } = await supabase
         .from('status_config')
         .delete()
         .eq('module', 'content');
 
       if (deleteError) {
-        console.error('❌ Erro ao limpar colunas antigas:', deleteError);
+        console.error('❌ CONTENT: Erro ao limpar colunas antigas:', deleteError);
         throw deleteError;
       }
 
-      // Insert new columns
       const formattedColumns = columns.map(column => ({
         status_id: column.id,
         status_name: column.name,
@@ -574,33 +607,31 @@ export function useContentData() {
           .insert(formattedColumns);
 
         if (insertError) {
-          console.error('❌ Erro ao inserir colunas:', insertError);
+          console.error('❌ CONTENT: Erro ao inserir colunas:', insertError);
           throw insertError;
         }
       }
 
-      console.log('✅ Colunas salvas com sucesso!');
+      console.log('✅ CONTENT: Colunas salvas com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao salvar colunas no banco de dados:', error);
+      console.error('❌ CONTENT: Erro ao salvar colunas no banco de dados:', error);
     }
   };
 
   const saveStatusesToDatabase = async (statuses: ContentStatus[]) => {
-    console.log('💾 Salvando status no banco de dados...', statuses);
+    console.log('💾 CONTENT: Salvando status no banco de dados...', statuses);
 
     try {
-      // Delete existing statuses for this module
       const { error: deleteError } = await supabase
         .from('status_config')
         .delete()
         .eq('module', 'content');
 
       if (deleteError) {
-        console.error('❌ Erro ao limpar status antigos:', deleteError);
+        console.error('❌ CONTENT: Erro ao limpar status antigos:', deleteError);
         throw deleteError;
       }
 
-      // Insert new statuses
       const formattedStatuses = statuses.map(status => ({
         status_id: status.id,
         status_name: status.name,
@@ -614,14 +645,14 @@ export function useContentData() {
           .insert(formattedStatuses);
 
         if (insertError) {
-          console.error('❌ Erro ao inserir status:', insertError);
+          console.error('❌ CONTENT: Erro ao inserir status:', insertError);
           throw insertError;
         }
       }
 
-      console.log('✅ Status salvos com sucesso!');
+      console.log('✅ CONTENT: Status salvos com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao salvar status no banco de dados:', error);
+      console.error('❌ CONTENT: Erro ao salvar status no banco de dados:', error);
     }
   };
 
