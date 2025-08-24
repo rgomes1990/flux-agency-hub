@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
@@ -17,28 +17,27 @@ export const useDataProtection = () => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const { user, logAudit } = useAuth();
 
-  // Função para criar backup de uma tabela
-  const createBackup = async (tableName: string, data: any) => {
+  // Função para criar backup automático antes de operações críticas
+  const createAutoBackup = async (tableName: TableName, currentData: any) => {
     try {
-      console.log('🔄 DATA PROTECTION: Criando backup para tabela:', tableName);
+      console.log(`🛡️ DATA PROTECTION: Auto-backup iniciado para ${tableName}`);
       setIsBackingUp(true);
 
-      const backupEntry = {
-        table_name: tableName,
-        backup_data: data,
-        user_id: user?.id || null,
-        created_at: new Date().toISOString()
-      };
-
       // Salvar backup na tabela de auditoria
-      if (user?.id) {
-        await logAudit(tableName, user.id, 'BACKUP', null, data);
+      if (user?.id && logAudit) {
+        await logAudit(tableName, `auto-backup-${Date.now()}`, 'AUTO_BACKUP', null, {
+          backup_data: currentData,
+          backup_size: Array.isArray(currentData) ? currentData.length : 1,
+          protection_level: 'HIGH',
+          auto_generated: true
+        });
       }
 
-      console.log('✅ DATA PROTECTION: Backup criado com sucesso para:', tableName);
+      console.log('✅ DATA PROTECTION: Auto-backup concluído');
+      return true;
     } catch (error) {
-      console.error('❌ DATA PROTECTION: Erro ao criar backup:', error);
-      throw error;
+      console.error('❌ DATA PROTECTION: Erro no auto-backup:', error);
+      return false;
     } finally {
       setIsBackingUp(false);
     }
@@ -47,75 +46,107 @@ export const useDataProtection = () => {
   // Função para verificar integridade dos dados
   const verifyDataIntegrity = async (tableName: TableName) => {
     try {
-      console.log('🔍 DATA PROTECTION: Verificando integridade da tabela:', tableName);
+      console.log(`🔍 DATA PROTECTION: Verificando integridade de ${tableName}`);
 
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from(tableName)
-        .select('id, created_at, updated_at')
+        .select('id, created_at, updated_at', { count: 'exact' })
         .limit(1);
 
       if (error) {
-        console.error('❌ DATA PROTECTION: Erro na verificação de integridade:', error);
-        return false;
+        console.error('❌ DATA PROTECTION: Erro na verificação:', error);
+        return { isValid: false, error: error.message };
       }
 
-      console.log('✅ DATA PROTECTION: Tabela', tableName, 'íntegra');
-      return true;
+      console.log(`✅ DATA PROTECTION: ${tableName} íntegra (${count} registros)`);
+      return { isValid: true, recordCount: count };
     } catch (error) {
       console.error('❌ DATA PROTECTION: Erro na verificação:', error);
-      return false;
+      return { isValid: false, error: 'Erro desconhecido' };
     }
   };
 
-  // Função para restaurar dados de backup (se necessário)
-  const restoreFromBackup = async (tableName: string, backupData: any) => {
+  // Operação segura com backup automático
+  const safeDataOperation = async <T>(
+    tableName: TableName,
+    operation: () => Promise<T>,
+    currentData?: any
+  ): Promise<T> => {
     try {
-      console.log('🔄 DATA PROTECTION: Restaurando dados da tabela:', tableName);
-
-      // Esta função seria implementada caso precise restaurar dados
-      // Por segurança, apenas logamos a tentativa
-      if (user?.id) {
-        await logAudit(tableName, user.id, 'RESTORE_ATTEMPT', null, { backup_size: backupData.length });
+      console.log(`🔒 DATA PROTECTION: Iniciando operação segura em ${tableName}`);
+      
+      // Criar backup antes da operação se dados foram fornecidos
+      if (currentData) {
+        const backupSuccess = await createAutoBackup(tableName, currentData);
+        if (!backupSuccess) {
+          console.warn('⚠️ DATA PROTECTION: Backup falhou, prosseguindo com operação...');
+        }
       }
-
-      console.log('✅ DATA PROTECTION: Tentativa de restauração registrada');
-    } catch (error) {
-      console.error('❌ DATA PROTECTION: Erro na restauração:', error);
-      throw error;
-    }
-  };
-
-  // Auto-backup quando dados são modificados
-  const safeDataOperation = async (
-    tableName: string,
-    operation: () => Promise<any>,
-    currentData: any
-  ) => {
-    try {
-      // Criar backup antes da operação
-      await createBackup(tableName, currentData);
       
       // Executar a operação
       const result = await operation();
       
       // Verificar integridade após a operação
-      const isIntact = await verifyDataIntegrity(tableName as TableName);
-      if (!isIntact) {
-        console.warn('⚠️ DATA PROTECTION: Possível problema de integridade detectado');
+      const integrity = await verifyDataIntegrity(tableName);
+      if (!integrity.isValid) {
+        console.warn('⚠️ DATA PROTECTION: Possível problema de integridade detectado:', integrity.error);
+        
+        // Logar o problema
+        if (user?.id && logAudit) {
+          await logAudit(tableName, 'integrity-check', 'INTEGRITY_WARNING', null, {
+            error: integrity.error,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
       
       return result;
     } catch (error) {
       console.error('❌ DATA PROTECTION: Erro na operação segura:', error);
+      
+      // Logar o erro
+      if (user?.id && logAudit) {
+        await logAudit(tableName, 'operation-error', 'ERROR', null, {
+          error: error instanceof Error ? error.message : 'Erro desconhecido',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       throw error;
+    }
+  };
+
+  // Monitoramento contínuo (executar periodicamente)
+  const runHealthCheck = async () => {
+    try {
+      console.log('🏥 DATA PROTECTION: Executando verificação de saúde...');
+      
+      const tables: TableName[] = [
+        'content_data', 'google_my_business_data', 'traffic_data', 
+        'videos_data', 'rsg_avaliacoes_data', 'sites_data', 
+        'content_padarias_data', 'tasks_data', 'client_passwords'
+      ];
+
+      const results = [];
+      
+      for (const table of tables) {
+        const integrity = await verifyDataIntegrity(table);
+        results.push({ table, ...integrity });
+      }
+
+      console.log('📊 DATA PROTECTION: Relatório de saúde:', results);
+      return results;
+    } catch (error) {
+      console.error('❌ DATA PROTECTION: Erro na verificação de saúde:', error);
+      return [];
     }
   };
 
   return {
     isBackingUp,
-    createBackup,
+    createAutoBackup,
     verifyDataIntegrity,
-    restoreFromBackup,
-    safeDataOperation
+    safeDataOperation,
+    runHealthCheck
   };
 };

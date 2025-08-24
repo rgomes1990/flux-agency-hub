@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +18,7 @@ export const useClientPasswordsData = () => {
 
   const loadPasswords = async () => {
     try {
-      console.log('Carregando senhas dos clientes...');
+      console.log('🔄 Carregando senhas dos clientes...');
       setLoading(true);
 
       const { data, error } = await supabase
@@ -28,11 +27,11 @@ export const useClientPasswordsData = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Erro ao carregar senhas:', error);
+        console.error('❌ Erro ao carregar senhas:', error);
         throw error;
       }
 
-      console.log('Senhas carregadas:', data?.length || 0);
+      console.log('✅ Senhas carregadas:', data?.length || 0);
 
       const formattedPasswords: ClientPassword[] = (data || []).map(item => ({
         id: item.id,
@@ -45,7 +44,7 @@ export const useClientPasswordsData = () => {
 
       setPasswords(formattedPasswords);
     } catch (error) {
-      console.error('Erro ao carregar senhas:', error);
+      console.error('❌ Erro ao carregar senhas:', error);
       setPasswords([]);
     } finally {
       setLoading(false);
@@ -58,7 +57,15 @@ export const useClientPasswordsData = () => {
 
   const addPassword = async (passwordData: Omit<ClientPassword, 'id' | 'createdAt'>) => {
     try {
-      console.log('Adicionando senha:', passwordData);
+      console.log('🔄 Adicionando senha:', passwordData);
+      
+      // Primeiro criar backup dos dados atuais
+      if (user && logAudit) {
+        await logAudit('client_passwords', 'backup', 'BACKUP', null, { 
+          total_passwords: passwords.length,
+          action: 'before_insert' 
+        });
+      }
       
       const { data, error } = await supabase
         .from('client_passwords')
@@ -66,18 +73,20 @@ export const useClientPasswordsData = () => {
           user_id: user?.id || null,
           cliente: passwordData.cliente,
           plataforma: passwordData.plataforma,
-          observacoes: passwordData.observacoes,
-          attachments: passwordData.attachments ? JSON.stringify(passwordData.attachments) : null
+          observacoes: passwordData.observacoes || null,
+          attachments: passwordData.attachments ? JSON.stringify(passwordData.attachments) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Erro ao adicionar senha:', error);
+        console.error('❌ Erro ao adicionar senha:', error);
         throw error;
       }
 
-      console.log('Senha adicionada com sucesso:', data);
+      console.log('✅ Senha adicionada com sucesso:', data);
 
       const newPassword: ClientPassword = {
         id: data.id,
@@ -90,7 +99,7 @@ export const useClientPasswordsData = () => {
 
       setPasswords(prev => [newPassword, ...prev]);
 
-      // Registrar na auditoria se o usuário estiver logado
+      // Registrar na auditoria
       if (user && logAudit) {
         await logAudit('client_passwords', data.id, 'INSERT', null, {
           cliente: passwordData.cliente,
@@ -98,9 +107,12 @@ export const useClientPasswordsData = () => {
         });
       }
 
+      // Recarregar dados para garantir consistência
+      await loadPasswords();
+
       return data.id;
     } catch (error) {
-      console.error('Erro ao adicionar senha:', error);
+      console.error('❌ Erro ao adicionar senha:', error);
       throw error;
     }
   };
@@ -109,7 +121,7 @@ export const useClientPasswordsData = () => {
     const oldPassword = passwords.find(p => p.id === id);
     
     try {
-      console.log('Atualizando senha:', id, updates);
+      console.log('🔄 Atualizando senha:', id, updates);
       
       const { error } = await supabase
         .from('client_passwords')
@@ -123,17 +135,16 @@ export const useClientPasswordsData = () => {
         .eq('id', id);
 
       if (error) {
-        console.error('Erro ao atualizar senha:', error);
+        console.error('❌ Erro ao atualizar senha:', error);
         throw error;
       }
 
-      console.log('Senha atualizada com sucesso');
+      console.log('✅ Senha atualizada com sucesso');
 
       setPasswords(prev => prev.map(password => 
         password.id === id ? { ...password, ...updates } : password
       ));
 
-      // Registrar na auditoria se o usuário estiver logado
       if (user && logAudit) {
         await logAudit('client_passwords', id, 'UPDATE', 
           { cliente: oldPassword?.cliente, plataforma: oldPassword?.plataforma },
@@ -141,7 +152,7 @@ export const useClientPasswordsData = () => {
         );
       }
     } catch (error) {
-      console.error('Erro ao atualizar senha:', error);
+      console.error('❌ Erro ao atualizar senha:', error);
       throw error;
     }
   };
@@ -150,7 +161,7 @@ export const useClientPasswordsData = () => {
     const passwordToDelete = passwords.find(p => p.id === id);
     
     try {
-      console.log('Deletando senha:', id);
+      console.log('🔄 Deletando senha:', id);
       
       const { error } = await supabase
         .from('client_passwords')
@@ -158,15 +169,14 @@ export const useClientPasswordsData = () => {
         .eq('id', id);
 
       if (error) {
-        console.error('Erro ao deletar senha:', error);
+        console.error('❌ Erro ao deletar senha:', error);
         throw error;
       }
 
-      console.log('Senha deletada com sucesso');
+      console.log('✅ Senha deletada com sucesso');
 
       setPasswords(prev => prev.filter(password => password.id !== id));
 
-      // Registrar na auditoria se o usuário estiver logado
       if (user && logAudit) {
         await logAudit('client_passwords', id, 'DELETE', 
           { cliente: passwordToDelete?.cliente, plataforma: passwordToDelete?.plataforma }, 
@@ -174,7 +184,7 @@ export const useClientPasswordsData = () => {
         );
       }
     } catch (error) {
-      console.error('Erro ao deletar senha:', error);
+      console.error('❌ Erro ao deletar senha:', error);
       throw error;
     }
   };

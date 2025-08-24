@@ -22,23 +22,35 @@ export const useAuditData = () => {
 
   const loadAuditLogs = async () => {
     try {
-      console.log('Carregando logs de auditoria...');
+      console.log('🔄 Carregando logs de auditoria...');
       setLoading(true);
 
+      // Aumentar significativamente o limite e ordenar melhor
       const { data, error } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(5000); // Aumentar o limite para capturar mais logs
+        .limit(10000); // Aumentar limite para capturar mais logs
 
       if (error) {
-        console.error('Erro ao carregar logs de auditoria:', error);
+        console.error('❌ Erro ao carregar logs de auditoria:', error);
         throw error;
       }
 
-      console.log('Logs de auditoria carregados:', data?.length || 0);
+      console.log('✅ Logs de auditoria carregados:', data?.length || 0);
 
-      // Converter os dados para o tipo correto
+      // Verificar se temos logs de todas as tabelas esperadas
+      const expectedTables = [
+        'content_data', 'google_my_business_data', 'traffic_data', 
+        'videos_data', 'rsg_avaliacoes_data', 'sites_data', 
+        'content_padarias_data', 'tasks_data', 'client_passwords',
+        'app_users', 'profiles'
+      ];
+
+      const tablesWithLogs = [...new Set((data || []).map(log => log.table_name))];
+      console.log('📊 Tabelas com logs:', tablesWithLogs);
+      console.log('📋 Tabelas esperadas:', expectedTables);
+
       const formattedLogs: AuditLog[] = (data || []).map(log => ({
         ...log,
         ip_address: log.ip_address ? String(log.ip_address) : undefined
@@ -46,7 +58,7 @@ export const useAuditData = () => {
 
       setAuditLogs(formattedLogs);
     } catch (error) {
-      console.error('Erro ao carregar logs de auditoria:', error);
+      console.error('❌ Erro ao carregar logs de auditoria:', error);
       setAuditLogs([]);
     } finally {
       setLoading(false);
@@ -59,47 +71,83 @@ export const useAuditData = () => {
 
   const clearOldLogs = async (days: number = 30) => {
     try {
-      console.log(`Limpando logs com mais de ${days} dias...`);
+      console.log(`🔄 Limpando logs com mais de ${days} dias...`);
       
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
       const cutoffISO = cutoffDate.toISOString();
 
-      console.log('Data de corte:', cutoffISO);
+      console.log('📅 Data de corte:', cutoffISO);
 
-      // Primeiro, verificar quantos logs serão deletados
-      const { data: logsToDelete, error: countError } = await supabase
+      // Contar logs que serão deletados
+      const { count: countToDelete, error: countError } = await supabase
         .from('audit_logs')
-        .select('id')
+        .select('*', { count: 'exact', head: true })
         .lt('timestamp', cutoffISO);
 
       if (countError) {
-        console.error('Erro ao contar logs para deletar:', countError);
+        console.error('❌ Erro ao contar logs para deletar:', countError);
         throw countError;
       }
 
-      console.log(`Logs que serão deletados: ${logsToDelete?.length || 0}`);
+      console.log(`📊 Logs que serão deletados: ${countToDelete || 0}`);
+
+      if (!countToDelete || countToDelete === 0) {
+        console.log('ℹ️ Nenhum log antigo encontrado para deletar');
+        return 0;
+      }
 
       // Executar a deleção
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from('audit_logs')
         .delete()
         .lt('timestamp', cutoffISO);
 
-      if (error) {
-        console.error('Erro ao limpar logs antigos:', error);
-        throw error;
+      if (deleteError) {
+        console.error('❌ Erro ao limpar logs antigos:', deleteError);
+        throw deleteError;
       }
 
-      console.log('Logs antigos removidos com sucesso');
+      console.log('✅ Logs antigos removidos com sucesso');
       
       // Recarregar os logs após a limpeza
       await loadAuditLogs();
       
-      return logsToDelete?.length || 0;
+      return countToDelete || 0;
     } catch (error) {
-      console.error('Erro ao limpar logs antigos:', error);
+      console.error('❌ Erro ao limpar logs antigos:', error);
       throw error;
+    }
+  };
+
+  // Nova função para criar backup de dados críticos
+  const createDataBackup = async (tableName: string, data: any) => {
+    try {
+      console.log(`🛡️ Criando backup de segurança para ${tableName}...`);
+      
+      const { error } = await supabase
+        .from('audit_logs')
+        .insert({
+          table_name: tableName,
+          record_id: `backup-${Date.now()}`,
+          action: 'BACKUP',
+          old_values: null,
+          new_values: {
+            backup_data: data,
+            backup_timestamp: new Date().toISOString(),
+            backup_size: Array.isArray(data) ? data.length : 1
+          },
+          timestamp: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('❌ Erro ao criar backup:', error);
+        throw error;
+      }
+
+      console.log('✅ Backup criado com sucesso');
+    } catch (error) {
+      console.error('❌ Erro no sistema de backup:', error);
     }
   };
 
@@ -111,6 +159,7 @@ export const useAuditData = () => {
     auditLogs,
     loading,
     refreshLogs,
-    clearOldLogs
+    clearOldLogs,
+    createDataBackup
   };
 };
