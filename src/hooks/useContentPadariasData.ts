@@ -263,14 +263,49 @@ export function useContentPadariasData() {
 
         const group = groupsMap.get(item.group_name)!;
         
-        // Processar anexos de forma mais robusta
+        // Processar anexos de forma mais robusta - FIXED
         let attachments = [];
         if (item.attachments) {
           try {
-            if (typeof item.attachments === 'string') {
-              attachments = JSON.parse(item.attachments);
-            } else if (Array.isArray(item.attachments)) {
-              attachments = item.attachments;
+            if (Array.isArray(item.attachments)) {
+              // Se é um array, processar cada item
+              attachments = item.attachments.map(att => {
+                if (typeof att === 'string') {
+                  // Se é string JSON, fazer parse
+                  try {
+                    const parsed = JSON.parse(att);
+                    return {
+                      name: parsed.name || 'Arquivo',
+                      type: parsed.type || 'application/octet-stream',
+                      data: parsed.data || '',
+                      size: parsed.size || 0
+                    };
+                  } catch {
+                    console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
+                    return null;
+                  }
+                } else if (typeof att === 'object' && att !== null) {
+                  // Se já é objeto, garantir propriedades
+                  return {
+                    name: att.name || 'Arquivo',
+                    type: att.type || 'application/octet-stream',
+                    data: att.data || '',
+                    size: att.size || 0
+                  };
+                }
+                return null;
+              }).filter(Boolean); // Remove nulls
+            } else if (typeof item.attachments === 'string') {
+              // Se é string JSON completa
+              const parsed = JSON.parse(item.attachments);
+              if (Array.isArray(parsed)) {
+                attachments = parsed.map(att => ({
+                  name: att.name || 'Arquivo',
+                  type: att.type || 'application/octet-stream',
+                  data: att.data || '',
+                  size: att.size || 0
+                }));
+              }
             }
           } catch (error) {
             console.warn('⚠️ Erro ao processar anexos:', error);
@@ -306,6 +341,7 @@ export function useContentPadariasData() {
           ...itemData
         };
 
+        console.log('📎 Cliente carregado com anexos:', clientItem.elemento, attachments.length);
         group.items.push(clientItem);
       });
 
@@ -433,18 +469,18 @@ export function useContentPadariasData() {
 
       updateGroups(updatedGroups);
       
-      // Preparar dados para salvar no banco - CRITICAL: Handle attachments properly
+      // Preparar dados para salvar no banco - FIXED: Better attachment handling
       const clientToUpdate = updatedGroups.flatMap(g => g.items).find(item => item.id === clientId);
       if (clientToUpdate) {
         const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = clientToUpdate;
         
-        // Process attachments correctly - handle removal properly
+        // Process attachments correctly - IMPROVED
         let processedAttachments: string[] | null = null;
         
         if (attachments !== undefined) {
           if (Array.isArray(attachments) && attachments.length > 0) {
+            // Garantir que cada anexo tem todas as propriedades necessárias
             processedAttachments = attachments.map(att => {
-              // Ensure attachment has all necessary properties
               const processedAtt = {
                 name: att.name || 'Arquivo',
                 type: att.type || 'application/octet-stream',
@@ -452,16 +488,7 @@ export function useContentPadariasData() {
                 size: att.size || 0
               };
               
-              // If attachment is already a JSON string, keep it
-              if (typeof att === 'string') {
-                try {
-                  JSON.parse(att);
-                  return att;
-                } catch {
-                  return JSON.stringify(processedAtt);
-                }
-              }
-              
+              console.log('📎 Processando anexo para salvar:', processedAtt.name, processedAtt.type, processedAtt.size);
               return JSON.stringify(processedAtt);
             });
           } else {
@@ -470,7 +497,7 @@ export function useContentPadariasData() {
           }
         }
 
-        console.log('💾 Salvando anexos processados:', processedAttachments);
+        console.log('💾 Salvando anexos processados:', processedAttachments?.length || 0, 'anexos');
 
         const { error } = await supabase
           .from('content_padarias_data')
@@ -478,7 +505,7 @@ export function useContentPadariasData() {
             elemento,
             servicos,
             observacoes,
-            attachments: processedAttachments, // This will properly handle null/empty arrays
+            attachments: processedAttachments,
             item_data: { status, ...itemData },
             updated_at: new Date().toISOString()
           })
@@ -489,7 +516,7 @@ export function useContentPadariasData() {
           throw error;
         }
 
-        console.log('✅ Cliente atualizado no banco com anexos:', processedAttachments);
+        console.log('✅ Cliente atualizado no banco com', processedAttachments?.length || 0, 'anexos');
       }
       
       console.log('✅ Padarias: Cliente atualizado com sucesso');
@@ -503,21 +530,25 @@ export function useContentPadariasData() {
     console.log('💾 Salvando dados no banco de dados...', contentPadariasData);
   
     try {
-      // Mapear os dados para o formato correto antes de salvar
+      // Mapear os dados para o formato correto antes de salvar - IMPROVED
       const formattedData = contentPadariasData.flatMap(group =>
         group.items.map(item => {
           const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = item;
           
-          // Convert attachments to proper format
+          // Convert attachments to proper format - ENHANCED
           let processedAttachments: string[] | null = null;
           if (attachments && Array.isArray(attachments) && attachments.length > 0) {
             processedAttachments = attachments.map(att => {
-              return JSON.stringify({
+              // Garantir que o anexo tem todas as propriedades necessárias
+              const processedAtt = {
                 name: att.name || 'Arquivo',
                 type: att.type || 'application/octet-stream',
                 data: att.data || '',
                 size: att.size || 0
-              });
+              };
+              
+              console.log('📎 Salvando anexo:', processedAtt.name, processedAtt.type, processedAtt.size, 'bytes');
+              return JSON.stringify(processedAtt);
             });
           }
           
