@@ -79,19 +79,21 @@ export function useContentData() {
         return;
       }
 
+      // Usar Map para garantir unicidade por ID
+      const itemsMap = new Map<string, any>();
       const groupsMap = new Map<string, ContentGroup>();
-      
-      // Usar Set para evitar duplicação de itens
-      const processedItems = new Set<string>();
 
+      // Primeiro, processar todos os itens únicos
       data.forEach(item => {
-        // Evitar duplicação baseada no ID
-        if (processedItems.has(item.id)) {
-          console.log('⚠️ CONTENT: Item duplicado ignorado:', item.id);
-          return;
+        if (!itemsMap.has(item.id)) {
+          itemsMap.set(item.id, item);
         }
-        processedItems.add(item.id);
+      });
 
+      console.log('🔍 CONTENT: Itens únicos encontrados:', itemsMap.size);
+
+      // Agora processar os itens únicos
+      itemsMap.forEach(item => {
         // Criar ou obter grupo
         if (!groupsMap.has(item.group_id)) {
           groupsMap.set(item.group_id, {
@@ -149,7 +151,13 @@ export function useContentData() {
           hasAttachments: contentItem.hasAttachments
         });
 
-        group.items.push(contentItem);
+        // Verificar se o item já existe no grupo antes de adicionar
+        const existingItemIndex = group.items.findIndex(existingItem => existingItem.id === contentItem.id);
+        if (existingItemIndex === -1) {
+          group.items.push(contentItem);
+        } else {
+          console.log('⚠️ CONTENT: Item já existe no grupo, ignorando duplicata:', contentItem.id);
+        }
       });
 
       const loadedGroups = Array.from(groupsMap.values());
@@ -158,6 +166,15 @@ export function useContentData() {
       // Log dos itens por grupo
       loadedGroups.forEach(group => {
         console.log(`📋 CONTENT: Grupo ${group.name} tem ${group.items.length} itens`);
+        // Log dos IDs dos itens para verificar duplicação
+        const itemIds = group.items.map(item => item.id);
+        const uniqueIds = [...new Set(itemIds)];
+        if (itemIds.length !== uniqueIds.length) {
+          console.warn('⚠️ CONTENT: Duplicatas detectadas no grupo', group.name, {
+            total: itemIds.length,
+            únicos: uniqueIds.length
+          });
+        }
       });
       
       updateGroups(loadedGroups);
