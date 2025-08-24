@@ -387,6 +387,24 @@ export function useTrafficData() {
     setColumns(updatedColumns);
   };
 
+  const moveColumnUp = (columnId: string) => {
+    const currentIndex = columns.findIndex(col => col.id === columnId);
+    if (currentIndex > 0) {
+      const newColumns = [...columns];
+      [newColumns[currentIndex - 1], newColumns[currentIndex]] = [newColumns[currentIndex], newColumns[currentIndex - 1]];
+      setColumns(newColumns);
+    }
+  };
+
+  const moveColumnDown = (columnId: string) => {
+    const currentIndex = columns.findIndex(col => col.id === columnId);
+    if (currentIndex < columns.length - 1) {
+      const newColumns = [...columns];
+      [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
+      setColumns(newColumns);
+    }
+  };
+
   const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
     const status = statuses.find(s => s.id === statusId);
     if (!status) return;
@@ -429,6 +447,8 @@ export function useTrafficData() {
     addColumn,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     getClientFiles
   };

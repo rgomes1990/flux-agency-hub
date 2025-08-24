@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
+import useTrafficData from '@/hooks/useTrafficData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, 
   ChevronDown, 
@@ -11,22 +11,17 @@ import {
   Settings,
   Edit,
   Trash2,
-  Paperclip,
-  Eye,
   Menu,
   ChevronUp,
   ChevronDown as ChevronDownIcon
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useTrafficData } from '@/hooks/useTrafficData';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { CustomStatusModal } from '@/components/ServiceManagement/CustomStatusModal';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
-import { useUndo } from '@/contexts/UndoContext';
 import { SortableTrafficRow } from '@/components/ClientManagement/SortableTrafficRow';
 import { 
   DndContext, 
@@ -49,7 +44,7 @@ export default function Traffic() {
   const { 
     groups, 
     columns,
-    customColumns, // Use customColumns for management interface
+    customColumns,
     statuses,
     updateGroups, 
     createMonth, 
@@ -62,13 +57,12 @@ export default function Traffic() {
     addColumn,
     updateColumn,
     deleteColumn,
-    moveColumnUp,
-    moveColumnDown,
     updateItemStatus,
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles
+    moveColumnUp,
+    moveColumnDown
   } = useTrafficData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -84,20 +78,12 @@ export default function Traffic() {
   const [newClientName, setNewClientName] = useState('');
   const [newClientServices, setNewClientServices] = useState('');
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
-  const [clientNotes, setClientNotes] = useState('');
-  const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [showFilePreview, setShowFilePreview] = useState(false);
   const [editingMonth, setEditingMonth] = useState<{ id: string, name: string } | null>(null);
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
-  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
-
-  const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -133,26 +119,11 @@ export default function Traffic() {
   };
 
   const handleDuplicateMonth = async () => {
-    console.log('🔄 Duplicate: Iniciando duplicação...', { duplicateMonthName, selectedGroupToDuplicate });
-    
-    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) {
-      console.log('⚠️ Duplicate: Dados insuficientes para duplicação');
-      return;
-    }
-    
-    try {
-      console.log('🔄 Duplicate: Chamando função de duplicação...');
-      await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
-      console.log('✅ Duplicate: Duplicação concluída com sucesso');
-    } catch (error) {
-      console.error('❌ Duplicate: Erro ao duplicar mês:', error);
-    } finally {
-      console.log('🔄 Duplicate: Limpando estados...');
-      // Sempre executar limpeza independente de sucesso ou erro
-      setDuplicateMonthName('');
-      setSelectedGroupToDuplicate('');
-      setShowDuplicateDialog(false);
-    }
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
+    await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+    setDuplicateMonthName('');
+    setSelectedGroupToDuplicate('');
+    setShowDuplicateDialog(false);
   };
 
   const handleCreateClient = () => {
@@ -210,12 +181,46 @@ export default function Traffic() {
     setConfirmDelete(null);
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const activeGroupId = active.data.current?.groupId;
+    const group = groups.find(g => g.id === activeGroupId);
+    
+    if (!group) return;
+
+    const oldIndex = group.items.findIndex(item => item.id === active.id);
+    const newIndex = group.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newItems = arrayMove(group.items, oldIndex, newIndex);
+      const updatedGroups = groups.map(g => 
+        g.id === activeGroupId 
+          ? { ...g, items: newItems }
+          : g
+      );
+      updateGroups(updatedGroups);
+    }
+  };
+
+  const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
+  const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
+  const [clientFile, setClientFile] = useState<File | null>(null);
+
   const openClientDetails = (clientId: string) => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client) {
-      setClientNotes(client.observacoes || '');
-      
-      // Parse existing observations from client notes
       try {
         const parsed = JSON.parse(client.observacoes || '[]');
         if (Array.isArray(parsed)) {
@@ -227,7 +232,6 @@ export default function Traffic() {
         setClientObservations([]);
       }
 
-      // Parse existing attachments - handle both string and array types
       try {
         let attachmentsToSet = [];
         if (typeof client.attachments === 'string') {
@@ -245,53 +249,20 @@ export default function Traffic() {
     }
   };
 
-  const handleMoveClient = (clientId: string, newGroupId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
-    
-    if (client && oldGroup) {
-      // Remove from old group
-      deleteClient(clientId);
-      
-      // Add to new group
-      addClient(newGroupId, {
-        elemento: client.elemento,
-        servicos: client.servicos || '',
-        observacoes: client.observacoes,
-        ...client
-      });
-      
-      setShowClientDetails(null);
-    }
-  };
-
-  const openFilePreview = (file: File) => {
-    setPreviewFile(file);
-    setShowFilePreview(true);
-  };
-
   const handleClientDetailsClose = async (open: boolean) => {
     if (!open && showClientDetails) {
-      console.log('💾 Salvando detalhes do cliente:', showClientDetails);
-      console.log('📝 Observações a salvar:', clientObservations);
-      console.log('📎 Anexos a salvar:', clientAttachments);
-
       try {
         const updates: any = { 
           observacoes: JSON.stringify(clientObservations)
         };
 
-        // Só incluir attachments se houver anexos para processar
         if (clientAttachments && clientAttachments.length > 0) {
           updates.attachments = clientAttachments;
         }
         
-        console.log('💾 Updates preparados:', updates);
-        
         await updateClient(showClientDetails, updates);
-        console.log('✅ Cliente salvo com sucesso');
       } catch (error) {
-        console.error('❌ Erro ao salvar cliente:', error);
+        console.error('Erro ao salvar cliente:', error);
       }
 
       setShowClientDetails(null);
@@ -301,50 +272,20 @@ export default function Traffic() {
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!over || active.id === over.id) {
-      return;
-    }
-
-    // Prevent moving between groups to avoid duplication
-    const activeGroupId = active.data.current?.groupId;
-    const overGroupId = over.data.current?.groupId;
+  const handleMoveClient = (clientId: string, newGroupId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     
-    // Only allow reordering within the same group
-    if (activeGroupId && overGroupId && activeGroupId !== overGroupId) {
-      console.warn('Não é possível mover itens entre grupos diferentes');
-      return;
-    }
-
-    const group = groups.find(g => g.id === activeGroupId);
-    
-    if (!group) {
-      console.warn('Grupo não encontrado para reordenação');
-      return;
-    }
-
-    const oldIndex = group.items.findIndex(item => item.id === active.id);
-    const newIndex = group.items.findIndex(item => item.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-      const newItems = arrayMove(group.items, oldIndex, newIndex);
-      const updatedGroups = groups.map(g => 
-        g.id === activeGroupId 
-          ? { ...g, items: newItems }
-          : g
-      );
+    if (client) {
+      deleteClient(clientId);
       
-      console.log('✅ Reordenando itens no grupo:', activeGroupId);
-      updateGroups(updatedGroups);
+      addClient(newGroupId, {
+        elemento: client.elemento,
+        servicos: client.servicos || '',
+        observacoes: client.observacoes,
+        ...client
+      });
+      
+      setShowClientDetails(null);
     }
   };
 
@@ -415,13 +356,8 @@ export default function Traffic() {
                 <DropdownMenuItem
                   key={group.id}
                   onClick={() => {
-                    console.log('🔄 Modal: Abrindo diálogo de duplicação para grupo:', group.id);
                     setSelectedGroupToDuplicate(group.id);
-                    // Pequeno delay para evitar conflitos de estado
-                    setTimeout(() => {
-                      console.log('🔄 Modal: Abrindo modal de duplicação');
-                      setShowDuplicateDialog(true);
-                    }, 10);
+                    setShowDuplicateDialog(true);
                   }}
                 >
                   Duplicar {group.name}
@@ -478,94 +414,93 @@ export default function Traffic() {
             }}
           >
             <div className="min-w-max" style={{ minWidth: '1200px' }}>
-          {/* Table Header */}
-          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-            <div className="flex items-center min-w-max">
-              <div className="w-8 flex items-center justify-center p-2">
-                <Checkbox
-                  checked={selectedItems.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </div>
-                <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              {customColumns.map((column) => (
-                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
-                  {column.name}
-                </div>
-              ))}
-              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
-            </div>
-          </div>
-
-          {/* Table Body */}
-          {groups.map((group) => (
-            <div key={group.id}>
-              {/* Group Header */}
-              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
+              {/* Table Header */}
+              <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
-                    <button onClick={() => toggleGroup(group.id)}>
-                      {group.isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600" />
-                      )}
-                    </button>
+                    <Checkbox
+                      checked={selectedItems.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
                   </div>
-                  <div className="flex items-center space-x-2 p-2 flex-1">
-                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name}</span>
-                  </div>
-                  <div className="flex items-center space-x-1 p-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditMonth(group.id)}
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+                  <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+                  {customColumns.map((column) => (
+                    <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                      {column.name}
+                    </div>
+                  ))}
+                  <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
                 </div>
               </div>
 
-              {/* Group Items */}
-              {group.isExpanded && (
-                <SortableContext 
-                  items={group.items.map(item => item.id)} 
-                  strategy={verticalListSortingStrategy}
-                >
-                  {group.items.map((item, index) => (
-                    <SortableTrafficRow
-                      key={item.id}
-                      item={item}
-                      groupId={group.id}
-                      index={index}
-                      selectedItems={selectedItems}
-                      columns={customColumns}
-                      onSelectItem={handleSelectItem}
-                      onOpenClientDetails={openClientDetails}
-                      onUpdateItemStatus={updateItemStatus}
-                      onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                      statuses={statuses}
-                      onUpdateClientField={updateClient}
-                      getClientAttachments={getClientFiles}
-                      openFilePreview={openFilePreview}
-                    />
-                  ))}
-                </SortableContext>
-              )}
-            </div>
-          ))}
+              {/* Table Body */}
+              {groups.map((group) => (
+                <div key={group.id}>
+                  {/* Group Header */}
+                  <div className="bg-red-50 border-b border-gray-200 hover:bg-red-100 transition-colors">
+                    <div className="flex items-center min-w-max">
+                      <div className="w-8 flex items-center justify-center p-2">
+                        <button onClick={() => toggleGroup(group.id)}>
+                          {group.isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-gray-600" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-2 p-2 flex-1">
+                        <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                        <span className="font-medium text-gray-900">{group.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-1 p-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditMonth(group.id)}
+                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Items */}
+                  {group.isExpanded && (
+                    <SortableContext 
+                      items={group.items.map(item => item.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {group.items.map((item, index) => (
+                        <SortableTrafficRow 
+                          key={item.id}
+                          item={item}
+                          groupId={group.id}
+                          index={index}
+                          selectedItems={selectedItems}
+                          columns={customColumns}
+                          onSelectItem={handleSelectItem}
+                          onOpenClientDetails={openClientDetails}
+                          onUpdateItemStatus={updateItemStatus}
+                          onUpdateClientField={updateClient}
+                          onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                          getClientFiles={() => []}
+                          statuses={statuses}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </DndContext>
@@ -740,7 +675,7 @@ export default function Traffic() {
       <CustomStatusModal
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
-        onAddStatus={addStatus}
+        onAddStatus={(status) => addStatus(status.name, status.color)}
         onUpdateStatus={(statusId, updates) => updateStatus(statusId, updates.name, updates.color)}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
@@ -753,33 +688,14 @@ export default function Traffic() {
           onOpenChange={handleClientDetailsClose}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
-          onUpdateObservations={(newObservations) => {
-            console.log('🔄 Atualizando observações:', newObservations);
-            setClientObservations(newObservations);
-          }}
+          onUpdateObservations={setClientObservations}
           clientFile={clientFile}
-          onFileChange={(file) => {
-            console.log('📎 Arquivo selecionado:', file?.name);
-            setClientFile(file);
-          }}
-          onFilePreview={openFilePreview}
+          onFileChange={setClientFile}
           availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails, newGroupId)}
           clientAttachments={clientAttachments}
-          onUpdateAttachments={(attachments) => {
-            console.log('📎 Atualizando anexos:', attachments);
-            setClientAttachments(attachments);
-          }}
-        />
-      )}
-
-      {/* File Preview Modal */}
-      {showFilePreview && previewFile && (
-        <FilePreview
-          open={showFilePreview}
-          onOpenChange={setShowFilePreview}
-          file={previewFile}
+          onUpdateAttachments={setClientAttachments}
         />
       )}
 
