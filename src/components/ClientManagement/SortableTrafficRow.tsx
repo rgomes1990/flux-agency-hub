@@ -48,7 +48,9 @@ export function SortableTrafficRow({
   } = useSortable({ 
     id: item.id,
     data: {
+      type: 'item',
       groupId: groupId,
+      item: item
     },
   });
 
@@ -56,7 +58,9 @@ export function SortableTrafficRow({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-  };
+    position: isDragging ? 'relative' : undefined,
+    zIndex: isDragging ? 1000 : undefined,
+  } as React.CSSProperties;
 
   return (
     <div 

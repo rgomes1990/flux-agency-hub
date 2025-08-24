@@ -424,39 +424,44 @@ export function useContentPadariasData() {
 
       updateGroups(updatedGroups);
       
-      // Preparar dados para salvar no banco
+      // Preparar dados para salvar no banco - CRITICAL: Handle attachments properly
       const clientToUpdate = updatedGroups.flatMap(g => g.items).find(item => item.id === clientId);
       if (clientToUpdate) {
         const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = clientToUpdate;
         
-        // Processar anexos corretamente - convert to JSON string for database
+        // Process attachments correctly - handle removal properly
         let processedAttachments: string[] | null = null;
-        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
-          processedAttachments = attachments.map(att => {
-            // Garantir que o anexo tenha todas as propriedades necessárias
-            const processedAtt = {
-              name: att.name || 'Arquivo',
-              type: att.type || 'application/octet-stream',
-              data: att.data || '',
-              size: att.size || 0
-            };
-            
-            // Se o anexo já é uma string JSON, manter como está
-            if (typeof att === 'string') {
-              try {
-                // Verificar se é um JSON válido
-                JSON.parse(att);
-                return att;
-              } catch {
-                // Se não é JSON válido, converter objeto processado
-                return JSON.stringify(processedAtt);
+        
+        if (attachments !== undefined) {
+          if (Array.isArray(attachments) && attachments.length > 0) {
+            processedAttachments = attachments.map(att => {
+              // Ensure attachment has all necessary properties
+              const processedAtt = {
+                name: att.name || 'Arquivo',
+                type: att.type || 'application/octet-stream',
+                data: att.data || '',
+                size: att.size || 0
+              };
+              
+              // If attachment is already a JSON string, keep it
+              if (typeof att === 'string') {
+                try {
+                  JSON.parse(att);
+                  return att;
+                } catch {
+                  return JSON.stringify(processedAtt);
+                }
               }
-            }
-            
-            // Se é um objeto, converter para JSON string
-            return JSON.stringify(processedAtt);
-          });
+              
+              return JSON.stringify(processedAtt);
+            });
+          } else {
+            // If attachments array is empty or null, explicitly set to null
+            processedAttachments = null;
+          }
         }
+
+        console.log('💾 Salvando anexos processados:', processedAttachments);
 
         const { error } = await supabase
           .from('content_padarias_data')
@@ -464,7 +469,7 @@ export function useContentPadariasData() {
             elemento,
             servicos,
             observacoes,
-            attachments: processedAttachments,
+            attachments: processedAttachments, // This will properly handle null/empty arrays
             item_data: { status, ...itemData },
             updated_at: new Date().toISOString()
           })
@@ -474,6 +479,8 @@ export function useContentPadariasData() {
           console.error('❌ Erro ao atualizar no banco:', error);
           throw error;
         }
+
+        console.log('✅ Cliente atualizado no banco com anexos:', processedAttachments);
       }
       
       console.log('✅ Padarias: Cliente atualizado com sucesso');

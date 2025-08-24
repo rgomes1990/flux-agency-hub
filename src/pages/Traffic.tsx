@@ -14,10 +14,9 @@ import {
   Paperclip,
   Eye,
   Menu,
-  RefreshCw
+  ChevronUp,
+  ChevronDown as ChevronDownIcon
 } from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useTrafficData } from '@/hooks/useTrafficData';
@@ -29,13 +28,28 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 import { useUndo } from '@/contexts/UndoContext';
 import { SortableTrafficRow } from '@/components/ClientManagement/SortableTrafficRow';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import { 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy, 
+  arrayMove 
+} from '@dnd-kit/sortable';
 
 export default function Traffic() {
   const isMobile = useIsMobile();
   const { 
     groups, 
     columns,
-    customColumns,
+    customColumns, // Use customColumns for management interface
     statuses,
     updateGroups, 
     createMonth, 
@@ -48,19 +62,14 @@ export default function Traffic() {
     addColumn,
     updateColumn,
     deleteColumn,
+    moveColumnUp,
+    moveColumnDown,
     updateItemStatus,
     addClient,
     deleteClient,
     updateClient,
     getClientFiles
   } = useTrafficData();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [newMonthName, setNewMonthName] = useState('');
@@ -86,7 +95,8 @@ export default function Traffic() {
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  
+  const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
+
   const { addUndoAction } = useUndo();
 
   const toggleGroup = (groupId: string) => {
@@ -123,15 +133,25 @@ export default function Traffic() {
   };
 
   const handleDuplicateMonth = async () => {
-    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) return;
+    console.log('🔄 Duplicate: Iniciando duplicação...', { duplicateMonthName, selectedGroupToDuplicate });
+    
+    if (!duplicateMonthName.trim() || !selectedGroupToDuplicate) {
+      console.log('⚠️ Duplicate: Dados insuficientes para duplicação');
+      return;
+    }
     
     try {
+      console.log('🔄 Duplicate: Chamando função de duplicação...');
       await duplicateMonth(selectedGroupToDuplicate, duplicateMonthName);
+      console.log('✅ Duplicate: Duplicação concluída com sucesso');
+    } catch (error) {
+      console.error('❌ Duplicate: Erro ao duplicar mês:', error);
+    } finally {
+      console.log('🔄 Duplicate: Limpando estados...');
+      // Sempre executar limpeza independente de sucesso ou erro
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
       setShowDuplicateDialog(false);
-    } catch (error) {
-      console.error('Erro ao duplicar mês:', error);
     }
   };
 
@@ -171,7 +191,7 @@ export default function Traffic() {
   const handleEditMonth = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      const nameWithoutSuffix = group.name.replace(' - TRÁFEGO', '');
+      const nameWithoutSuffix = group.name.replace(' - TRÁFEGO PAGO', '');
       setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
     }
@@ -194,8 +214,6 @@ export default function Traffic() {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client) {
       setClientNotes(client.observacoes || '');
-      const files = getClientFiles(clientId);
-      setClientFile(files[0] || null);
       
       // Parse existing observations from client notes
       try {
@@ -208,26 +226,23 @@ export default function Traffic() {
       } catch {
         setClientObservations([]);
       }
+
+      // Parse existing attachments - handle both string and array types
+      try {
+        let attachmentsToSet = [];
+        if (typeof client.attachments === 'string') {
+          const parsed = JSON.parse(client.attachments);
+          attachmentsToSet = Array.isArray(parsed) ? parsed : [];
+        } else if (Array.isArray(client.attachments)) {
+          attachmentsToSet = client.attachments;
+        }
+        setClientAttachments(attachmentsToSet);
+      } catch {
+        setClientAttachments([]);
+      }
       
       setShowClientDetails(clientId);
     }
-  };
-
-  const saveClientDetails = async () => {
-    if (showClientDetails) {
-      const updates: any = { 
-        observacoes: JSON.stringify(clientObservations) 
-      };
-      
-      if (clientFile) {
-        updates.attachments = [clientFile];
-      }
-      
-      await updateClient(showClientDetails, updates);
-    }
-    setShowClientDetails(null);
-    setClientObservations([]);
-    setClientFile(null);
   };
 
   const handleMoveClient = (clientId: string, newGroupId: string) => {
@@ -255,53 +270,82 @@ export default function Traffic() {
     setShowFilePreview(true);
   };
 
-  const getClientAttachments = (clientId: string) => {
-    return getClientFiles(clientId);
+  const handleClientDetailsClose = async (open: boolean) => {
+    if (!open && showClientDetails) {
+      console.log('💾 Salvando detalhes do cliente:', showClientDetails);
+      console.log('📝 Observações a salvar:', clientObservations);
+      console.log('📎 Anexos a salvar:', clientAttachments);
+
+      try {
+        const updates: any = { 
+          observacoes: JSON.stringify(clientObservations)
+        };
+
+        // Só incluir attachments se houver anexos para processar
+        if (clientAttachments && clientAttachments.length > 0) {
+          updates.attachments = clientAttachments;
+        }
+        
+        console.log('💾 Updates preparados:', updates);
+        
+        await updateClient(showClientDetails, updates);
+        console.log('✅ Cliente salvo com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao salvar cliente:', error);
+      }
+
+      setShowClientDetails(null);
+      setClientObservations([]);
+      setClientAttachments([]);
+      setClientFile(null);
+    }
   };
 
-  const handleDragEnd = (event: any) => {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
-    // Find the source and target groups
-    const activeGroupId = active.data.current?.groupId;
-    const overGroupId = over.data.current?.groupId;
-
-    if (!activeGroupId) return;
-
-    const newGroups = [...groups];
-    const activeGroupIndex = newGroups.findIndex(g => g.id === activeGroupId);
-    const overGroupIndex = overGroupId ? newGroups.findIndex(g => g.id === overGroupId) : activeGroupIndex;
-
-    if (activeGroupIndex === -1) return;
-
-    const activeGroup = newGroups[activeGroupIndex];
-    const activeItemIndex = activeGroup.items.findIndex(item => item.id === activeId);
-
-    if (activeItemIndex === -1) return;
-
-    const [movedItem] = activeGroup.items.splice(activeItemIndex, 1);
-
-    if (activeGroupId === overGroupId || overGroupIndex === activeGroupIndex) {
-      // Moving within the same group
-      const overItemIndex = activeGroup.items.findIndex(item => item.id === overId);
-      const insertIndex = overItemIndex === -1 ? activeGroup.items.length : overItemIndex;
-      activeGroup.items.splice(insertIndex, 0, movedItem);
-    } else if (overGroupIndex !== -1) {
-      // Moving to a different group
-      const overGroup = newGroups[overGroupIndex];
-      const overItemIndex = overGroup.items.findIndex(item => item.id === overId);
-      const insertIndex = overItemIndex === -1 ? overGroup.items.length : overItemIndex;
-      overGroup.items.splice(insertIndex, 0, movedItem);
+    if (!over || active.id === over.id) {
+      return;
     }
 
-    updateGroups(newGroups);
+    // Prevent moving between groups to avoid duplication
+    const activeGroupId = active.data.current?.groupId;
+    const overGroupId = over.data.current?.groupId;
+    
+    // Only allow reordering within the same group
+    if (activeGroupId && overGroupId && activeGroupId !== overGroupId) {
+      console.warn('Não é possível mover itens entre grupos diferentes');
+      return;
+    }
+
+    const group = groups.find(g => g.id === activeGroupId);
+    
+    if (!group) {
+      console.warn('Grupo não encontrado para reordenação');
+      return;
+    }
+
+    const oldIndex = group.items.findIndex(item => item.id === active.id);
+    const newIndex = group.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+      const newItems = arrayMove(group.items, oldIndex, newIndex);
+      const updatedGroups = groups.map(g => 
+        g.id === activeGroupId 
+          ? { ...g, items: newItems }
+          : g
+      );
+      
+      console.log('✅ Reordenando itens no grupo:', activeGroupId);
+      updateGroups(updatedGroups);
+    }
   };
 
   return (
@@ -324,14 +368,6 @@ export default function Traffic() {
               <Menu className="h-4 w-4" />
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.reload()}
-            className="ml-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -356,7 +392,7 @@ export default function Traffic() {
                   onChange={(e) => setNewMonthName(e.target.value)}
                 />
                 <div className="flex space-x-2">
-                  <Button onClick={handleCreateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+                  <Button onClick={handleCreateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                     Criar
                   </Button>
                   <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
@@ -379,8 +415,13 @@ export default function Traffic() {
                 <DropdownMenuItem
                   key={group.id}
                   onClick={() => {
+                    console.log('🔄 Modal: Abrindo diálogo de duplicação para grupo:', group.id);
                     setSelectedGroupToDuplicate(group.id);
-                    setShowDuplicateDialog(true);
+                    // Pequeno delay para evitar conflitos de estado
+                    setTimeout(() => {
+                      console.log('🔄 Modal: Abrindo modal de duplicação');
+                      setShowDuplicateDialog(true);
+                    }, 10);
                   }}
                 >
                   Duplicar {group.name}
@@ -422,8 +463,21 @@ export default function Traffic() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <div className={`${isMobile ? 'min-w-[800px]' : 'min-w-full'}`}>
+      <div className="flex-1 relative">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div 
+            className="h-full overflow-x-auto overflow-y-auto" 
+            style={{ 
+              paddingBottom: '10px',
+              scrollbarWidth: 'auto',
+              scrollbarColor: '#6b7280 #f3f4f6'
+            }}
+          >
+            <div className="min-w-max" style={{ minWidth: '1200px' }}>
           {/* Table Header */}
           <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
             <div className="flex items-center min-w-max">
@@ -433,34 +487,13 @@ export default function Traffic() {
                   onCheckedChange={handleSelectAll}
                 />
               </div>
-              <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              <div className="w-36 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-              {columns.map((column) => {
-                const getColumnWidth = (columnName: string) => {
-                  switch(columnName.toLowerCase()) {
-                    case 'whatsapp':
-                      return 'w-50';
-                    case 'crédito':
-                    case 'credito':
-                      return 'w-60';
-                    case 'campanhas':
-                      return 'w-40';
-                    case 'email':
-                    case 'e-mail':
-                      return 'w-40';
-                    case 'atualizações':
-                    case 'atualizacoes':
-                      return 'w-32';
-                    default:
-                      return 'w-32';
-                  }
-                };
-                return (
-                  <div key={column.id} className={`${getColumnWidth(column.name)} p-2 text-xs font-medium text-gray-600 border-r border-gray-300`}>
-                    {column.name}
-                  </div>
-                );
-              })}
+                <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
+              {customColumns.map((column) => (
+                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                  {column.name}
+                </div>
+              ))}
               <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
             </div>
           </div>
@@ -469,7 +502,7 @@ export default function Traffic() {
           {groups.map((group) => (
             <div key={group.id}>
               {/* Group Header */}
-              <div className="bg-orange-50 border-b border-gray-200 hover:bg-orange-100 transition-colors">
+              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
                     <button onClick={() => toggleGroup(group.id)}>
@@ -507,39 +540,38 @@ export default function Traffic() {
 
               {/* Group Items */}
               {group.isExpanded && (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
+                <SortableContext 
+                  items={group.items.map(item => item.id)} 
+                  strategy={verticalListSortingStrategy}
                 >
-                  <SortableContext items={group.items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                    {group.items.map((item, index) => (
-                      <SortableTrafficRow
-                        key={item.id}
-                        item={item}
-                        groupId={group.id}
-                        index={index}
-                        selectedItems={selectedItems}
-                        columns={columns}
-                        onSelectItem={handleSelectItem}
-                        onOpenClientDetails={openClientDetails}
-                        onUpdateItemStatus={updateItemStatus}
-                        onUpdateClientField={updateClient}
-                        onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                        getClientAttachments={getClientAttachments}
-                        openFilePreview={openFilePreview}
-                        statuses={statuses}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
+                  {group.items.map((item, index) => (
+                    <SortableTrafficRow
+                      key={item.id}
+                      item={item}
+                      groupId={group.id}
+                      index={index}
+                      selectedItems={selectedItems}
+                      columns={customColumns}
+                      onSelectItem={handleSelectItem}
+                      onOpenClientDetails={openClientDetails}
+                      onUpdateItemStatus={updateItemStatus}
+                      onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                      statuses={statuses}
+                      onUpdateClientField={updateClient}
+                      getClientAttachments={getClientFiles}
+                      openFilePreview={openFilePreview}
+                    />
+                  ))}
+                </SortableContext>
               )}
             </div>
           ))}
-        </div>
+            </div>
+          </div>
+        </DndContext>
       </div>
 
-      {/* Dialogs */}
+      {/* Duplicate Month Dialog */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
@@ -552,7 +584,7 @@ export default function Traffic() {
               onChange={(e) => setDuplicateMonthName(e.target.value)}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleDuplicateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+              <Button onClick={handleDuplicateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Duplicar
               </Button>
               <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="flex-1">
@@ -563,38 +595,41 @@ export default function Traffic() {
         </DialogContent>
       </Dialog>
 
+      {/* Add Client Dialog */}
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Novo Cliente</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Mês</label>
+              <select
+                value={selectedGroupForClient}
+                onChange={(e) => setSelectedGroupForClient(e.target.value)}
+                className="w-full mt-1 p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Selecione um mês</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Input
-              placeholder="Nome do cliente"
+              placeholder="Elemento"
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
             />
             <Input
-              placeholder="Serviços (ex: Campanha Google Ads)"
+              placeholder="Serviços (ex: Gestão de Redes Sociais)"
               value={newClientServices}
               onChange={(e) => setNewClientServices(e.target.value)}
             />
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Mês</label>
-              <select 
-                className="w-full p-2 border rounded-md"
-                value={selectedGroupForClient}
-                onChange={(e) => setSelectedGroupForClient(e.target.value)}
-              >
-                <option value="">Selecione um mês</option>
-                {groups.map(group => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            </div>
             <div className="flex space-x-2">
-              <Button onClick={handleCreateClient} className="bg-orange-600 hover:bg-orange-700 flex-1">
-                Criar
+              <Button onClick={handleCreateClient} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                Adicionar
               </Button>
               <Button variant="outline" onClick={() => setShowClientDialog(false)} className="flex-1">
                 Cancelar
@@ -604,54 +639,80 @@ export default function Traffic() {
         </DialogContent>
       </Dialog>
 
+      {/* Column Management Dialog */}
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
             <DialogTitle>Gerenciar Colunas</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              placeholder="Nome da coluna"
-              value={newColumnName}
-              onChange={(e) => setNewColumnName(e.target.value)}
-            />
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo da Coluna</label>
-              <select 
-                className="w-full p-2 border rounded-md"
-                value={newColumnType}
-                onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
-              >
-                <option value="status">Status (com cores)</option>
-                <option value="text">Texto livre</option>
-              </select>
-            </div>
-            <Button onClick={handleCreateColumn} className="w-full bg-orange-600 hover:bg-orange-700">
-              Criar Coluna
-            </Button>
-            
             <div className="space-y-2">
               <h4 className="font-medium">Colunas Existentes:</h4>
-              {customColumns.map(column => (
-                <div key={column.id} className="flex items-center justify-between p-2 border rounded">
-                  <span className="text-sm">
+              {customColumns.map((column, index) => (
+                <div key={column.id} className="flex items-center justify-between p-3 border rounded bg-gray-50">
+                  <span className="text-sm font-medium">
                     {column.name} ({column.type})
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnUp(column.id)}
+                      disabled={index === 0}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para cima"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveColumnDown(column.id)}
+                      disabled={index === customColumns.length - 1}
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      title="Mover para baixo"
+                    >
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete({ type: 'column', id: column.id })}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+                      title="Excluir coluna"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
+            </div>
+            <div className="border-t pt-4">
+              <Input
+                placeholder="Nome da coluna"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+              />
+              <div className="space-y-2 mt-2">
+                <label className="text-sm font-medium">Tipo da Coluna</label>
+                <select
+                  value={newColumnType}
+                  onChange={(e) => setNewColumnType(e.target.value as 'status' | 'text')}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="status">Status (com cores)</option>
+                  <option value="text">Texto livre</option>
+                </select>
+                <Button onClick={handleCreateColumn} className="w-full bg-blue-600 hover:bg-blue-700">
+                  Criar Coluna
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Edit Month Dialog */}
       <Dialog open={showEditMonthDialog} onOpenChange={setShowEditMonthDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
@@ -664,7 +725,7 @@ export default function Traffic() {
               onChange={(e) => setEditingMonth(prev => prev ? { ...prev, name: e.target.value } : null)}
             />
             <div className="flex space-x-2">
-              <Button onClick={handleUpdateMonth} className="bg-orange-600 hover:bg-orange-700 flex-1">
+              <Button onClick={handleUpdateMonth} className="bg-blue-600 hover:bg-blue-700 flex-1">
                 Salvar
               </Button>
               <Button variant="outline" onClick={() => setShowEditMonthDialog(false)} className="flex-1">
@@ -675,73 +736,71 @@ export default function Traffic() {
         </DialogContent>
       </Dialog>
 
+      {/* Status Management Modal */}
+      <CustomStatusModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        onAddStatus={addStatus}
+        onUpdateStatus={(statusId, updates) => updateStatus(statusId, updates.name, updates.color)}
+        onDeleteStatus={deleteStatus}
+        existingStatuses={statuses}
+      />
+
+      {/* Client Details Modal */}
       {showClientDetails && (
         <ClientDetails
           open={!!showClientDetails}
-          onOpenChange={(open) => !open && setShowClientDetails(null)}
+          onOpenChange={handleClientDetailsClose}
           clientName={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.elemento || ''}
           observations={clientObservations}
           onUpdateObservations={(newObservations) => {
+            console.log('🔄 Atualizando observações:', newObservations);
             setClientObservations(newObservations);
-            // Save observations to database
-            const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
-            if (clientItem) {
-              updateClient(showClientDetails!, { observacoes: JSON.stringify(newObservations) });
-            }
           }}
           clientFile={clientFile}
-          onFileChange={setClientFile}
+          onFileChange={(file) => {
+            console.log('📎 Arquivo selecionado:', file?.name);
+            setClientFile(file);
+          }}
           onFilePreview={openFilePreview}
-          availableGroups={groups}
+          availableGroups={groups.map(g => ({ id: g.id, name: g.name }))}
           currentGroupId={groups.find(g => g.items.some(item => item.id === showClientDetails))?.id || ''}
-          onMoveClient={(newGroupId) => handleMoveClient(showClientDetails!, newGroupId)}
-          clientAttachments={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || []}
+          onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
+          clientAttachments={clientAttachments}
           onUpdateAttachments={(attachments) => {
-            // Save attachments automatically to database
-            if (showClientDetails) {
-              updateClient(showClientDetails, { attachments });
-            }
+            console.log('📎 Atualizando anexos:', attachments);
+            setClientAttachments(attachments);
           }}
         />
       )}
 
-      <CustomStatusModal
-        open={showStatusModal}
-        onOpenChange={setShowStatusModal}
-        onAddStatus={(status) => addStatus(status.name, status.color)}
-        onUpdateStatus={(status) => updateStatus(status.id, status.name, status.color)}
-        onDeleteStatus={(statusId) => deleteStatus(statusId)}
-        existingStatuses={statuses}
-      />
+      {/* File Preview Modal */}
+      {showFilePreview && previewFile && (
+        <FilePreview
+          open={showFilePreview}
+          onOpenChange={setShowFilePreview}
+          file={previewFile}
+        />
+      )}
 
-      <FilePreview
-        file={previewFile}
-        open={showFilePreview}
-        onOpenChange={setShowFilePreview}
-      />
-
-      <ConfirmationDialog
-        open={!!confirmDelete}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
-        onConfirm={() => {
-          if (confirmDelete?.type === 'client') {
-            handleDeleteClient(confirmDelete.id);
-          } else if (confirmDelete?.type === 'column') {
-            handleDeleteColumn(confirmDelete.id);
-          } else if (confirmDelete?.type === 'month') {
-            handleDeleteMonth(confirmDelete.id);
-          }
-        }}
-        title="Confirmar Exclusão"
-        message={
-          confirmDelete?.type === 'client' 
-            ? "Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
-            : confirmDelete?.type === 'month'
-            ? "Tem certeza que deseja excluir este mês e todos os seus clientes? Esta ação não pode ser desfeita."
-            : "Tem certeza que deseja excluir esta coluna? Esta ação não pode ser desfeita."
-        }
-        confirmText="Excluir"
-      />
+      {/* Confirmation Dialogs */}
+      {confirmDelete && (
+        <ConfirmationDialog
+          open={!!confirmDelete}
+          onOpenChange={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            if (confirmDelete.type === 'client') {
+              handleDeleteClient(confirmDelete.id);
+            } else if (confirmDelete.type === 'column') {
+              handleDeleteColumn(confirmDelete.id);
+            } else if (confirmDelete.type === 'month') {
+              handleDeleteMonth(confirmDelete.id);
+            }
+          }}
+          title={`Confirmar ${confirmDelete.type === 'client' ? 'exclusão do cliente' : confirmDelete.type === 'column' ? 'exclusão da coluna' : 'exclusão do mês'}`}
+          message={`Tem certeza de que deseja ${confirmDelete.type === 'client' ? 'excluir este cliente' : confirmDelete.type === 'column' ? 'excluir esta coluna' : 'excluir este mês'}? Esta ação não pode ser desfeita.`}
+        />
+      )}
     </div>
   );
 }

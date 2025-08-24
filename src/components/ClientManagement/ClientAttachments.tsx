@@ -55,7 +55,12 @@ export function ClientAttachments({
   };
 
   const handleRemoveAttachment = (index: number) => {
+    console.log('🗑️ Removendo anexo no índice:', index);
+    console.log('📎 Anexos antes da remoção:', attachments);
+    
     const updatedAttachments = attachments.filter((_, i) => i !== index);
+    
+    console.log('📎 Anexos após remoção:', updatedAttachments);
     onUpdateAttachments(updatedAttachments);
   };
 
