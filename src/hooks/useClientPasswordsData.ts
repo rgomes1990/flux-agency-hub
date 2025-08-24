@@ -1,190 +1,141 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from './useAuth';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ClientPassword {
+export interface ClientPassword {
   id: string;
   cliente: string;
   plataforma: string;
   observacoes?: string;
-  attachments?: File[];
-  createdAt: string;
+  attachments?: Array<{ name: string; data: string; type: string; size?: number }>;
 }
 
-export const useClientPasswordsData = () => {
+export function useClientPasswordsData() {
   const [passwords, setPasswords] = useState<ClientPassword[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user, logAudit } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadPasswords = async () => {
+  const loadPasswords = useCallback(async () => {
+    console.log('🔄 Carregando senhas dos clientes...');
+    setIsLoading(true);
+    
     try {
-      console.log('Carregando senhas dos clientes...');
-      setLoading(true);
-
       const { data, error } = await supabase
         .from('client_passwords')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Erro ao carregar senhas:', error);
+        console.error('❌ Erro ao carregar senhas:', error);
         throw error;
       }
 
-      console.log('Senhas carregadas:', data?.length || 0);
+      console.log('📊 Senhas carregadas:', data?.length || 0);
 
-      const formattedPasswords: ClientPassword[] = (data || []).map(item => ({
-        id: item.id,
-        cliente: item.cliente,
-        plataforma: item.plataforma,
-        observacoes: item.observacoes || undefined,
-        attachments: item.attachments ? (typeof item.attachments === 'string' ? JSON.parse(item.attachments) : item.attachments) : [],
-        createdAt: item.created_at
-      }));
+      if (data) {
+        const formattedPasswords = data.map(item => ({
+          id: item.id,
+          cliente: item.cliente,
+          plataforma: item.plataforma,
+          observacoes: item.observacoes || '',
+          attachments: item.attachments ? (Array.isArray(item.attachments) ? item.attachments : []) : []
+        }));
 
-      setPasswords(formattedPasswords);
+        setPasswords(formattedPasswords);
+      }
     } catch (error) {
-      console.error('Erro ao carregar senhas:', error);
-      setPasswords([]);
+      console.error('❌ Erro ao carregar senhas dos clientes:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadPasswords();
-  }, []);
+  }, [loadPasswords]);
 
-  const addPassword = async (passwordData: Omit<ClientPassword, 'id' | 'createdAt'>) => {
+  const addPassword = async (password: Omit<ClientPassword, 'id'>) => {
+    console.log('➕ Adicionando nova senha:', password.cliente);
+    
     try {
-      console.log('Adicionando senha:', passwordData);
-      
       const { data, error } = await supabase
         .from('client_passwords')
         .insert({
-          user_id: user?.id || null,
-          cliente: passwordData.cliente,
-          plataforma: passwordData.plataforma,
-          observacoes: passwordData.observacoes,
-          attachments: passwordData.attachments ? JSON.stringify(passwordData.attachments) : null
+          cliente: password.cliente,
+          plataforma: password.plataforma,
+          observacoes: password.observacoes || '',
+          attachments: password.attachments || null
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Erro ao adicionar senha:', error);
+        console.error('❌ Erro ao adicionar senha:', error);
         throw error;
       }
 
-      console.log('Senha adicionada com sucesso:', data);
-
-      const newPassword: ClientPassword = {
-        id: data.id,
-        cliente: data.cliente,
-        plataforma: data.plataforma,
-        observacoes: data.observacoes || undefined,
-        attachments: data.attachments ? JSON.parse(data.attachments as string) : [],
-        createdAt: data.created_at
-      };
-
-      setPasswords(prev => [newPassword, ...prev]);
-
-      // Registrar na auditoria se o usuário estiver logado
-      if (user && logAudit) {
-        await logAudit('client_passwords', data.id, 'INSERT', null, {
-          cliente: passwordData.cliente,
-          plataforma: passwordData.plataforma
-        });
-      }
-
-      return data.id;
+      console.log('✅ Senha adicionada com sucesso:', data);
+      await loadPasswords(); // Recarregar dados
     } catch (error) {
-      console.error('Erro ao adicionar senha:', error);
+      console.error('❌ Erro ao adicionar senha:', error);
       throw error;
     }
   };
 
   const updatePassword = async (id: string, updates: Partial<ClientPassword>) => {
-    const oldPassword = passwords.find(p => p.id === id);
+    console.log('🔄 Atualizando senha:', id);
     
     try {
-      console.log('Atualizando senha:', id, updates);
-      
       const { error } = await supabase
         .from('client_passwords')
         .update({
           cliente: updates.cliente,
           plataforma: updates.plataforma,
-          observacoes: updates.observacoes,
-          attachments: updates.attachments ? JSON.stringify(updates.attachments) : null,
-          updated_at: new Date().toISOString()
+          observacoes: updates.observacoes || '',
+          attachments: updates.attachments || null
         })
         .eq('id', id);
 
       if (error) {
-        console.error('Erro ao atualizar senha:', error);
+        console.error('❌ Erro ao atualizar senha:', error);
         throw error;
       }
 
-      console.log('Senha atualizada com sucesso');
-
-      setPasswords(prev => prev.map(password => 
-        password.id === id ? { ...password, ...updates } : password
-      ));
-
-      // Registrar na auditoria se o usuário estiver logado
-      if (user && logAudit) {
-        await logAudit('client_passwords', id, 'UPDATE', 
-          { cliente: oldPassword?.cliente, plataforma: oldPassword?.plataforma },
-          { cliente: updates.cliente, plataforma: updates.plataforma }
-        );
-      }
+      console.log('✅ Senha atualizada com sucesso');
+      await loadPasswords(); // Recarregar dados
     } catch (error) {
-      console.error('Erro ao atualizar senha:', error);
+      console.error('❌ Erro ao atualizar senha:', error);
       throw error;
     }
   };
 
   const deletePassword = async (id: string) => {
-    const passwordToDelete = passwords.find(p => p.id === id);
+    console.log('🗑️ Deletando senha:', id);
     
     try {
-      console.log('Deletando senha:', id);
-      
       const { error } = await supabase
         .from('client_passwords')
         .delete()
         .eq('id', id);
 
       if (error) {
-        console.error('Erro ao deletar senha:', error);
+        console.error('❌ Erro ao deletar senha:', error);
         throw error;
       }
 
-      console.log('Senha deletada com sucesso');
-
-      setPasswords(prev => prev.filter(password => password.id !== id));
-
-      // Registrar na auditoria se o usuário estiver logado
-      if (user && logAudit) {
-        await logAudit('client_passwords', id, 'DELETE', 
-          { cliente: passwordToDelete?.cliente, plataforma: passwordToDelete?.plataforma }, 
-          null
-        );
-      }
+      console.log('✅ Senha deletada com sucesso');
+      await loadPasswords(); // Recarregar dados
     } catch (error) {
-      console.error('Erro ao deletar senha:', error);
+      console.error('❌ Erro ao deletar senha:', error);
       throw error;
     }
   };
 
   return {
     passwords,
-    loading,
+    isLoading,
     addPassword,
     updatePassword,
     deletePassword,
-    refreshPasswords: loadPasswords
+    loadPasswords
   };
-};
+}

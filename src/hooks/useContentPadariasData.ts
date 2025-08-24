@@ -223,9 +223,10 @@ export function useContentPadariasData() {
     console.log('🔄 Carregando dados do Conteúdo Padarias...');
     
     try {
+      // Carregar dados SEM anexos para performance inicial
       const { data, error } = await supabase
         .from('content_padarias_data')
-        .select('*')
+        .select('id, group_id, group_name, group_color, elemento, servicos, observacoes, item_data, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -233,7 +234,7 @@ export function useContentPadariasData() {
         throw error;
       }
 
-      console.log('📊 Dados carregados:', data?.length, 'registros');
+      console.log('📊 Dados carregados (sem anexos):', data?.length, 'registros');
 
       if (!data || data.length === 0) {
         console.log('📝 Nenhum dado encontrado, criando dados padrão...');
@@ -245,7 +246,6 @@ export function useContentPadariasData() {
       const processedItems = new Set<string>();
 
       data.forEach(item => {
-        // Skip if already processed
         if (processedItems.has(item.id)) {
           return;
         }
@@ -263,59 +263,6 @@ export function useContentPadariasData() {
 
         const group = groupsMap.get(item.group_name)!;
         
-        // Processar anexos de forma mais robusta - FIXED
-        let attachments: Array<{ name: string; data: string; type: string; size?: number }> = [];
-        if (item.attachments) {
-          try {
-            if (Array.isArray(item.attachments)) {
-              // Se é um array, processar cada item
-              const mappedAttachments = item.attachments.map((att: any) => {
-                if (typeof att === 'string') {
-                  // Se é string JSON, fazer parse
-                  try {
-                    const parsed = JSON.parse(att);
-                    return {
-                      name: parsed.name || 'Arquivo',
-                      type: parsed.type || 'application/octet-stream',
-                      data: parsed.data || '',
-                      size: parsed.size || 0
-                    };
-                  } catch {
-                    console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
-                    return null;
-                  }
-                } else if (typeof att === 'object' && att !== null) {
-                  // Se já é objeto, garantir propriedades
-                  return {
-                    name: att.name || 'Arquivo',
-                    type: att.type || 'application/octet-stream',
-                    data: att.data || '',
-                    size: att.size || 0
-                  };
-                }
-                return null;
-              });
-              
-              // Filter out null values with proper typing
-              attachments = mappedAttachments.filter((att: any): att is { name: string; data: string; type: string; size?: number } => att !== null);
-            } else if (typeof item.attachments === 'string') {
-              // Se é string JSON completa
-              const parsed = JSON.parse(item.attachments);
-              if (Array.isArray(parsed)) {
-                attachments = parsed.map((att: any) => ({
-                  name: att.name || 'Arquivo',
-                  type: att.type || 'application/octet-stream',
-                  data: att.data || '',
-                  size: att.size || 0
-                }));
-              }
-            }
-          } catch (error) {
-            console.warn('⚠️ Erro ao processar anexos:', error);
-            attachments = [];
-          }
-        }
-
         // Type-safe handling of item_data
         let itemData: any = {};
         let status: any = {};
@@ -339,12 +286,11 @@ export function useContentPadariasData() {
           elemento: item.elemento,
           servicos: item.servicos || '',
           observacoes: item.observacoes || '',
-          attachments: attachments,
+          attachments: [], // Inicialmente vazio - será carregado sob demanda
           status: status,
           ...itemData
         };
 
-        console.log('📎 Cliente carregado com anexos:', clientItem.elemento, attachments.length);
         group.items.push(clientItem);
       });
 
@@ -357,20 +303,31 @@ export function useContentPadariasData() {
     }
   }, []);
 
-  const getClientFiles = useCallback((clientId: string) => {
+  const loadClientAttachments = useCallback(async (clientId: string): Promise<Array<{ name: string; data: string; type: string; size?: number }>> => {
+    console.log('📎 Carregando anexos do cliente:', clientId);
+    
     try {
-      // Find the client item
-      const clientItem = groups.flatMap(group => group.items).find(item => item.id === clientId);
-  
-      if (!clientItem || !clientItem.attachments) {
-        console.log(`No attachments found for client ${clientId}`);
+      const { data, error } = await supabase
+        .from('content_padarias_data')
+        .select('attachments')
+        .eq('id', clientId)
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao carregar anexos:', error);
         return [];
       }
-  
-      // Check if attachments is already an array of objects
-      if (Array.isArray(clientItem.attachments)) {
-        return clientItem.attachments.map(att => {
-          // Se o anexo é uma string JSON, parsear
+
+      if (!data?.attachments) {
+        console.log('📎 Nenhum anexo encontrado para o cliente:', clientId);
+        return [];
+      }
+
+      // Processar anexos de forma robusta
+      let attachments: Array<{ name: string; data: string; type: string; size?: number }> = [];
+      
+      if (Array.isArray(data.attachments)) {
+        const mappedAttachments = data.attachments.map((att: any) => {
           if (typeof att === 'string') {
             try {
               const parsed = JSON.parse(att);
@@ -380,34 +337,58 @@ export function useContentPadariasData() {
                 data: parsed.data || '',
                 size: parsed.size || 0
               };
-            } catch (error) {
-              console.error('Error parsing attachment JSON:', error);
-              return { name: 'Arquivo corrompido', type: 'unknown', data: '', size: 0 };
+            } catch {
+              console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
+              return null;
             }
+          } else if (typeof att === 'object' && att !== null) {
+            return {
+              name: att.name || 'Arquivo',
+              type: att.type || 'application/octet-stream',
+              data: att.data || '',
+              size: att.size || 0
+            };
           }
-          // Se já é um objeto, garantir que tem as propriedades necessárias
-          return {
-            name: att.name || 'Arquivo',
-            type: att.type || 'application/octet-stream',
-            data: att.data || '',
-            size: att.size || 0
-          };
+          return null;
         });
+        
+        attachments = mappedAttachments.filter((att): att is { name: string; data: string; type: string; size?: number } => att !== null);
+      } else if (typeof data.attachments === 'string') {
+        try {
+          const parsed = JSON.parse(data.attachments);
+          if (Array.isArray(parsed)) {
+            attachments = parsed.map((att: any) => ({
+              name: att.name || 'Arquivo',
+              type: att.type || 'application/octet-stream',
+              data: att.data || '',
+              size: att.size || 0
+            }));
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao processar anexos JSON:', error);
+        }
       }
-  
-      console.warn(`Unexpected format for attachments: ${clientItem.attachments}`);
-      return [];
+
+      console.log('📎 Anexos carregados:', attachments.length);
+      return attachments;
+
     } catch (error) {
-      console.error('Error getting client files:', error);
+      console.error('❌ Erro ao carregar anexos do cliente:', error);
       return [];
     }
-  }, [groups]);
+  }, []);
+
+  const getClientFiles = useCallback(async (clientId: string) => {
+    // Esta função agora carrega os anexos sob demanda
+    return await loadClientAttachments(clientId);
+  }, [loadClientAttachments]);
 
   const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
     console.log('🔄 Padarias: Adicionando anexo ao cliente:', clientId);
     
     try {
-      const clientFiles = getClientFiles(clientId);
+      // Carregar anexos atuais
+      const currentAttachments = await loadClientAttachments(clientId);
       const newAttachment = {
         name: attachment.name,
         type: attachment.type,
@@ -415,7 +396,7 @@ export function useContentPadariasData() {
         size: attachment.size || 0
       };
       
-      const updatedAttachments = [...clientFiles, newAttachment];
+      const updatedAttachments = [...currentAttachments, newAttachment];
       
       await updateClient(clientId, { attachments: updatedAttachments });
       
@@ -430,15 +411,16 @@ export function useContentPadariasData() {
     console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
     
     try {
-      const clientFiles = getClientFiles(clientId);
-      console.log('📎 Padarias: Anexos atuais:', clientFiles);
+      // Carregar anexos atuais
+      const currentAttachments = await loadClientAttachments(clientId);
+      console.log('📎 Padarias: Anexos atuais:', currentAttachments);
       
-      if (attachmentIndex < 0 || attachmentIndex >= clientFiles.length) {
+      if (attachmentIndex < 0 || attachmentIndex >= currentAttachments.length) {
         console.warn('⚠️ Padarias: Índice de anexo inválido:', attachmentIndex);
         return;
       }
       
-      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
+      const updatedAttachments = currentAttachments.filter((_, index) => index !== attachmentIndex);
       console.log('📎 Padarias: Anexos após remoção:', updatedAttachments);
       
       await updateClient(clientId, { attachments: updatedAttachments });
@@ -785,6 +767,7 @@ export function useContentPadariasData() {
     deleteClient,
     updateClient,
     getClientFiles,
+    loadClientAttachments,
     addClientAttachment,
     removeClientAttachment
   };
