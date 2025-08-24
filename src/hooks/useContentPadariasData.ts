@@ -269,34 +269,35 @@ export function useContentPadariasData() {
           try {
             if (Array.isArray(item.attachments)) {
               // Se é um array, processar cada item
-              attachments = item.attachments
-                .map((att: any) => {
-                  if (typeof att === 'string') {
-                    // Se é string JSON, fazer parse
-                    try {
-                      const parsed = JSON.parse(att);
-                      return {
-                        name: parsed.name || 'Arquivo',
-                        type: parsed.type || 'application/octet-stream',
-                        data: parsed.data || '',
-                        size: parsed.size || 0
-                      };
-                    } catch {
-                      console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
-                      return null;
-                    }
-                  } else if (typeof att === 'object' && att !== null) {
-                    // Se já é objeto, garantir propriedades
+              const mappedAttachments = item.attachments.map((att: any) => {
+                if (typeof att === 'string') {
+                  // Se é string JSON, fazer parse
+                  try {
+                    const parsed = JSON.parse(att);
                     return {
-                      name: att.name || 'Arquivo',
-                      type: att.type || 'application/octet-stream',
-                      data: att.data || '',
-                      size: att.size || 0
+                      name: parsed.name || 'Arquivo',
+                      type: parsed.type || 'application/octet-stream',
+                      data: parsed.data || '',
+                      size: parsed.size || 0
                     };
+                  } catch {
+                    console.warn('⚠️ Erro ao fazer parse do anexo string:', att);
+                    return null;
                   }
-                  return null;
-                })
-                .filter((att): att is { name: string; data: string; type: string; size?: number } => att !== null);
+                } else if (typeof att === 'object' && att !== null) {
+                  // Se já é objeto, garantir propriedades
+                  return {
+                    name: att.name || 'Arquivo',
+                    type: att.type || 'application/octet-stream',
+                    data: att.data || '',
+                    size: att.size || 0
+                  };
+                }
+                return null;
+              });
+              
+              // Filter out null values with proper typing
+              attachments = mappedAttachments.filter((att: any): att is { name: string; data: string; type: string; size?: number } => att !== null);
             } else if (typeof item.attachments === 'string') {
               // Se é string JSON completa
               const parsed = JSON.parse(item.attachments);
