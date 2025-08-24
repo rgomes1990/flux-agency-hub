@@ -5,11 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Eye, Calendar, User, Database } from 'lucide-react';
+import { Trash2, Eye, Calendar, User, Database, RefreshCw } from 'lucide-react';
 import { useAuditData } from '@/hooks/useAuditData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 export default function Audit() {
   const { auditLogs, loading, refreshLogs, clearOldLogs } = useAuditData();
@@ -18,6 +19,8 @@ export default function Audit() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [filterTable, setFilterTable] = useState('');
   const [filterAction, setFilterAction] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const filteredLogs = auditLogs.filter(log => {
     const matchesSearch = log.user_username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,13 +45,23 @@ export default function Audit() {
 
   const getTableName = (tableName: string) => {
     const tableNames: { [key: string]: string } = {
-      'traffic': 'Tráfego',
-      'services': 'Serviços',
+      'traffic_data': 'Tráfego',
+      'content_data': 'Conteúdo',
+      'videos_data': 'Vídeos',
+      'sites_data': 'Sites',
+      'google_my_business_data': 'Google My Business',
+      'rsg_avaliacoes_data': 'RSG Avaliações',
+      'content_padarias_data': 'Conteúdo Padarias',
+      'client_passwords': 'Senhas dos Clientes',
+      'tasks_data': 'Tarefas',
+      'app_users': 'Usuários',
       'clients': 'Clientes',
-      'auth': 'Autenticação',
+      'projects': 'Projetos',
+      'campaigns': 'Campanhas',
       'content': 'Conteúdo',
       'tasks': 'Tarefas',
-      'projects': 'Projetos'
+      'reports': 'Relatórios',
+      'auth': 'Autenticação'
     };
     return tableNames[tableName] || tableName;
   };
@@ -57,15 +70,32 @@ export default function Audit() {
   const uniqueActions = [...new Set(auditLogs.map(log => log.action))];
 
   const handleClearOldLogs = async () => {
-    if (confirm('Tem certeza que deseja limpar logs com mais de 30 dias?')) {
-      try {
-        await clearOldLogs(30);
-        await refreshLogs(); // Atualizar a lista após limpar
-        alert('Logs antigos removidos com sucesso!');
-      } catch (error) {
-        console.error('Erro ao limpar logs:', error);
-        alert('Erro ao limpar logs antigos');
-      }
+    if (!confirm('Tem certeza que deseja limpar logs com mais de 30 dias? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      const deletedCount = await clearOldLogs(30);
+      toast.success(`${deletedCount} logs antigos foram removidos com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao limpar logs:', error);
+      toast.error('Erro ao limpar logs antigos. Tente novamente.');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const handleRefreshLogs = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshLogs();
+      toast.success('Logs atualizados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar logs:', error);
+      toast.error('Erro ao atualizar logs. Tente novamente.');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -90,13 +120,22 @@ export default function Audit() {
           <p className="text-gray-600 mt-1">Controle e monitoramento de todas as alterações do sistema</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={refreshLogs} variant="outline">
-            <Database className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={handleRefreshLogs} 
+            variant="outline"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <Button onClick={handleClearOldLogs} variant="outline" className="text-red-600">
+          <Button 
+            onClick={handleClearOldLogs} 
+            variant="outline" 
+            className="text-red-600"
+            disabled={isClearing}
+          >
             <Trash2 className="h-4 w-4 mr-2" />
-            Limpar Logs Antigos
+            {isClearing ? 'Limpando...' : 'Limpar Logs Antigos'}
           </Button>
         </div>
       </div>
