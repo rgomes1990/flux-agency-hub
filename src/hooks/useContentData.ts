@@ -8,6 +8,7 @@ export interface ContentItem {
   servicos: string;
   observacoes: string;
   hasAttachments?: boolean; // Apenas indicador se tem anexos
+  attachments?: any[]; // Para quando carregados sob demanda
   status?: {
     id?: string;
     name?: string;
@@ -123,7 +124,7 @@ export function useContentData() {
 
         const contentItem: ContentItem = {
           id: item.id,
-          elemento: item.elemento,
+          elemento: item.elemento || '',
           servicos: item.servicos || '',
           observacoes: item.observacoes || '',
           hasAttachments: !!hasAttachments, // Apenas indicador booleano
@@ -204,6 +205,15 @@ export function useContentData() {
     }
   }, []);
 
+  // Função para obter arquivos do cliente (compatibilidade)
+  const getClientFiles = useCallback((clientId: string) => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (client?.attachments) {
+      return Array.isArray(client.attachments) ? client.attachments : [];
+    }
+    return [];
+  }, [groups]);
+
   const createMonth = async (monthName: string) => {
     const newGroupId = crypto.randomUUID();
     const newGroup: ContentGroup = {
@@ -263,9 +273,9 @@ export function useContentData() {
     await saveStatusesToDatabase([...statuses, status]);
   };
 
-  const updateStatus = async (updatedStatus: ContentStatus) => {
+  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
     const updatedStatuses = statuses.map(status =>
-      status.id === updatedStatus.id ? updatedStatus : status
+      status.id === statusId ? { ...status, ...updates } : status
     );
 
     setStatuses(updatedStatuses);
@@ -405,7 +415,7 @@ export function useContentData() {
       // Mapear os dados para o formato correto antes de salvar
       const formattedData = contentData.flatMap(group =>
         group.items.map(item => {
-          const { id, elemento, servicos, observacoes, hasAttachments, status, ...itemData } = item;
+          const { id, elemento, servicos, observacoes, hasAttachments, status, attachments, ...itemData } = item;
           return {
             id: id,
             group_id: group.id,
@@ -414,6 +424,7 @@ export function useContentData() {
             elemento: elemento,
             servicos: servicos,
             observacoes: observacoes,
+            attachments: attachments || null,
             item_data: { status, ...itemData },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -621,7 +632,8 @@ export function useContentData() {
     statuses,
     loading,
     updateGroups,
-    loadClientAttachments, // Nova função para carregar anexos sob demanda
+    loadClientAttachments,
+    getClientFiles,
     createMonth,
     updateMonth,
     deleteMonth,

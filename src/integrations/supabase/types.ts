@@ -365,35 +365,47 @@ export type Database = {
       }
       content_data: {
         Row: {
+          attachments: Json | null
           created_at: string
+          elemento: string | null
           group_color: string | null
           group_id: string
           group_name: string
           id: string
           is_expanded: boolean | null
           item_data: Json
+          observacoes: string | null
+          servicos: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          attachments?: Json | null
           created_at?: string
+          elemento?: string | null
           group_color?: string | null
           group_id: string
           group_name: string
           id?: string
           is_expanded?: boolean | null
           item_data: Json
+          observacoes?: string | null
+          servicos?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          attachments?: Json | null
           created_at?: string
+          elemento?: string | null
           group_color?: string | null
           group_id?: string
           group_name?: string
           id?: string
           is_expanded?: boolean | null
           item_data?: Json
+          observacoes?: string | null
+          servicos?: string | null
           updated_at?: string
           user_id?: string | null
         }

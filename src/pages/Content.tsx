@@ -318,6 +318,10 @@ export default function Content() {
     return getClientFiles(clientId);
   };
 
+  const handleStatusUpdate = (statusId: string, updates: { name: string; color: string }) => {
+    updateStatus(statusId, updates);
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -540,7 +544,6 @@ export default function Content() {
         </DndContext>
       </div>
 
-
       {/* Dialogs */}
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
         console.log('🔄 Modal: Estado do diálogo mudou para:', open);
@@ -753,7 +756,7 @@ export default function Content() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={addStatus}
-        onUpdateStatus={updateStatus}
+        onUpdateStatus={handleStatusUpdate}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />
