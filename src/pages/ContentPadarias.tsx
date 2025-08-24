@@ -68,8 +68,7 @@ export default function ContentPadarias() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles,
-    loadClientAttachments
+    getClientFiles
   } = useContentPadariasData();
   
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -228,8 +227,21 @@ export default function ContentPadarias() {
         setClientObservations([]);
       }
 
-      // Não carregar anexos aqui - será carregado no componente ClientAttachments
-      setClientAttachments([]);
+      // Parse existing attachments - handle both string and array types
+      try {
+        let attachmentsToSet = [];
+        if (typeof client.attachments === 'string') {
+          const parsed = JSON.parse(client.attachments);
+          attachmentsToSet = Array.isArray(parsed) ? parsed : [];
+        } else if (Array.isArray(client.attachments)) {
+          attachmentsToSet = client.attachments;
+        }
+        console.log('📎 Definindo anexos do cliente:', attachmentsToSet);
+        setClientAttachments(attachmentsToSet);
+      } catch {
+        console.log('📎 Erro ao processar anexos, definindo array vazio');
+        setClientAttachments([]);
+      }
       
       setShowClientDetails(clientId);
     }
@@ -743,8 +755,6 @@ export default function ContentPadarias() {
             console.log('📎 Atualizando anexos via callback:', attachments);
             setClientAttachments(attachments);
           }}
-          clientId={showClientDetails}
-          onLoadAttachments={loadClientAttachments}
         />
       )}
 
