@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import useTrafficData from '@/hooks/useTrafficData';
+import { useTrafficData } from '@/hooks/useTrafficData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -217,6 +217,28 @@ export default function Traffic() {
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
   const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
   const [clientFile, setClientFile] = useState<File | null>(null);
+
+  const getClientAttachments = (clientId: string): Array<{ name: string; data: string; type: string; size?: number }> => {
+    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
+    if (!client) return [];
+    
+    try {
+      if (typeof client.attachments === 'string') {
+        const parsed = JSON.parse(client.attachments);
+        return Array.isArray(parsed) ? parsed : [];
+      } else if (Array.isArray(client.attachments)) {
+        return client.attachments;
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  };
+
+  const openFilePreview = (file: any) => {
+    // Implement file preview logic if needed
+    console.log('Opening file preview:', file);
+  };
 
   const openClientDetails = (clientId: string) => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
@@ -493,7 +515,8 @@ export default function Traffic() {
                           onUpdateItemStatus={updateItemStatus}
                           onUpdateClientField={updateClient}
                           onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                          getClientFiles={() => []}
+                          getClientAttachments={getClientAttachments}
+                          openFilePreview={openFilePreview}
                           statuses={statuses}
                         />
                       ))}
@@ -676,7 +699,7 @@ export default function Traffic() {
         open={showStatusModal}
         onOpenChange={setShowStatusModal}
         onAddStatus={(status) => addStatus(status.name, status.color)}
-        onUpdateStatus={(statusId, updates) => updateStatus(statusId, updates.name, updates.color)}
+        onUpdateStatus={(statusId, status) => updateStatus(statusId, status.name, status.color)}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
       />
