@@ -39,6 +39,7 @@ export default function useRSGAvaliacoesData() {
   const [groups, setGroups] = useState<RSGAvaliacoesGroup[]>([]);
   const [columns, setColumns] = useState<RSGAvaliacoesColumn[]>([]);
   const [statuses, setStatuses] = useState<RSGAvaliacoesStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     loadRSGAvaliacoesData();
@@ -51,9 +52,15 @@ export default function useRSGAvaliacoesData() {
   };
 
   const loadRSGAvaliacoesData = useCallback(async () => {
+    if (isLoading) return; // Prevent concurrent loads
+    
     console.log('🔄 Carregando dados do RSG Avaliações...');
+    setIsLoading(true);
     
     try {
+      // Clear existing data first
+      setGroups([]);
+      
       const { data, error } = await supabase
         .from('rsg_avaliacoes_data')
         .select('*')
@@ -72,54 +79,66 @@ export default function useRSGAvaliacoesData() {
         return;
       }
 
+      // Enhanced deduplication strategy
       const groupsMap = new Map<string, RSGAvaliacoesGroup>();
-      const processedItems = new Set<string>();
+      const processedRecordIds = new Set<string>();
+      const processedGroupItems = new Map<string, Set<string>>();
 
-      data.forEach(item => {
-        // Skip if already processed to avoid duplicates
-        if (processedItems.has(item.id)) {
-          console.log('⚠️ Item duplicado encontrado, pulando:', item.id);
+      data.forEach(record => {
+        // Skip duplicate database records
+        const recordKey = `${record.group_id}-${record.id}`;
+        if (processedRecordIds.has(recordKey)) {
+          console.log('⚠️ Registro duplicado ignorado:', recordKey);
           return;
         }
-        processedItems.add(item.id);
+        processedRecordIds.add(recordKey);
 
-        if (!groupsMap.has(item.group_name)) {
-          groupsMap.set(item.group_name, {
-            id: item.group_id,
-            name: item.group_name,
-            color: item.group_color || 'bg-purple-500',
-            isExpanded: item.is_expanded !== false,
+        // Initialize group tracking
+        if (!groupsMap.has(record.group_id)) {
+          groupsMap.set(record.group_id, {
+            id: record.group_id,
+            name: record.group_name,
+            color: record.group_color || 'bg-purple-500',
+            isExpanded: record.is_expanded !== false,
             items: []
           });
+          processedGroupItems.set(record.group_id, new Set<string>());
         }
 
-        const group = groupsMap.get(item.group_name)!;
+        const group = groupsMap.get(record.group_id)!;
+        const groupItemIds = processedGroupItems.get(record.group_id)!;
         
         // Process item data safely
         let itemData: any = {};
-        let status: any = {};
         
-        if (item.item_data) {
+        if (record.item_data) {
           try {
-            if (typeof item.item_data === 'string') {
-              itemData = JSON.parse(item.item_data);
+            if (typeof record.item_data === 'string') {
+              itemData = JSON.parse(record.item_data);
             } else {
-              itemData = item.item_data as any;
+              itemData = record.item_data as any;
             }
-            status = itemData?.status || {};
           } catch (error) {
             console.warn('⚠️ Erro ao processar item_data:', error);
-            itemData = {};
+            return; // Skip malformed data
           }
         }
 
+        // Prevent item duplication within group
+        const itemId = itemData.id || record.id;
+        if (groupItemIds.has(itemId)) {
+          console.log('⚠️ Item duplicado no grupo ignorado:', itemId);
+          return;
+        }
+        groupItemIds.add(itemId);
+
         const rsgItem: RSGAvaliacoesItem = {
-          id: item.id,
+          id: itemId,
           elemento: itemData.elemento || '',
           servicos: itemData.servicos || '',
           observacoes: itemData.observacoes || '',
           attachments: itemData.attachments || [],
-          status: status,
+          status: itemData.status || {},
           ...itemData
         };
 
@@ -127,58 +146,84 @@ export default function useRSGAvaliacoesData() {
       });
 
       const loadedGroups = Array.from(groupsMap.values());
-      console.log('✅ Grupos carregados:', loadedGroups.length);
+      console.log('✅ Grupos RSG carregados:', loadedGroups.length);
+      console.log('📊 Itens por grupo RSG:', loadedGroups.map(g => ({ name: g.name, count: g.items.length })));
+      
       updateGroups(loadedGroups);
 
     } catch (error) {
       console.error('❌ Erro ao carregar dados do RSG Avaliações:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [isLoading]);
 
   const saveRSGAvaliacoesToDatabase = async (rsgData: RSGAvaliacoesGroup[]) => {
-    console.log('💾 Salvando dados no banco de dados...', rsgData);
+    console.log('💾 Salvando dados RSG no banco de dados...', rsgData);
   
     try {
-      // Delete existing data to prevent duplicates
+      // Delete all existing data first
       const { error: deleteError } = await supabase
         .from('rsg_avaliacoes_data')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (deleteError) {
-        console.error('❌ Erro ao limpar dados antigos:', deleteError);
+        console.error('❌ Erro ao limpar dados RSG antigos:', deleteError);
         throw deleteError;
       }
 
-      // Format data for database
+      // Format and batch insert
       const formattedData = rsgData.flatMap(group =>
-        group.items.map(item => ({
-          id: item.id,
-          group_id: group.id,
-          group_name: group.name,
-          group_color: group.color,
-          is_expanded: group.isExpanded,
-          item_data: item,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }))
+        group.items.length > 0
+          ? group.items.map(item => ({
+              id: crypto.randomUUID(),
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: item,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }))
+          : [{
+              id: crypto.randomUUID(),
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: {
+                id: `empty-${group.id}`,
+                elemento: '',
+                servicos: '',
+                observacoes: '',
+                attachments: []
+              },
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]
       );
 
-      // Insert new data
+      // Insert in batches
       if (formattedData.length > 0) {
-        const { error: insertError } = await supabase
-          .from('rsg_avaliacoes_data')
-          .insert(formattedData);
+        const batchSize = 50;
+        for (let i = 0; i < formattedData.length; i += batchSize) {
+          const batch = formattedData.slice(i, i + batchSize);
+          const { error: insertError } = await supabase
+            .from('rsg_avaliacoes_data')
+            .insert(batch);
 
-        if (insertError) {
-          console.error('❌ Erro ao inserir dados:', insertError);
-          throw insertError;
+          if (insertError) {
+            console.error('❌ Erro ao inserir lote RSG:', insertError);
+            throw insertError;
+          }
         }
       }
 
-      console.log('✅ Dados salvos com sucesso!');
+      console.log('✅ Dados RSG salvos com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao salvar dados no banco de dados:', error);
+      console.error('❌ Erro ao salvar dados RSG no banco de dados:', error);
+      throw error;
     }
   };
 

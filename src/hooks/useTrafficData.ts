@@ -39,6 +39,7 @@ export function useTrafficData() {
   const [groups, setGroups] = useState<TrafficGroup[]>([]);
   const [columns, setColumns] = useState<TrafficColumn[]>([]);
   const [statuses, setStatuses] = useState<TrafficStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     loadTrafficData();
@@ -51,9 +52,15 @@ export function useTrafficData() {
   };
 
   const loadTrafficData = useCallback(async () => {
+    if (isLoading) return; // Prevent concurrent loads
+    
     console.log('🔄 Carregando dados do Tráfego Pago...');
+    setIsLoading(true);
     
     try {
+      // Clear existing data first to prevent mixing old and new
+      setGroups([]);
+      
       const { data, error } = await supabase
         .from('traffic_data')
         .select('*')
@@ -72,54 +79,66 @@ export function useTrafficData() {
         return;
       }
 
+      // Use a more robust deduplication strategy
       const groupsMap = new Map<string, TrafficGroup>();
-      const processedItems = new Set<string>();
+      const processedItemIds = new Set<string>();
+      const processedGroupItems = new Map<string, Set<string>>();
 
-      data.forEach(item => {
-        // Skip if already processed to avoid duplicates
-        if (processedItems.has(item.id)) {
-          console.log('⚠️ Item duplicado encontrado, pulando:', item.id);
+      data.forEach(record => {
+        // Skip duplicate records entirely
+        const recordKey = `${record.group_id}-${record.id}`;
+        if (processedItemIds.has(recordKey)) {
+          console.log('⚠️ Registro duplicado ignorado:', recordKey);
           return;
         }
-        processedItems.add(item.id);
+        processedItemIds.add(recordKey);
 
-        if (!groupsMap.has(item.group_name)) {
-          groupsMap.set(item.group_name, {
-            id: item.group_id,
-            name: item.group_name,
-            color: item.group_color || 'bg-red-500',
-            isExpanded: item.is_expanded !== false,
+        // Initialize group if not exists
+        if (!groupsMap.has(record.group_id)) {
+          groupsMap.set(record.group_id, {
+            id: record.group_id,
+            name: record.group_name,
+            color: record.group_color || 'bg-red-500',
+            isExpanded: record.is_expanded !== false,
             items: []
           });
+          processedGroupItems.set(record.group_id, new Set<string>());
         }
 
-        const group = groupsMap.get(item.group_name)!;
+        const group = groupsMap.get(record.group_id)!;
+        const groupItemIds = processedGroupItems.get(record.group_id)!;
         
         // Process item data safely
         let itemData: any = {};
-        let status: any = {};
         
-        if (item.item_data) {
+        if (record.item_data) {
           try {
-            if (typeof item.item_data === 'string') {
-              itemData = JSON.parse(item.item_data);
+            if (typeof record.item_data === 'string') {
+              itemData = JSON.parse(record.item_data);
             } else {
-              itemData = item.item_data as any;
+              itemData = record.item_data as any;
             }
-            status = itemData?.status || {};
           } catch (error) {
             console.warn('⚠️ Erro ao processar item_data:', error);
-            itemData = {};
+            return; // Skip malformed data
           }
         }
 
+        // Skip if item already processed in this group
+        const itemId = itemData.id || record.id;
+        if (groupItemIds.has(itemId)) {
+          console.log('⚠️ Item duplicado no grupo ignorado:', itemId);
+          return;
+        }
+        groupItemIds.add(itemId);
+
         const trafficItem: TrafficItem = {
-          id: item.id,
+          id: itemId,
           elemento: itemData.elemento || '',
           servicos: itemData.servicos || '',
           observacoes: itemData.observacoes || '',
           attachments: itemData.attachments || [],
-          status: status,
+          status: itemData.status || {},
           ...itemData
         };
 
@@ -128,57 +147,84 @@ export function useTrafficData() {
 
       const loadedGroups = Array.from(groupsMap.values());
       console.log('✅ Grupos carregados:', loadedGroups.length);
+      console.log('📊 Itens por grupo:', loadedGroups.map(g => ({ name: g.name, count: g.items.length })));
+      
       updateGroups(loadedGroups);
 
     } catch (error) {
       console.error('❌ Erro ao carregar dados do Tráfego Pago:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [isLoading]);
 
   const saveTrafficToDatabase = async (trafficData: TrafficGroup[]) => {
     console.log('💾 Salvando dados no banco de dados...', trafficData);
   
     try {
-      // Delete existing data to prevent duplicates
+      // Use transaction-like approach: delete all, then insert all
+      // First, delete ALL existing traffic data
       const { error: deleteError } = await supabase
         .from('traffic_data')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all real records
 
       if (deleteError) {
         console.error('❌ Erro ao limpar dados antigos:', deleteError);
         throw deleteError;
       }
 
-      // Format data for database
+      // Format and insert all data at once
       const formattedData = trafficData.flatMap(group =>
-        group.items.map(item => ({
-          id: item.id,
-          group_id: group.id,
-          group_name: group.name,
-          group_color: group.color,
-          is_expanded: group.isExpanded,
-          item_data: item,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }))
+        group.items.length > 0 
+          ? group.items.map(item => ({
+              id: crypto.randomUUID(), // Always use new UUID for database record
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: item,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }))
+          : [{
+              id: crypto.randomUUID(),
+              group_id: group.id,
+              group_name: group.name,
+              group_color: group.color,
+              is_expanded: group.isExpanded,
+              item_data: {
+                id: `empty-${group.id}`,
+                elemento: '',
+                servicos: '',
+                observacoes: '',
+                attachments: []
+              },
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]
       );
 
-      // Insert new data
+      // Insert new data in batches to avoid conflicts
       if (formattedData.length > 0) {
-        const { error: insertError } = await supabase
-          .from('traffic_data')
-          .insert(formattedData);
+        const batchSize = 50;
+        for (let i = 0; i < formattedData.length; i += batchSize) {
+          const batch = formattedData.slice(i, i + batchSize);
+          const { error: insertError } = await supabase
+            .from('traffic_data')
+            .insert(batch);
 
-        if (insertError) {
-          console.error('❌ Erro ao inserir dados:', insertError);
-          throw insertError;
+          if (insertError) {
+            console.error('❌ Erro ao inserir lote:', insertError);
+            throw insertError;
+          }
         }
       }
 
       console.log('✅ Dados salvos com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao salvar dados no banco de dados:', error);
+      throw error;
     }
   };
 
@@ -424,14 +470,13 @@ export function useTrafficData() {
   };
 
   const getClientFiles = (clientId: string): File[] => {
-    // Implementation for getting client files
     return [];
   };
 
   return {
     groups,
     columns,
-    customColumns: columns, // Alias for compatibility
+    customColumns: columns,
     statuses,
     updateGroups,
     createMonth,

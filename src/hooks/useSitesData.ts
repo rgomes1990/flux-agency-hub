@@ -38,6 +38,7 @@ export const useSitesData = () => {
   const [columns, setColumns] = useState<SiteColumn[]>([]);
   const [customColumns, setCustomColumns] = useState<SiteColumn[]>([]);
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { logAudit, user } = useAuth();
 
@@ -110,8 +111,14 @@ export const useSitesData = () => {
   };
 
   const loadSitesData = async () => {
+    if (isLoading) return; // Prevent concurrent loads
+    
     try {
       console.log('🔄 SITES: Carregando dados compartilhados');
+      setIsLoading(true);
+      
+      // Clear existing data first
+      setGroups([]);
       
       const { data, error } = await supabase
         .from('sites_data')
@@ -130,9 +137,20 @@ export const useSitesData = () => {
       }
 
       if (data && data.length > 0) {
+        // Enhanced deduplication for sites
         const groupsMap = new Map<string, SiteGroup>();
+        const processedRecordIds = new Set<string>();
+        const processedGroupItems = new Map<string, Set<string>>();
 
         data.forEach((item, index) => {
+          // Skip duplicate database records
+          const recordKey = `${item.group_id}-${item.id}`;
+          if (processedRecordIds.has(recordKey)) {
+            console.log(`⚠️ SITES: Registro duplicado ${index + 1} ignorado:`, recordKey);
+            return;
+          }
+          processedRecordIds.add(recordKey);
+
           console.log(`🔍 SITES: Processando item ${index + 1}:`, {
             group_id: item.group_id,
             item_data_type: typeof item.item_data,
@@ -150,7 +168,8 @@ export const useSitesData = () => {
             console.error('❌ SITES: Erro ao fazer parse do item_data:', parseError);
             return;
           }
-          
+
+          // Initialize group and item tracking
           if (!groupsMap.has(item.group_id)) {
             groupsMap.set(item.group_id, {
               id: item.group_id,
@@ -159,10 +178,21 @@ export const useSitesData = () => {
               isExpanded: item.is_expanded,
               items: []
             });
+            processedGroupItems.set(item.group_id, new Set<string>());
           }
 
           const group = groupsMap.get(item.group_id)!;
+          const groupItemIds = processedGroupItems.get(item.group_id)!;
+          
           if (itemData) {
+            // Prevent item duplication within group
+            const itemId = itemData.id || `item-${index}`;
+            if (groupItemIds.has(itemId)) {
+              console.log('⚠️ SITES: Item duplicado no grupo ignorado:', itemId);
+              return;
+            }
+            groupItemIds.add(itemId);
+            
             group.items.push(itemData);
           }
         });
@@ -179,6 +209,8 @@ export const useSitesData = () => {
       }
     } catch (error) {
       console.error('❌ SITES: Erro crítico ao carregar dados:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -195,10 +227,22 @@ export const useSitesData = () => {
         totalItems: newGroups.reduce((acc, g) => acc + g.items.length, 0)
       });
       
-      for (const group of newGroups) {
+      // Delete all existing data first (complete reset approach)
+      const { error: deleteAllError } = await supabase
+        .from('sites_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (deleteAllError) {
+        console.error('❌ SITES: Erro ao limpar todos os dados:', deleteAllError);
+        throw deleteAllError;
+      }
+
+      // Insert all data in batches
+      const allInsertData = newGroups.flatMap(group => {
         console.log(`🔄 SITES: Processando grupo: ${group.name} (${group.items.length} itens)`);
         
-        const insertData = group.items.length > 0 
+        return group.items.length > 0 
           ? group.items.map((item, index) => {
               console.log(`📝 SITES: Preparando item ${index + 1}:`, {
                 id: item.id,
@@ -207,6 +251,7 @@ export const useSitesData = () => {
               });
 
               return {
+                id: crypto.randomUUID(), // Always generate new database ID
                 user_id: user.id,
                 group_id: group.id,
                 group_name: group.name,
@@ -216,6 +261,7 @@ export const useSitesData = () => {
               };
             })
           : [{
+              id: crypto.randomUUID(),
               user_id: user.id,
               group_id: group.id,
               group_name: group.name,
@@ -230,38 +276,22 @@ export const useSitesData = () => {
                 attachments: []
               }
             }];
+      });
 
-        console.log('📝 SITES: Dados para inserir:', {
-          groupId: group.id,
-          itemCount: insertData.length,
-          userId: user.id
-        });
+      // Insert in batches to avoid conflicts
+      if (allInsertData.length > 0) {
+        const batchSize = 50;
+        for (let i = 0; i < allInsertData.length; i += batchSize) {
+          const batch = allInsertData.slice(i, i + batchSize);
+          console.log(`📝 SITES: Inserindo lote ${Math.floor(i/batchSize) + 1}:`, batch.length, 'registros');
 
-        // PRIMEIRO inserir os novos dados
-        const { data: insertResult, error: insertError } = await supabase
-          .from('sites_data')
-          .insert(insertData)
-          .select('id');
-
-        if (insertError) {
-          console.error('❌ SITES: Erro ao inserir:', insertError);
-          throw insertError;
-        }
-
-        console.log('✅ SITES: Dados inseridos:', insertResult?.length || 0);
-
-        // SÓ DEPOIS deletar dados antigos do grupo (exceto os recém inseridos)
-        const newRecordIds = insertResult?.map(record => record.id) || [];
-        if (newRecordIds.length > 0) {
-          const { error: deleteError } = await supabase
+          const { error: insertError } = await supabase
             .from('sites_data')
-            .delete()
-            .eq('group_id', group.id)
-            .not('id', 'in', `(${newRecordIds.map(id => `'${id}'`).join(',')})`);
+            .insert(batch);
 
-          if (deleteError) {
-            console.error('❌ SITES: Erro ao deletar dados antigos:', deleteError);
-            // Não fazer throw aqui pois os novos dados já foram salvos
+          if (insertError) {
+            console.error('❌ SITES: Erro ao inserir lote:', insertError);
+            throw insertError;
           }
         }
       }
@@ -304,18 +334,15 @@ export const useSitesData = () => {
         userId: user.id
       });
 
-      // Primeiro, vamos adicionar ao estado local
       const newGroups = [...groups, newGroup];
       setGroups(newGroups);
       
-      // Depois tentar salvar no banco usando a função existente
       try {
         await saveSitesToDatabase(newGroups);
         console.log('✅ SITES: Mês criado e salvo com sucesso');
         return newGroup.id;
       } catch (saveError) {
         console.error('❌ SITES: Erro ao salvar no banco:', saveError);
-        // Reverter o estado se falhar
         setGroups(groups);
         throw saveError;
       }
@@ -339,7 +366,6 @@ export const useSitesData = () => {
         preservedId: clientData.id
       });
       
-      // If we have an existing ID, preserve it (for moves), otherwise create new
       const newClient: SiteItem = {
         id: clientData.id || `sites-client-${Date.now()}`,
         elemento: clientData.elemento || 'Novo Cliente',
@@ -347,12 +373,10 @@ export const useSitesData = () => {
         informacoes: clientData.informacoes || '',
         observacoes: clientData.observacoes || '',
         attachments: clientData.attachments || [],
-        ...clientData // This preserves all existing status fields
+        ...clientData
       };
 
-      // Ensure we don't add default values to custom columns if the client already has data
       if (!clientData.id) {
-        // Only add default values for new clients
         customColumns.forEach(column => {
           if (!newClient[column.id]) {
             newClient[column.id] = column.type === 'status' ? '' : '';
@@ -704,7 +728,6 @@ export const useSitesData = () => {
       size: attachment.size || 0
     }));
   };
-
 
   return {
     groups,
