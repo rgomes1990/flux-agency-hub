@@ -57,10 +57,14 @@ export function ClientAttachments({
   const handleRemoveAttachment = (index: number) => {
     console.log('🗑️ Removendo anexo no índice:', index);
     console.log('📎 Anexos antes da remoção:', attachments);
+    console.log('📎 Anexo sendo removido:', attachments[index]);
     
+    // Criar nova array sem o anexo removido
     const updatedAttachments = attachments.filter((_, i) => i !== index);
     
     console.log('📎 Anexos após remoção:', updatedAttachments);
+    
+    // Chamar a função de callback para atualizar os anexos
     onUpdateAttachments(updatedAttachments);
   };
 
@@ -101,7 +105,7 @@ export function ClientAttachments({
         <div className="space-y-2 max-h-40 overflow-y-auto">
           {attachments.map((attachment, index) => (
             <div
-              key={index}
+              key={`${attachment.name}-${index}`}
               className="flex items-center justify-between p-2 bg-gray-50 rounded border"
             >
               <div className="flex items-center space-x-2 flex-1">
@@ -119,6 +123,7 @@ export function ClientAttachments({
                   variant="ghost"
                   onClick={() => handleViewAttachment(attachment)}
                   className="h-6 w-6 p-0"
+                  title="Visualizar anexo"
                 >
                   <Eye className="h-3 w-3" />
                 </Button>
@@ -127,6 +132,7 @@ export function ClientAttachments({
                   variant="ghost"
                   onClick={() => handleRemoveAttachment(index)}
                   className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                  title="Remover anexo"
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>

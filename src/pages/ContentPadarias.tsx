@@ -236,8 +236,10 @@ export default function ContentPadarias() {
         } else if (Array.isArray(client.attachments)) {
           attachmentsToSet = client.attachments;
         }
+        console.log('📎 Definindo anexos do cliente:', attachmentsToSet);
         setClientAttachments(attachmentsToSet);
       } catch {
+        console.log('📎 Erro ao processar anexos, definindo array vazio');
         setClientAttachments([]);
       }
       
@@ -281,10 +283,8 @@ export default function ContentPadarias() {
           observacoes: JSON.stringify(clientObservations)
         };
 
-        // Só incluir attachments se houver anexos para processar
-        if (clientAttachments && clientAttachments.length > 0) {
-          updates.attachments = clientAttachments;
-        }
+        // SEMPRE incluir attachments na atualização, mesmo que seja um array vazio
+        updates.attachments = clientAttachments;
         
         console.log('💾 Updates preparados:', updates);
         
@@ -752,7 +752,7 @@ export default function ContentPadarias() {
           onMoveClient={(newGroupId) => showClientDetails && handleMoveClient(showClientDetails, newGroupId)}
           clientAttachments={clientAttachments}
           onUpdateAttachments={(attachments) => {
-            console.log('📎 Atualizando anexos:', attachments);
+            console.log('📎 Atualizando anexos via callback:', attachments);
             setClientAttachments(attachments);
           }}
         />

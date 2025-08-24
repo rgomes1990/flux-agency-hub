@@ -57,7 +57,7 @@ export function useContentPadariasData() {
       id: newGroupId,
       name: `${monthName} - PADARIAS`,
       color: 'bg-blue-500',
-      isExpanded: true, // Changed to true to show by default
+      isExpanded: true,
       items: []
     };
 
@@ -89,7 +89,7 @@ export function useContentPadariasData() {
       id: newGroupId,
       name: `${newMonthName} - PADARIAS`,
       color: groupToDuplicate.color,
-      isExpanded: true, // Changed to true to show by default
+      isExpanded: true,
       items: groupToDuplicate.items.map(item => ({
         ...item,
         id: crypto.randomUUID(),
@@ -256,7 +256,7 @@ export function useContentPadariasData() {
             id: item.group_id,
             name: item.group_name,
             color: item.group_color || 'bg-blue-500',
-            isExpanded: true, // Changed to true to show by default
+            isExpanded: true,
             items: []
           });
         }
@@ -388,13 +388,21 @@ export function useContentPadariasData() {
     }
   };
 
-  // Função para remover anexo
+  // Função para remover anexo - CORRIGIDA
   const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
     console.log('🔄 Padarias: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
     
     try {
       const clientFiles = getClientFiles(clientId);
+      console.log('📎 Padarias: Anexos atuais:', clientFiles);
+      
+      if (attachmentIndex < 0 || attachmentIndex >= clientFiles.length) {
+        console.warn('⚠️ Padarias: Índice de anexo inválido:', attachmentIndex);
+        return;
+      }
+      
       const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
+      console.log('📎 Padarias: Anexos após remoção:', updatedAttachments);
       
       await updateClient(clientId, { attachments: updatedAttachments });
       
@@ -409,6 +417,7 @@ export function useContentPadariasData() {
     console.log('🔄 Padarias: Atualizando cliente:', clientId, 'com:', updates);
     
     try {
+      // Atualizar estado local primeiro
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => {
@@ -563,21 +572,21 @@ export function useContentPadariasData() {
         id: crypto.randomUUID(),
         name: 'Janeiro - PADARIAS',
         color: 'bg-blue-500',
-        isExpanded: true, // Changed to true to show by default
+        isExpanded: true,
         items: []
       },
       {
         id: crypto.randomUUID(),
         name: 'Fevereiro - PADARIAS',
         color: 'bg-green-500',
-        isExpanded: true, // Changed to true to show by default
+        isExpanded: true,
         items: []
       },
       {
         id: crypto.randomUUID(),
         name: 'Março - PADARIAS',
         color: 'bg-red-500',
-        isExpanded: true, // Changed to true to show by default
+        isExpanded: true,
         items: []
       }
     ];
