@@ -504,9 +504,9 @@ export function useContentData() {
       { id: 'enviar-aprovacao', name: 'Enviar aprovação', color: '#6b7280' }
     ];
 
-    // Salvar status no banco
-    await saveStatusesToDatabase(defaultStatuses);
+    console.log('✅ CONTENT: Criando status padrão...');
     setStatuses(defaultStatuses);
+    await saveStatusesToDatabase(defaultStatuses);
 
     // Criar colunas padrão
     const defaultColumns: ContentColumn[] = [
@@ -516,9 +516,10 @@ export function useContentData() {
       { id: 'postagem', name: 'Postagem', type: 'status' }
     ];
 
-    // Salvar colunas no banco
-    await saveColumnsToDatabase(defaultColumns);
+    console.log('✅ CONTENT: Criando colunas padrão...');
+    setColumns(defaultColumns);
     setCustomColumns(defaultColumns);
+    await saveColumnsToDatabase(defaultColumns);
 
     // Criar o grupo padrão "AGOSTO - CONTEÚDO"
     const defaultGroupId = crypto.randomUUID();
@@ -645,24 +646,25 @@ export function useContentData() {
   const loadColumns = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('status_config')
+        .from('column_config')
         .select('*')
         .eq('module', 'content')
-        .order('created_at', { ascending: false });
+        .order('column_order', { ascending: true });
 
       if (error) {
         console.error('❌ CONTENT: Erro ao carregar colunas:', error);
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         const typedColumns = data.map(col => ({
-          id: col.status_id,
-          name: col.status_name,
-          type: 'status' as const
+          id: col.column_id,
+          name: col.column_name,
+          type: col.column_type as 'status' | 'text'
         }));
         setColumns(typedColumns);
         setCustomColumns(typedColumns);
+        console.log('✅ CONTENT: Colunas carregadas:', typedColumns.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar colunas:', error);
@@ -682,13 +684,14 @@ export function useContentData() {
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         const typedStatuses = data.map(status => ({
           id: status.status_id,
           name: status.status_name,
           color: status.status_color
         }));
         setStatuses(typedStatuses);
+        console.log('✅ CONTENT: Status carregados:', typedStatuses.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar status:', error);
@@ -699,8 +702,9 @@ export function useContentData() {
     console.log('💾 CONTENT: Salvando colunas no banco de dados...', columns);
 
     try {
+      // Deletar colunas antigas
       const { error: deleteError } = await supabase
-        .from('status_config')
+        .from('column_config')
         .delete()
         .eq('module', 'content');
 
@@ -709,16 +713,18 @@ export function useContentData() {
         throw deleteError;
       }
 
-      const formattedColumns = columns.map(column => ({
-        status_id: column.id,
-        status_name: column.name,
-        status_color: '#3b82f6',
+      // Inserir novas colunas
+      const formattedColumns = columns.map((column, index) => ({
+        column_id: column.id,
+        column_name: column.name,
+        column_type: column.type,
+        column_order: index,
         module: 'content'
       }));
 
       if (formattedColumns.length > 0) {
         const { error: insertError } = await supabase
-          .from('status_config')
+          .from('column_config')
           .insert(formattedColumns);
 
         if (insertError) {
