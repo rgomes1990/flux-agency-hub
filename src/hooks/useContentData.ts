@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useDataProtection } from './useDataProtection';
 
 export interface ContentItem {
   id: string;
   elemento: string;
   servicos: string;
   observacoes: string;
-  hasAttachments?: boolean;
-  attachments?: any[];
+  attachments?: Array<{ name: string; data: string; type: string; size?: number }>;
   status?: {
     id?: string;
     name?: string;
@@ -42,8 +40,6 @@ export function useContentData() {
   const [columns, setColumns] = useState<ContentColumn[]>([]);
   const [customColumns, setCustomColumns] = useState<ContentColumn[]>([]);
   const [statuses, setStatuses] = useState<ContentStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { safeDataOperation } = useDataProtection();
 
   useEffect(() => {
     loadContentData();
@@ -55,379 +51,57 @@ export function useContentData() {
     setGroups(updatedGroups);
   };
 
-  const loadContentData = useCallback(async () => {
-    console.log('🔄 CONTENT: Carregando dados...');
-    setLoading(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('content_data')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ CONTENT: Erro ao carregar dados:', error);
-        throw error;
-      }
-
-      console.log('📊 CONTENT: Dados carregados:', data?.length, 'registros');
-
-      if (!data || data.length === 0) {
-        console.log('📝 CONTENT: Criando dados padrão...');
-        await createDefaultData();
-        return;
-      }
-
-      // Usar Map para garantir unicidade por ID
-      const itemsMap = new Map<string, any>();
-      const groupsMap = new Map<string, ContentGroup>();
-
-      // Primeiro, processar todos os itens únicos
-      data.forEach(item => {
-        if (!itemsMap.has(item.id)) {
-          itemsMap.set(item.id, item);
-        }
-      });
-
-      console.log('🔍 CONTENT: Itens únicos encontrados:', itemsMap.size);
-
-      // Agora processar os itens únicos
-      itemsMap.forEach(item => {
-        // Criar ou obter grupo
-        if (!groupsMap.has(item.group_id)) {
-          groupsMap.set(item.group_id, {
-            id: item.group_id,
-            name: item.group_name,
-            color: item.group_color || 'bg-blue-500',
-            isExpanded: true,
-            items: []
-          });
-        }
-
-        const group = groupsMap.get(item.group_id)!;
-        
-        // Verificar se tem anexos
-        const hasAttachments = item.attachments && 
-          ((Array.isArray(item.attachments) && item.attachments.length > 0) || 
-           (typeof item.attachments === 'string' && item.attachments.trim() !== ''));
-
-        // Processar item_data para extrair status corretamente
-        let itemData: any = {};
-        let status: any = null;
-        
-        if (item.item_data) {
-          try {
-            if (typeof item.item_data === 'string') {
-              itemData = JSON.parse(item.item_data);
-            } else {
-              itemData = item.item_data;
-            }
-            
-            // Extrair status do item_data
-            if (itemData.status) {
-              status = itemData.status;
-              console.log('✅ CONTENT: Status encontrado para item:', item.elemento, status);
-            }
-          } catch (error) {
-            console.warn('⚠️ CONTENT: Erro ao processar item_data:', error);
-            itemData = {};
-          }
-        }
-
-        const contentItem: ContentItem = {
-          id: item.id,
-          elemento: item.elemento || '',
-          servicos: item.servicos || '',
-          observacoes: item.observacoes || '',
-          hasAttachments: !!hasAttachments,
-          status: status,
-          ...itemData // Incluir outros dados do item_data
-        };
-
-        console.log('📝 CONTENT: Item processado:', {
-          elemento: contentItem.elemento,
-          status: contentItem.status,
-          hasAttachments: contentItem.hasAttachments
-        });
-
-        // Verificar se o item já existe no grupo antes de adicionar
-        const existingItemIndex = group.items.findIndex(existingItem => existingItem.id === contentItem.id);
-        if (existingItemIndex === -1) {
-          group.items.push(contentItem);
-        } else {
-          console.log('⚠️ CONTENT: Item já existe no grupo, ignorando duplicata:', contentItem.id);
-        }
-      });
-
-      const loadedGroups = Array.from(groupsMap.values());
-      console.log('✅ CONTENT: Grupos carregados:', loadedGroups.length);
-      
-      // Log dos itens por grupo
-      loadedGroups.forEach(group => {
-        console.log(`📋 CONTENT: Grupo ${group.name} tem ${group.items.length} itens`);
-        // Log dos IDs dos itens para verificar duplicação
-        const itemIds = group.items.map(item => item.id);
-        const uniqueIds = [...new Set(itemIds)];
-        if (itemIds.length !== uniqueIds.length) {
-          console.warn('⚠️ CONTENT: Duplicatas detectadas no grupo', group.name, {
-            total: itemIds.length,
-            únicos: uniqueIds.length
-          });
-        }
-      });
-      
-      updateGroups(loadedGroups);
-
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao carregar dados:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadClientAttachments = useCallback(async (clientId: string) => {
-    console.log('📎 CONTENT: Carregando anexos do cliente:', clientId);
-    
-    try {
-      const { data, error } = await supabase
-        .from('content_data')
-        .select('attachments')
-        .eq('id', clientId)
-        .single();
-
-      if (error) {
-        console.error('❌ CONTENT: Erro ao carregar anexos:', error);
-        return [];
-      }
-
-      if (!data?.attachments) {
-        return [];
-      }
-
-      let attachments = [];
-      try {
-        if (Array.isArray(data.attachments)) {
-          attachments = data.attachments.map((att: any) => {
-            if (typeof att === 'string') {
-              const parsed = JSON.parse(att);
-              return {
-                name: parsed.name || 'Arquivo',
-                type: parsed.type || 'application/octet-stream',
-                data: parsed.data || '',
-                size: parsed.size || 0
-              };
-            }
-            return {
-              name: att.name || 'Arquivo',
-              type: att.type || 'application/octet-stream',
-              data: att.data || '',
-              size: att.size || 0
-            };
-          });
-        } else if (typeof data.attachments === 'string') {
-          const parsed = JSON.parse(data.attachments);
-          if (Array.isArray(parsed)) {
-            attachments = parsed;
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ CONTENT: Erro ao processar anexos:', error);
-      }
-
-      console.log('✅ CONTENT: Anexos carregados:', attachments.length);
-      return attachments;
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao carregar anexos:', error);
-      return [];
-    }
-  }, []);
-
-  const getClientFiles = useCallback((clientId: string) => {
-    const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
-    if (client?.attachments) {
-      return Array.isArray(client.attachments) ? client.attachments : [];
-    }
-    return [];
-  }, [groups]);
-
   const createMonth = async (monthName: string) => {
-    console.log('🔄 CONTENT: Criando novo mês:', monthName);
-    
-    try {
-      const newGroupId = crypto.randomUUID();
-      const newGroup: ContentGroup = {
-        id: newGroupId,
-        name: `${monthName} - CONTEÚDO`,
-        color: 'bg-blue-500',
-        isExpanded: true,
-        items: []
-      };
+    const newGroupId = crypto.randomUUID();
+    const newGroup: ContentGroup = {
+      id: newGroupId,
+      name: `${monthName} - CONTEÚDO`,
+      color: 'bg-blue-500',
+      isExpanded: true,
+      items: []
+    };
 
-      // Primeiro inserir no banco de dados
-      const { error: insertError } = await supabase
-        .from('content_data')
-        .insert({
-          id: crypto.randomUUID(),
-          group_id: newGroupId,
-          group_name: newGroup.name,
-          group_color: newGroup.color,
-          elemento: '',
-          servicos: '',
-          observacoes: '',
-          attachments: null,
-          item_data: { status: null },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-      if (insertError) {
-        console.error('❌ CONTENT: Erro ao inserir grupo no banco:', insertError);
-        throw insertError;
-      }
-
-      // Depois atualizar o estado local
-      const updatedGroups = [...groups, newGroup];
-      setGroups(updatedGroups);
-      
-      console.log('✅ CONTENT: Mês criado com sucesso:', monthName);
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao criar mês:', error);
-      throw error;
-    }
+    setGroups([...groups, newGroup]);
+    await saveContentToDatabase([...groups, newGroup]);
   };
 
   const updateMonth = async (groupId: string, newMonthName: string) => {
-    console.log('🔄 CONTENT: Atualizando mês:', groupId, 'para:', newMonthName);
-    
-    try {
-      const newGroupName = `${newMonthName} - CONTEÚDO`;
-      
-      // Primeiro atualizar no banco de dados
-      const { error: updateError } = await supabase
-        .from('content_data')
-        .update({ 
-          group_name: newGroupName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('group_id', groupId);
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, name: `${newMonthName} - CONTEÚDO` } : group
+    );
 
-      if (updateError) {
-        console.error('❌ CONTENT: Erro ao atualizar grupo no banco:', updateError);
-        throw updateError;
-      }
-
-      // Depois atualizar o estado local
-      const updatedGroups = groups.map(group =>
-        group.id === groupId ? { ...group, name: newGroupName } : group
-      );
-
-      setGroups(updatedGroups);
-      
-      console.log('✅ CONTENT: Mês atualizado com sucesso');
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao atualizar mês:', error);
-      throw error;
-    }
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
   };
 
   const deleteMonth = async (groupId: string) => {
-    console.log('🔄 CONTENT: Deletando mês:', groupId);
-    
-    try {
-      // Deletar todos os itens do grupo no banco
-      const { error: deleteError } = await supabase
-        .from('content_data')
-        .delete()
-        .eq('group_id', groupId);
-
-      if (deleteError) {
-        console.error('❌ CONTENT: Erro ao deletar grupo no banco:', deleteError);
-        throw deleteError;
-      }
-
-      // Depois atualizar o estado local
-      const updatedGroups = groups.filter(group => group.id !== groupId);
-      setGroups(updatedGroups);
-      
-      console.log('✅ CONTENT: Mês deletado com sucesso');
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao deletar mês:', error);
-      throw error;
-    }
+    const updatedGroups = groups.filter(group => group.id !== groupId);
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
   };
 
   const duplicateMonth = async (groupId: string, newMonthName: string) => {
-    console.log('🔄 CONTENT: Duplicando mês:', groupId, 'para:', newMonthName);
-    
-    try {
-      const groupToDuplicate = groups.find(group => group.id === groupId);
-      if (!groupToDuplicate) {
-        console.error('❌ CONTENT: Grupo não encontrado para duplicar:', groupId);
-        return;
-      }
-    
-      const newGroupId = crypto.randomUUID();
-      const newGroupName = `${newMonthName} - CONTEÚDO`;
-      
-      // Preparar dados para inserção no banco
-      const itemsToInsert = groupToDuplicate.items.length > 0 
-        ? groupToDuplicate.items.map(item => ({
-            id: crypto.randomUUID(),
-            group_id: newGroupId,
-            group_name: newGroupName,
-            group_color: groupToDuplicate.color,
-            elemento: item.elemento || '',
-            servicos: item.servicos || '',
-            observacoes: item.observacoes || '',
-            attachments: item.attachments || null,
-            item_data: { status: item.status || null, ...item },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }))
-        : [{
-            id: crypto.randomUUID(),
-            group_id: newGroupId,
-            group_name: newGroupName,
-            group_color: groupToDuplicate.color,
-            elemento: '',
-            servicos: '',
-            observacoes: '',
-            attachments: null,
-            item_data: { status: null },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }];
-
-      // Inserir no banco de dados
-      const { error: insertError } = await supabase
-        .from('content_data')
-        .insert(itemsToInsert);
-
-      if (insertError) {
-        console.error('❌ CONTENT: Erro ao inserir grupo duplicado no banco:', insertError);
-        throw insertError;
-      }
-
-      // Depois atualizar o estado local
-      const duplicatedGroup: ContentGroup = {
-        id: newGroupId,
-        name: newGroupName,
-        color: groupToDuplicate.color,
-        isExpanded: true,
-        items: groupToDuplicate.items.map(item => ({
-          ...item,
-          id: crypto.randomUUID()
-        }))
-      };
-    
-      const updatedGroups = [...groups, duplicatedGroup];
-      setGroups(updatedGroups);
-      
-      console.log('✅ CONTENT: Mês duplicado com sucesso');
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao duplicar mês:', error);
-      throw error;
-    }
+    const groupToDuplicate = groups.find(group => group.id === groupId);
+    if (!groupToDuplicate) return;
+  
+    const newGroupId = crypto.randomUUID();
+    const duplicatedGroup: ContentGroup = {
+      id: newGroupId,
+      name: `${newMonthName} - CONTEÚDO`,
+      color: groupToDuplicate.color,
+      isExpanded: true,
+      items: groupToDuplicate.items.map(item => ({
+        ...item,
+        id: crypto.randomUUID(),
+        elemento: item.elemento || '',
+        servicos: item.servicos || '',
+        observacoes: item.observacoes || ''
+      }))
+    };
+  
+    const updatedGroups = [...groups, duplicatedGroup];
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
   };
 
   const addStatus = async (status: ContentStatus) => {
@@ -435,9 +109,9 @@ export function useContentData() {
     await saveStatusesToDatabase([...statuses, status]);
   };
 
-  const updateStatus = async (statusId: string, updates: { name: string; color: string }) => {
+  const updateStatus = async (updatedStatus: ContentStatus) => {
     const updatedStatuses = statuses.map(status =>
-      status.id === statusId ? { ...status, ...updates } : status
+      status.id === updatedStatus.id ? updatedStatus : status
     );
 
     setStatuses(updatedStatuses);
@@ -502,196 +176,317 @@ export function useContentData() {
     await saveColumnsToDatabase(newColumns);
   };
 
-  const updateItemStatus = async (itemId: string, status: any) => {
-    console.log('🔄 CONTENT: Atualizando status do item:', itemId, status);
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    console.log('📊 CONTENT: Atualizando status do item:', { itemId, field, statusId });
     
-    try {
-      // Primeiro atualizar no banco de dados
-      const { error: updateError } = await supabase
-        .from('content_data')
-        .update({ 
-          item_data: { status: status },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', itemId);
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = { ...item, [field]: statusId };
+          console.log('📝 CONTENT: Item atualizado:', updatedItem);
+          return updatedItem;
+        }
+        return item;
+      })
+    }));
 
-      if (updateError) {
-        console.error('❌ CONTENT: Erro ao atualizar status no banco:', updateError);
-        throw updateError;
-      }
-
-      // Depois atualizar o estado local
-      const updatedGroups = groups.map(group => ({
-        ...group,
-        items: group.items.map(item => {
-          if (item.id === itemId) {
-            const updatedItem = { ...item, status: status };
-            console.log('✅ CONTENT: Item atualizado com status:', updatedItem);
-            return updatedItem;
-          }
-          return item;
-        })
-      }));
-
-      setGroups(updatedGroups);
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao atualizar status:', error);
-      throw error;
-    }
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
   };
 
   const addClient = async (groupId: string, client: Omit<ContentItem, 'id'>) => {
+    const newClientId = crypto.randomUUID();
+    const newClient: ContentItem = {
+      id: newClientId,
+      elemento: client.elemento || '',
+      servicos: client.servicos || '',
+      observacoes: client.observacoes || '',
+      ...client
+    };
+
+    const updatedGroups = groups.map(group =>
+      group.id === groupId ? { ...group, items: [...group.items, newClient] } : group
+    );
+
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
+  };
+
+  const deleteClient = async (clientId: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.id !== clientId)
+    }));
+
+    setGroups(updatedGroups);
+    await saveContentToDatabase(updatedGroups);
+  };
+
+  const loadContentData = useCallback(async () => {
+    console.log('🔄 CONTENT: Carregando dados...');
+    
     try {
-      const newClientId = crypto.randomUUID();
-      const group = groups.find(g => g.id === groupId);
-      if (!group) {
-        throw new Error('Grupo não encontrado');
+      const { data, error } = await supabase
+        .from('content_data')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ CONTENT: Erro ao carregar dados:', error);
+        throw error;
       }
 
-      const newClient: ContentItem = {
-        id: newClientId,
-        elemento: client.elemento || '',
-        servicos: client.servicos || '',
-        observacoes: client.observacoes || '',
-        hasAttachments: false,
-        ...client
-      };
+      console.log('📊 CONTENT: Dados carregados:', data?.length, 'registros');
 
-      // Primeiro inserir no banco de dados
-      const { error: insertError } = await supabase
-        .from('content_data')
-        .insert({
-          id: newClientId,
-          group_id: groupId,
-          group_name: group.name,
-          group_color: group.color,
-          elemento: newClient.elemento,
-          servicos: newClient.servicos,
-          observacoes: newClient.observacoes,
-          attachments: null,
-          item_data: { status: null },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+      if (!data || data.length === 0) {
+        console.log('📝 CONTENT: Nenhum dado encontrado, criando dados padrão...');
+        await createDefaultData();
+        return;
+      }
+
+      const groupsMap = new Map<string, ContentGroup>();
+      const processedItems = new Set<string>();
+
+      data.forEach(item => {
+        if (processedItems.has(item.id)) {
+          return;
+        }
+        processedItems.add(item.id);
+
+        console.log('🔍 CONTENT: Itens únicos encontrados:', processedItems.size);
+
+        if (!groupsMap.has(item.group_name)) {
+          groupsMap.set(item.group_name, {
+            id: item.group_id,
+            name: item.group_name,
+            color: item.group_color || 'bg-blue-500',
+            isExpanded: true,
+            items: []
+          });
+        }
+
+        const group = groupsMap.get(item.group_name)!;
+        
+        let attachments: Array<{ name: string; data: string; type: string; size?: number }> = [];
+        if (item.attachments) {
+          try {
+            if (typeof item.attachments === 'string') {
+              attachments = JSON.parse(item.attachments);
+            } else {
+              attachments = item.attachments;
+            }
+          } catch (error) {
+            console.warn('⚠️ CONTENT: Erro ao processar anexos:', error);
+            attachments = [];
+          }
+        }
+
+        let itemData: any = {};
+        let status: any = {};
+        
+        if (item.item_data) {
+          try {
+            if (typeof item.item_data === 'string') {
+              itemData = JSON.parse(item.item_data);
+            } else {
+              itemData = item.item_data as any;
+            }
+            status = itemData?.status || {};
+          } catch (error) {
+            console.warn('⚠️ CONTENT: Erro ao processar item_data:', error);
+            itemData = {};
+          }
+        }
+
+        // Encontrar status pelo ID nos dados salvos
+        const statusFound = status?.id ? { id: status.id, name: status.name || '', color: status.color || '' } : status;
+        console.log('✅ CONTENT: Status encontrado para item:', item.elemento, statusFound);
+
+        const clientItem: ContentItem = {
+          id: item.id,
+          elemento: item.elemento,
+          servicos: item.servicos || '',
+          observacoes: item.observacoes || '',
+          attachments: attachments,
+          status: statusFound,
+          hasAttachments: attachments.length > 0,
+          ...itemData
+        };
+
+        console.log('📝 CONTENT: Item processado:', {
+          elemento: clientItem.elemento,
+          status: clientItem.status,
+          hasAttachments: clientItem.hasAttachments
         });
 
-      if (insertError) {
-        console.error('❌ CONTENT: Erro ao inserir cliente no banco:', insertError);
-        throw insertError;
-      }
+        group.items.push(clientItem);
+      });
 
-      // Depois atualizar o estado local
-      const updatedGroups = groups.map(group =>
-        group.id === groupId ? { ...group, items: [...group.items, newClient] } : group
-      );
+      const loadedGroups = Array.from(groupsMap.values());
+      console.log('✅ CONTENT: Grupos carregados:', loadedGroups.length);
+      
+      loadedGroups.forEach(group => {
+        console.log('📋 CONTENT: Grupo', group.name, 'tem', group.items.length, 'itens');
+      });
+      
+      updateGroups(loadedGroups);
 
-      setGroups(updatedGroups);
-      return newClient;
     } catch (error) {
-      console.error('❌ CONTENT: Erro ao adicionar cliente:', error);
+      console.error('❌ CONTENT: Erro ao carregar dados:', error);
+    }
+  }, []);
+
+  const getClientFiles = useCallback((clientId: string) => {
+    try {
+      const clientItem = groups.flatMap(group => group.items).find(item => item.id === clientId);
+  
+      if (!clientItem || !clientItem.attachments) {
+        console.log(`No attachments found for client ${clientId}`);
+        return [];
+      }
+  
+      if (Array.isArray(clientItem.attachments)) {
+        return clientItem.attachments.map(att => {
+          if (typeof att === 'string') {
+            try {
+              const parsed = JSON.parse(att);
+              return {
+                name: parsed.name || 'Arquivo',
+                type: parsed.type || 'application/octet-stream',
+                data: parsed.data || '',
+                size: parsed.size || 0
+              };
+            } catch (error) {
+              console.error('Error parsing attachment JSON:', error);
+              return { name: 'Arquivo corrompido', type: 'unknown', data: '', size: 0 };
+            }
+          }
+          return {
+            name: att.name || 'Arquivo',
+            type: att.type || 'application/octet-stream',
+            data: att.data || '',
+            size: att.size || 0
+          };
+        });
+      }
+  
+      console.warn(`Unexpected format for attachments: ${clientItem.attachments}`);
+      return [];
+    } catch (error) {
+      console.error('Error getting client files:', error);
+      return [];
+    }
+  }, [groups]);
+
+  const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
+    console.log('🔄 CONTENT: Adicionando anexo ao cliente:', clientId);
+    
+    try {
+      const clientFiles = getClientFiles(clientId);
+      const newAttachment = {
+        name: attachment.name,
+        type: attachment.type,
+        data: attachment.data,
+        size: attachment.size || 0
+      };
+      
+      const updatedAttachments = [...clientFiles, newAttachment];
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ CONTENT: Anexo adicionado com sucesso');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao adicionar anexo:', error);
       throw error;
     }
   };
 
-  const deleteClient = async (clientId: string) => {
+  const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
+    console.log('🔄 CONTENT: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
+    
     try {
-      // Primeiro deletar do banco de dados
-      const { error: deleteError } = await supabase
-        .from('content_data')
-        .delete()
-        .eq('id', clientId);
-
-      if (deleteError) {
-        console.error('❌ CONTENT: Erro ao deletar cliente no banco:', deleteError);
-        throw deleteError;
+      const clientFiles = getClientFiles(clientId);
+      console.log('📎 CONTENT: Anexos atuais:', clientFiles);
+      
+      if (attachmentIndex < 0 || attachmentIndex >= clientFiles.length) {
+        console.warn('⚠️ CONTENT: Índice de anexo inválido:', attachmentIndex);
+        return;
       }
-
-      // Depois atualizar o estado local
-      const updatedGroups = groups.map(group => ({
-        ...group,
-        items: group.items.filter(item => item.id !== clientId)
-      }));
-
-      setGroups(updatedGroups);
-      return clientId;
+      
+      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
+      console.log('📎 CONTENT: Anexos após remoção:', updatedAttachments);
+      
+      await updateClient(clientId, { attachments: updatedAttachments });
+      
+      console.log('✅ CONTENT: Anexo removido com sucesso');
     } catch (error) {
-      console.error('❌ CONTENT: Erro ao deletar cliente:', error);
+      console.error('❌ CONTENT: Erro ao remover anexo:', error);
       throw error;
     }
   };
 
   const updateClient = async (clientId: string, updates: any) => {
+    console.log('🔄 CONTENT: Atualizando cliente:', clientId, 'com:', updates);
+    
     try {
-      console.log('💾 CONTENT: Atualizando cliente:', clientId, updates);
-
-      // Preparar dados para atualização
-      const { hasAttachments, status, ...otherUpdates } = updates;
-      
-      const updateData: any = {
-        updated_at: new Date().toISOString()
-      };
-
-      // Atualizar campos específicos
-      if (otherUpdates.elemento !== undefined) updateData.elemento = otherUpdates.elemento;
-      if (otherUpdates.servicos !== undefined) updateData.servicos = otherUpdates.servicos;
-      if (otherUpdates.observacoes !== undefined) updateData.observacoes = otherUpdates.observacoes;
-      if (otherUpdates.attachments !== undefined) updateData.attachments = otherUpdates.attachments;
-      
-      // Buscar dados atuais do item para manter o item_data existente
-      const { data: currentData, error: fetchError } = await supabase
-        .from('content_data')
-        .select('item_data')
-        .eq('id', clientId)
-        .single();
-
-      if (fetchError) {
-        console.error('❌ CONTENT: Erro ao buscar dados atuais:', fetchError);
-      }
-
-      // Mesclar dados existentes com novos dados
-      let currentItemData = {};
-      try {
-        if (currentData?.item_data) {
-          currentItemData = typeof currentData.item_data === 'string' 
-            ? JSON.parse(currentData.item_data) 
-            : currentData.item_data;
-        }
-      } catch (error) {
-        console.warn('⚠️ CONTENT: Erro ao processar item_data atual:', error);
-      }
-
-      // Atualizar item_data com todos os updates
-      updateData.item_data = { 
-        ...currentItemData,
-        ...otherUpdates
-      };
-
-      console.log('📝 CONTENT: Dados para atualização:', updateData);
-
-      // Atualizar no banco de dados
-      const { error: updateError } = await supabase
-        .from('content_data')
-        .update(updateData)
-        .eq('id', clientId);
-
-      if (updateError) {
-        console.error('❌ CONTENT: Erro ao atualizar cliente no banco:', updateError);
-        throw updateError;
-      }
-
-      // Atualizar o estado local
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => {
           if (item.id === clientId) {
-            return { ...item, ...updates };
+            return { 
+              ...item, 
+              ...updates
+            };
           }
           return item;
         })
       }));
 
-      setGroups(updatedGroups);
+      updateGroups(updatedGroups);
+      
+      const clientToUpdate = updatedGroups.flatMap(g => g.items).find(item => item.id === clientId);
+      if (clientToUpdate) {
+        const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = clientToUpdate;
+        
+        let processedAttachments: string | null = null;
+        
+        if (attachments !== undefined) {
+          if (Array.isArray(attachments) && attachments.length > 0) {
+            processedAttachments = JSON.stringify(attachments.map(att => ({
+              name: att.name || 'Arquivo',
+              type: att.type || 'application/octet-stream',
+              data: att.data || '',
+              size: att.size || 0
+            })));
+          } else {
+            processedAttachments = null;
+          }
+        }
+
+        console.log('💾 CONTENT: Salvando anexos processados:', processedAttachments ? 'com anexos' : 'sem anexos');
+
+        const { error } = await supabase
+          .from('content_data')
+          .update({
+            elemento,
+            servicos,
+            observacoes,
+            attachments: processedAttachments,
+            item_data: { status, ...itemData },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clientId);
+
+        if (error) {
+          console.error('❌ CONTENT: Erro ao atualizar no banco:', error);
+          throw error;
+        }
+
+        console.log('✅ CONTENT: Cliente atualizado no banco');
+      }
+      
       console.log('✅ CONTENT: Cliente atualizado com sucesso');
-      return updates;
     } catch (error) {
       console.error('❌ CONTENT: Erro ao atualizar cliente:', error);
       throw error;
@@ -699,59 +494,189 @@ export function useContentData() {
   };
 
   const saveContentToDatabase = async (contentData: ContentGroup[]) => {
-    console.log('💾 CONTENT: Função saveContentToDatabase chamada - usando operações individuais');
-    // Esta função agora é principalmente para compatibilidade
-    // As operações individuais já salvam diretamente no banco
+    console.log('💾 CONTENT: Salvando dados no banco de dados...', contentData);
+  
+    try {
+      const formattedData = contentData.flatMap(group =>
+        group.items.map(item => {
+          const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = item;
+          
+          let processedAttachments: string | null = null;
+          if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+            processedAttachments = JSON.stringify(attachments.map(att => ({
+              name: att.name || 'Arquivo',
+              type: att.type || 'application/octet-stream',
+              data: att.data || '',
+              size: att.size || 0
+            })));
+          }
+          
+          return {
+            id: id,
+            group_id: group.id,
+            group_name: group.name,
+            group_color: group.color,
+            elemento: elemento,
+            servicos: servicos,
+            observacoes: observacoes,
+            attachments: processedAttachments,
+            item_data: { status, ...itemData },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        })
+      );
+  
+      const { error: deleteError } = await supabase
+        .from('content_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+  
+      if (deleteError) {
+        console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
+        throw deleteError;
+      }
+  
+      if (formattedData.length > 0) {
+        const { error: insertError } = await supabase
+          .from('content_data')
+          .insert(formattedData);
+  
+        if (insertError) {
+          console.error('❌ CONTENT: Erro ao inserir dados:', insertError);
+          throw insertError;
+        }
+      }
+  
+      console.log('✅ CONTENT: Dados salvos com sucesso!');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao salvar dados no banco de dados:', error);
+    }
   };
 
   const createDefaultData = async () => {
-    console.log('📝 CONTENT: Criando dados padrão...');
-    
-    const defaultGroups = [
-      { name: 'Janeiro - CONTEÚDO', color: 'bg-blue-500' },
-      { name: 'Fevereiro - CONTEÚDO', color: 'bg-green-500' },
-      { name: 'Março - CONTEÚDO', color: 'bg-red-500' }
+    const defaultGroups: ContentGroup[] = [
+      {
+        id: crypto.randomUUID(),
+        name: 'AGOSTO - CONTEÚDO',
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: [
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Protenista',
+            servicos: '16 Conteúdos',
+            observacoes: '',
+            Temas: 'aprovado',
+            Textos: 'parado',
+            Artes: 'parado',
+            Postagem: 'parado'
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Aereo Leste',
+            servicos: '4 Conteúdos',
+            observacoes: '',
+            Temas: 'aprovado',
+            Textos: 'aprovado',
+            Artes: 'aprovado',
+            Postagem: 'aprovacao-parcial'
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Grupo Forte',
+            servicos: '4 Conteúdos',
+            observacoes: '',
+            Temas: 'aprovado',
+            Textos: 'aprovado',
+            Artes: 'aprovado',
+            Postagem: 'aprovado'
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Ana Cardoso',
+            servicos: '8 Conteúdos',
+            observacoes: '',
+            Temas: 'andamento',
+            Textos: 'parado',
+            Artes: 'parado',
+            Postagem: 'parado'
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Medicate',
+            servicos: '8 Conteúdos',
+            observacoes: '',
+            Temas: '',
+            Textos: '',
+            Artes: '',
+            Postagem: ''
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Aéreo Leste',
+            servicos: '4 Conteúdos',
+            observacoes: '',
+            Temas: '',
+            Textos: '',
+            Artes: '',
+            Postagem: ''
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Gran Vitale',
+            servicos: '4 Conteúdos',
+            observacoes: '',
+            Temas: 'aprovado',
+            Textos: 'enviar-aprovacao',
+            Artes: 'parado',
+            Postagem: 'parado'
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'Farmácia Santo Sal',
+            servicos: '',
+            observacoes: '',
+            Temas: '',
+            Textos: '',
+            Artes: '',
+            Postagem: ''
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'OrangeXpress',
+            servicos: '4 Conteúdos',
+            observacoes: '',
+            Temas: '',
+            Textos: '',
+            Artes: '',
+            Postagem: ''
+          },
+          {
+            id: crypto.randomUUID(),
+            elemento: 'MEDICATE',
+            servicos: '8 postagens',
+            observacoes: '',
+            Temas: '',
+            Textos: '',
+            Artes: '',
+            Postagem: ''
+          }
+        ]
+      }
     ];
 
-    try {
-      const groupsToInsert = defaultGroups.map(group => ({
-        id: crypto.randomUUID(),
-        group_id: crypto.randomUUID(),
-        group_name: group.name,
-        group_color: group.color,
-        elemento: '',
-        servicos: '',
-        observacoes: '',
-        attachments: null,
-        item_data: { status: null },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-
-      const { error: insertError } = await supabase
-        .from('content_data')
-        .insert(groupsToInsert);
-
-      if (insertError) {
-        console.error('❌ CONTENT: Erro ao criar dados padrão:', insertError);
-        throw insertError;
-      }
-
-      // Recarregar dados
-      await loadContentData();
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao criar dados padrão:', error);
-      throw error;
-    }
+    setGroups(defaultGroups);
+    await saveContentToDatabase(defaultGroups);
   };
 
   const loadColumns = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('column_config')
+        .from('status_config')
         .select('*')
         .eq('module', 'content')
-        .order('column_order', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ CONTENT: Erro ao carregar colunas:', error);
@@ -760,13 +685,13 @@ export function useContentData() {
 
       if (data) {
         const typedColumns = data.map(col => ({
-          id: col.column_id,
-          name: col.column_name,
-          type: col.column_type as 'status' | 'text'
+          id: col.status_id,
+          name: col.status_name,
+          type: 'status' as const
         }));
-        console.log('✅ CONTENT: Colunas carregadas:', typedColumns.length);
         setColumns(typedColumns);
         setCustomColumns(typedColumns);
+        console.log('✅ CONTENT: Colunas carregadas:', typedColumns.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar colunas:', error);
@@ -792,8 +717,8 @@ export function useContentData() {
           name: status.status_name,
           color: status.status_color
         }));
-        console.log('✅ CONTENT: Status carregados:', typedStatuses.length);
         setStatuses(typedStatuses);
+        console.log('✅ CONTENT: Status carregados:', typedStatuses.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar status:', error);
@@ -804,9 +729,8 @@ export function useContentData() {
     console.log('💾 CONTENT: Salvando colunas no banco de dados...', columns);
 
     try {
-      // Delete existing columns for this module
       const { error: deleteError } = await supabase
-        .from('column_config')
+        .from('status_config')
         .delete()
         .eq('module', 'content');
 
@@ -815,18 +739,16 @@ export function useContentData() {
         throw deleteError;
       }
 
-      // Insert new columns
-      const formattedColumns = columns.map((column, index) => ({
-        column_id: column.id,
-        column_name: column.name,
-        column_type: column.type,
-        column_order: index,
+      const formattedColumns = columns.map(column => ({
+        status_id: column.id,
+        status_name: column.name,
+        status_color: '#3b82f6',
         module: 'content'
       }));
 
       if (formattedColumns.length > 0) {
         const { error: insertError } = await supabase
-          .from('column_config')
+          .from('status_config')
           .insert(formattedColumns);
 
         if (insertError) {
@@ -845,7 +767,6 @@ export function useContentData() {
     console.log('💾 CONTENT: Salvando status no banco de dados...', statuses);
 
     try {
-      // Delete existing statuses for this module
       const { error: deleteError } = await supabase
         .from('status_config')
         .delete()
@@ -856,7 +777,6 @@ export function useContentData() {
         throw deleteError;
       }
 
-      // Insert new statuses
       const formattedStatuses = statuses.map(status => ({
         status_id: status.id,
         status_name: status.name,
@@ -886,10 +806,7 @@ export function useContentData() {
     columns,
     customColumns,
     statuses,
-    loading,
     updateGroups,
-    loadClientAttachments,
-    getClientFiles,
     createMonth,
     updateMonth,
     deleteMonth,
@@ -905,6 +822,9 @@ export function useContentData() {
     updateItemStatus,
     addClient,
     deleteClient,
-    updateClient
+    updateClient,
+    getClientFiles,
+    addClientAttachment,
+    removeClientAttachment
   };
 }
