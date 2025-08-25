@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,6 +12,11 @@ export interface ContentItem {
     name?: string;
     color?: string;
   };
+  // Campos dinâmicos para os status das colunas
+  Temas?: string;
+  Textos?: string;
+  Artes?: string;
+  Postagem?: string;
   [key: string]: any;
 }
 
@@ -177,16 +181,12 @@ export function useContentData() {
     await saveColumnsToDatabase(newColumns);
   };
 
-  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
-    console.log('📊 CONTENT: Atualizando status do item:', { itemId, field, statusId });
-    
+  const updateItemStatus = async (itemId: string, status: any) => {
     const updatedGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => {
         if (item.id === itemId) {
-          const updatedItem = { ...item, [field]: statusId };
-          console.log('📝 CONTENT: Item atualizado:', updatedItem);
-          return updatedItem;
+          return { ...item, status: status };
         }
         return item;
       })
@@ -225,7 +225,7 @@ export function useContentData() {
   };
 
   const loadContentData = useCallback(async () => {
-    console.log('🔄 CONTENT: Carregando dados...');
+    console.log('🔄 CONTENT: Carregando dados do Conteúdo...');
     
     try {
       const { data, error } = await supabase
@@ -250,12 +250,11 @@ export function useContentData() {
       const processedItems = new Set<string>();
 
       data.forEach(item => {
+        // Skip if already processed
         if (processedItems.has(item.id)) {
           return;
         }
         processedItems.add(item.id);
-
-        console.log('🔍 CONTENT: Itens únicos encontrados:', processedItems.size);
 
         if (!groupsMap.has(item.group_name)) {
           groupsMap.set(item.group_name, {
@@ -269,6 +268,7 @@ export function useContentData() {
 
         const group = groupsMap.get(item.group_name)!;
         
+        // Processar anexos de forma mais robusta
         let attachments: Array<{ name: string; data: string; type: string; size?: number }> = [];
         if (item.attachments) {
           try {
@@ -283,26 +283,20 @@ export function useContentData() {
           }
         }
 
+        // Processar item_data
         let itemData: any = {};
-        let status: any = {};
-        
         if (item.item_data) {
           try {
             if (typeof item.item_data === 'string') {
               itemData = JSON.parse(item.item_data);
             } else {
-              itemData = item.item_data as any;
+              itemData = item.item_data;
             }
-            status = itemData?.status || {};
           } catch (error) {
             console.warn('⚠️ CONTENT: Erro ao processar item_data:', error);
             itemData = {};
           }
         }
-
-        // Encontrar status pelo ID nos dados salvos
-        const statusFound = status?.id ? { id: status.id, name: status.name || '', color: status.color || '' } : status;
-        console.log('✅ CONTENT: Status encontrado para item:', item.elemento, statusFound);
 
         const clientItem: ContentItem = {
           id: item.id,
@@ -310,27 +304,15 @@ export function useContentData() {
           servicos: item.servicos || '',
           observacoes: item.observacoes || '',
           attachments: attachments,
-          status: statusFound,
-          hasAttachments: attachments.length > 0,
           ...itemData
         };
 
-        console.log('📝 CONTENT: Item processado:', {
-          elemento: clientItem.elemento,
-          status: clientItem.status,
-          hasAttachments: clientItem.hasAttachments
-        });
-
+        console.log('📎 CONTENT: Cliente carregado:', clientItem.elemento, clientItem);
         group.items.push(clientItem);
       });
 
       const loadedGroups = Array.from(groupsMap.values());
       console.log('✅ CONTENT: Grupos carregados:', loadedGroups.length);
-      
-      loadedGroups.forEach(group => {
-        console.log('📋 CONTENT: Grupo', group.name, 'tem', group.items.length, 'itens');
-      });
-      
       updateGroups(loadedGroups);
 
     } catch (error) {
@@ -380,53 +362,6 @@ export function useContentData() {
     }
   }, [groups]);
 
-  const addClientAttachment = async (clientId: string, attachment: { name: string; data: string; type: string; size?: number }) => {
-    console.log('🔄 CONTENT: Adicionando anexo ao cliente:', clientId);
-    
-    try {
-      const clientFiles = getClientFiles(clientId);
-      const newAttachment = {
-        name: attachment.name,
-        type: attachment.type,
-        data: attachment.data,
-        size: attachment.size || 0
-      };
-      
-      const updatedAttachments = [...clientFiles, newAttachment];
-      
-      await updateClient(clientId, { attachments: updatedAttachments });
-      
-      console.log('✅ CONTENT: Anexo adicionado com sucesso');
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao adicionar anexo:', error);
-      throw error;
-    }
-  };
-
-  const removeClientAttachment = async (clientId: string, attachmentIndex: number) => {
-    console.log('🔄 CONTENT: Removendo anexo do cliente:', clientId, 'índice:', attachmentIndex);
-    
-    try {
-      const clientFiles = getClientFiles(clientId);
-      console.log('📎 CONTENT: Anexos atuais:', clientFiles);
-      
-      if (attachmentIndex < 0 || attachmentIndex >= clientFiles.length) {
-        console.warn('⚠️ CONTENT: Índice de anexo inválido:', attachmentIndex);
-        return;
-      }
-      
-      const updatedAttachments = clientFiles.filter((_, index) => index !== attachmentIndex);
-      console.log('📎 CONTENT: Anexos após remoção:', updatedAttachments);
-      
-      await updateClient(clientId, { attachments: updatedAttachments });
-      
-      console.log('✅ CONTENT: Anexo removido com sucesso');
-    } catch (error) {
-      console.error('❌ CONTENT: Erro ao remover anexo:', error);
-      throw error;
-    }
-  };
-
   const updateClient = async (clientId: string, updates: any) => {
     console.log('🔄 CONTENT: Atualizando cliente:', clientId, 'com:', updates);
     
@@ -448,24 +383,20 @@ export function useContentData() {
       
       const clientToUpdate = updatedGroups.flatMap(g => g.items).find(item => item.id === clientId);
       if (clientToUpdate) {
-        const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = clientToUpdate;
+        const { id, elemento, servicos, observacoes, attachments, ...itemData } = clientToUpdate;
         
-        let processedAttachments: string | null = null;
-        
-        if (attachments !== undefined) {
-          if (Array.isArray(attachments) && attachments.length > 0) {
-            processedAttachments = JSON.stringify(attachments.map(att => ({
+        let processedAttachments = null;
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+          processedAttachments = attachments.map(att => {
+            const processedAtt = {
               name: att.name || 'Arquivo',
               type: att.type || 'application/octet-stream',
               data: att.data || '',
               size: att.size || 0
-            })));
-          } else {
-            processedAttachments = null;
-          }
+            };
+            return JSON.stringify(processedAtt);
+          });
         }
-
-        console.log('💾 CONTENT: Salvando anexos processados:', processedAttachments ? 'com anexos' : 'sem anexos');
 
         const { error } = await supabase
           .from('content_data')
@@ -474,7 +405,7 @@ export function useContentData() {
             servicos,
             observacoes,
             attachments: processedAttachments,
-            item_data: { status, ...itemData },
+            item_data: itemData,
             updated_at: new Date().toISOString()
           })
           .eq('id', clientId);
@@ -500,16 +431,21 @@ export function useContentData() {
     try {
       const formattedData = contentData.flatMap(group =>
         group.items.map(item => {
-          const { id, elemento, servicos, observacoes, attachments, status, ...itemData } = item;
+          const { id, elemento, servicos, observacoes, attachments, ...itemData } = item;
           
-          let processedAttachments: string | null = null;
+          let processedAttachments = null;
           if (attachments && Array.isArray(attachments) && attachments.length > 0) {
-            processedAttachments = JSON.stringify(attachments.map(att => ({
-              name: att.name || 'Arquivo',
-              type: att.type || 'application/octet-stream',
-              data: att.data || '',
-              size: att.size || 0
-            })));
+            processedAttachments = attachments.map(att => {
+              const processedAtt = {
+                name: att.name || 'Arquivo',
+                type: att.type || 'application/octet-stream',
+                data: att.data || '',
+                size: att.size || 0
+              };
+              
+              console.log('📎 CONTENT: Salvando anexo:', processedAtt.name, processedAtt.type);
+              return processedAtt;
+            });
           }
           
           return {
@@ -521,7 +457,7 @@ export function useContentData() {
             servicos: servicos,
             observacoes: observacoes,
             attachments: processedAttachments,
-            item_data: { status, ...itemData },
+            item_data: itemData,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -556,119 +492,154 @@ export function useContentData() {
   };
 
   const createDefaultData = async () => {
-    const defaultGroups: ContentGroup[] = [
+    console.log('🔧 CONTENT: Criando dados padrão...');
+
+    // Primeiro, criar os status padrão
+    const defaultStatuses: ContentStatus[] = [
+      { id: 'aprovado', name: 'Aprovado', color: '#22c55e' },
+      { id: 'parado', name: 'Parado', color: '#ef4444' },
+      { id: 'andamento', name: 'Andamento', color: '#f97316' },
+      { id: 'aprovacao-parcial', name: 'Aprovação parcial', color: '#3b82f6' },
+      { id: 'selecionar', name: 'Selecionar', color: '#9ca3af' },
+      { id: 'enviar-aprovacao', name: 'Enviar aprovação', color: '#6b7280' }
+    ];
+
+    // Salvar status no banco
+    await saveStatusesToDatabase(defaultStatuses);
+    setStatuses(defaultStatuses);
+
+    // Criar colunas padrão
+    const defaultColumns: ContentColumn[] = [
+      { id: 'temas', name: 'Temas', type: 'status' },
+      { id: 'textos', name: 'Textos', type: 'status' },
+      { id: 'artes', name: 'Artes', type: 'status' },
+      { id: 'postagem', name: 'Postagem', type: 'status' }
+    ];
+
+    // Salvar colunas no banco
+    await saveColumnsToDatabase(defaultColumns);
+    setCustomColumns(defaultColumns);
+
+    // Criar o grupo padrão "AGOSTO - CONTEÚDO"
+    const defaultGroupId = crypto.randomUUID();
+    const defaultClients: ContentItem[] = [
       {
         id: crypto.randomUUID(),
-        name: 'AGOSTO - CONTEÚDO',
-        color: 'bg-blue-500',
-        isExpanded: true,
-        items: [
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Protenista',
-            servicos: '16 Conteúdos',
-            observacoes: '',
-            Temas: 'aprovado',
-            Textos: 'parado',
-            Artes: 'parado',
-            Postagem: 'parado'
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Aereo Leste',
-            servicos: '4 Conteúdos',
-            observacoes: '',
-            Temas: 'aprovado',
-            Textos: 'aprovado',
-            Artes: 'aprovado',
-            Postagem: 'aprovacao-parcial'
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Grupo Forte',
-            servicos: '4 Conteúdos',
-            observacoes: '',
-            Temas: 'aprovado',
-            Textos: 'aprovado',
-            Artes: 'aprovado',
-            Postagem: 'aprovado'
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Ana Cardoso',
-            servicos: '8 Conteúdos',
-            observacoes: '',
-            Temas: 'andamento',
-            Textos: 'parado',
-            Artes: 'parado',
-            Postagem: 'parado'
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Medicate',
-            servicos: '8 Conteúdos',
-            observacoes: '',
-            Temas: '',
-            Textos: '',
-            Artes: '',
-            Postagem: ''
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Aéreo Leste',
-            servicos: '4 Conteúdos',
-            observacoes: '',
-            Temas: '',
-            Textos: '',
-            Artes: '',
-            Postagem: ''
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Gran Vitale',
-            servicos: '4 Conteúdos',
-            observacoes: '',
-            Temas: 'aprovado',
-            Textos: 'enviar-aprovacao',
-            Artes: 'parado',
-            Postagem: 'parado'
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'Farmácia Santo Sal',
-            servicos: '',
-            observacoes: '',
-            Temas: '',
-            Textos: '',
-            Artes: '',
-            Postagem: ''
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'OrangeXpress',
-            servicos: '4 Conteúdos',
-            observacoes: '',
-            Temas: '',
-            Textos: '',
-            Artes: '',
-            Postagem: ''
-          },
-          {
-            id: crypto.randomUUID(),
-            elemento: 'MEDICATE',
-            servicos: '8 postagens',
-            observacoes: '',
-            Temas: '',
-            Textos: '',
-            Artes: '',
-            Postagem: ''
-          }
-        ]
+        elemento: 'Protenista',
+        servicos: '16 Conteúdos',
+        observacoes: '',
+        Temas: 'aprovado',
+        Textos: 'parado',
+        Artes: 'parado',
+        Postagem: 'parado'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Aereo Leste',
+        servicos: '4 Conteúdos',
+        observacoes: '',
+        Temas: 'aprovado',
+        Textos: 'aprovado',
+        Artes: 'aprovado',
+        Postagem: 'aprovacao-parcial'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Grupo Forte',
+        servicos: '4 Conteúdos',
+        observacoes: '',
+        Temas: 'aprovado',
+        Textos: 'aprovado',
+        Artes: 'aprovado',
+        Postagem: 'aprovado'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Ana Cardoso',
+        servicos: '8 Conteúdos',
+        observacoes: '',
+        Temas: 'andamento',
+        Textos: 'parado',
+        Artes: 'parado',
+        Postagem: 'parado'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Medicate',
+        servicos: '8 Conteúdos',
+        observacoes: '',
+        Temas: 'selecionar',
+        Textos: 'selecionar',
+        Artes: 'selecionar',
+        Postagem: 'selecionar'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Aéreo Leste',
+        servicos: '4 Conteúdos',
+        observacoes: '',
+        Temas: 'selecionar',
+        Textos: 'selecionar',
+        Artes: 'selecionar',
+        Postagem: 'selecionar'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Gran Vitale',
+        servicos: '4 Conteúdos',
+        observacoes: '',
+        Temas: 'aprovado',
+        Textos: 'enviar-aprovacao',
+        Artes: 'parado',
+        Postagem: 'parado'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'Farmácia Santo Sal',
+        servicos: '',
+        observacoes: '',
+        Temas: 'selecionar',
+        Textos: 'selecionar',
+        Artes: 'selecionar',
+        Postagem: 'selecionar'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'OrangeXpress',
+        servicos: '4 Conteúdos',
+        observacoes: '',
+        Temas: 'selecionar',
+        Textos: 'selecionar',
+        Artes: 'selecionar',
+        Postagem: 'selecionar'
+      },
+      {
+        id: crypto.randomUUID(),
+        elemento: 'MEDICATE',
+        servicos: '8 postagens',
+        observacoes: '',
+        Temas: 'selecionar',
+        Textos: 'selecionar',
+        Artes: 'selecionar',
+        Postagem: 'selecionar'
       }
     ];
 
+    const defaultGroups: ContentGroup[] = [
+      {
+        id: defaultGroupId,
+        name: 'AGOSTO - CONTEÚDO',
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: defaultClients
+      }
+    ];
+
+    console.log('✅ CONTENT: Salvando grupos padrão...');
     setGroups(defaultGroups);
     await saveContentToDatabase(defaultGroups);
+    
+    console.log('✅ CONTENT: Dados padrão criados com sucesso!');
   };
 
   const loadColumns = useCallback(async () => {
@@ -692,7 +663,6 @@ export function useContentData() {
         }));
         setColumns(typedColumns);
         setCustomColumns(typedColumns);
-        console.log('✅ CONTENT: Colunas carregadas:', typedColumns.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar colunas:', error);
@@ -719,7 +689,6 @@ export function useContentData() {
           color: status.status_color
         }));
         setStatuses(typedStatuses);
-        console.log('✅ CONTENT: Status carregados:', typedStatuses.length);
       }
     } catch (error) {
       console.error('❌ CONTENT: Erro ao carregar status:', error);
@@ -824,8 +793,6 @@ export function useContentData() {
     addClient,
     deleteClient,
     updateClient,
-    getClientFiles,
-    addClientAttachment,
-    removeClientAttachment
+    getClientFiles
   };
 }
