@@ -186,7 +186,6 @@ export function useContentData() {
     }
   }, []);
 
-  // Função para carregar anexos de um cliente específico
   const loadClientAttachments = useCallback(async (clientId: string) => {
     console.log('📎 CONTENT: Carregando anexos do cliente:', clientId);
     
@@ -244,7 +243,6 @@ export function useContentData() {
     }
   }, []);
 
-  // Função para obter arquivos do cliente
   const getClientFiles = useCallback((clientId: string) => {
     const client = groups.flatMap(g => g.items).find(item => item.id === clientId);
     if (client?.attachments) {
@@ -254,57 +252,112 @@ export function useContentData() {
   }, [groups]);
 
   const createMonth = async (monthName: string) => {
-    const newGroupId = crypto.randomUUID();
-    const newGroup: ContentGroup = {
-      id: newGroupId,
-      name: `${monthName} - CONTEÚDO`,
-      color: 'bg-blue-500',
-      isExpanded: true,
-      items: []
-    };
+    console.log('🔄 CONTENT: Criando novo mês:', monthName);
+    
+    try {
+      const newGroupId = crypto.randomUUID();
+      const newGroup: ContentGroup = {
+        id: newGroupId,
+        name: `${monthName} - CONTEÚDO`,
+        color: 'bg-blue-500',
+        isExpanded: true,
+        items: []
+      };
 
-    setGroups([...groups, newGroup]);
-    await saveContentToDatabase([...groups, newGroup]);
+      const updatedGroups = [...groups, newGroup];
+      setGroups(updatedGroups);
+      
+      // Salvar no banco de dados
+      await saveContentToDatabase(updatedGroups);
+      
+      console.log('✅ CONTENT: Mês criado com sucesso:', monthName);
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao criar mês:', error);
+      throw error;
+    }
   };
 
   const updateMonth = async (groupId: string, newMonthName: string) => {
-    const updatedGroups = groups.map(group =>
-      group.id === groupId ? { ...group, name: `${newMonthName} - CONTEÚDO` } : group
-    );
+    console.log('🔄 CONTENT: Atualizando mês:', groupId, 'para:', newMonthName);
+    
+    try {
+      const updatedGroups = groups.map(group =>
+        group.id === groupId ? { ...group, name: `${newMonthName} - CONTEÚDO` } : group
+      );
 
-    setGroups(updatedGroups);
-    await saveContentToDatabase(updatedGroups);
+      setGroups(updatedGroups);
+      await saveContentToDatabase(updatedGroups);
+      
+      console.log('✅ CONTENT: Mês atualizado com sucesso');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao atualizar mês:', error);
+      throw error;
+    }
   };
 
   const deleteMonth = async (groupId: string) => {
-    const updatedGroups = groups.filter(group => group.id !== groupId);
-    setGroups(updatedGroups);
-    await saveContentToDatabase(updatedGroups);
+    console.log('🔄 CONTENT: Deletando mês:', groupId);
+    
+    try {
+      const updatedGroups = groups.filter(group => group.id !== groupId);
+      setGroups(updatedGroups);
+      
+      // Primeiro deletar todos os itens do grupo no banco
+      const { error: deleteItemsError } = await supabase
+        .from('content_data')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (deleteItemsError) {
+        console.error('❌ CONTENT: Erro ao deletar itens do grupo:', deleteItemsError);
+        throw deleteItemsError;
+      }
+
+      // Depois salvar os grupos atualizados
+      await saveContentToDatabase(updatedGroups);
+      
+      console.log('✅ CONTENT: Mês deletado com sucesso');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao deletar mês:', error);
+      throw error;
+    }
   };
 
   const duplicateMonth = async (groupId: string, newMonthName: string) => {
-    const groupToDuplicate = groups.find(group => group.id === groupId);
-    if (!groupToDuplicate) return;
-  
-    const newGroupId = crypto.randomUUID();
-    const duplicatedGroup: ContentGroup = {
-      id: newGroupId,
-      name: `${newMonthName} - CONTEÚDO`,
-      color: groupToDuplicate.color,
-      isExpanded: true,
-      items: groupToDuplicate.items.map(item => ({
-        ...item,
-        id: crypto.randomUUID(),
-        elemento: item.elemento || '',
-        servicos: item.servicos || '',
-        observacoes: item.observacoes || '',
-        hasAttachments: item.hasAttachments || false
-      }))
-    };
-  
-    const updatedGroups = [...groups, duplicatedGroup];
-    setGroups(updatedGroups);
-    await saveContentToDatabase(updatedGroups);
+    console.log('🔄 CONTENT: Duplicando mês:', groupId, 'para:', newMonthName);
+    
+    try {
+      const groupToDuplicate = groups.find(group => group.id === groupId);
+      if (!groupToDuplicate) {
+        console.error('❌ CONTENT: Grupo não encontrado para duplicar:', groupId);
+        return;
+      }
+    
+      const newGroupId = crypto.randomUUID();
+      const duplicatedGroup: ContentGroup = {
+        id: newGroupId,
+        name: `${newMonthName} - CONTEÚDO`,
+        color: groupToDuplicate.color,
+        isExpanded: true,
+        items: groupToDuplicate.items.map(item => ({
+          ...item,
+          id: crypto.randomUUID(),
+          elemento: item.elemento || '',
+          servicos: item.servicos || '',
+          observacoes: item.observacoes || '',
+          hasAttachments: item.hasAttachments || false
+        }))
+      };
+    
+      const updatedGroups = [...groups, duplicatedGroup];
+      setGroups(updatedGroups);
+      await saveContentToDatabase(updatedGroups);
+      
+      console.log('✅ CONTENT: Mês duplicado com sucesso');
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao duplicar mês:', error);
+      throw error;
+    }
   };
 
   const addStatus = async (status: ContentStatus) => {
@@ -484,6 +537,43 @@ export function useContentData() {
       );
 
       console.log('💾 CONTENT: Dados formatados para salvar:', formattedData.length, 'itens');
+
+      // Se não há itens, só precisamos garantir que grupos vazios existam
+      if (formattedData.length === 0 && contentData.length > 0) {
+        // Inserir um registro "dummy" para cada grupo vazio
+        const emptyGroupRecords = contentData.map(group => ({
+          id: crypto.randomUUID(),
+          group_id: group.id,
+          group_name: group.name,
+          group_color: group.color,
+          elemento: '',
+          servicos: '',
+          observacoes: '',
+          attachments: null,
+          item_data: { status: null },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+
+        // Deletar registros antigos
+        await supabase
+          .from('content_data')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        // Inserir registros dos grupos vazios
+        const { error: insertError } = await supabase
+          .from('content_data')
+          .insert(emptyGroupRecords);
+
+        if (insertError) {
+          console.error('❌ CONTENT: Erro ao inserir grupos vazios:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ CONTENT: Grupos vazios salvos com sucesso!');
+        return;
+      }
   
       // Deletar todos os dados existentes
       const { error: deleteError } = await supabase
@@ -511,10 +601,13 @@ export function useContentData() {
       console.log('✅ CONTENT: Dados salvos com sucesso!');
     } catch (error) {
       console.error('❌ CONTENT: Erro ao salvar dados no banco de dados:', error);
+      throw error;
     }
   };
 
   const createDefaultData = async () => {
+    console.log('📝 CONTENT: Criando dados padrão...');
+    
     const defaultGroups: ContentGroup[] = [
       {
         id: crypto.randomUUID(),
