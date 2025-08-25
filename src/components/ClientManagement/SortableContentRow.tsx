@@ -52,6 +52,13 @@ export function SortableContentRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  console.log('🎨 SortableContentRow: Renderizando item:', {
+    elemento: item.elemento,
+    customColumns: customColumns.length,
+    statuses: statuses.length,
+    itemData: item
+  });
+
   return (
     <div 
       ref={setNodeRef}
@@ -90,19 +97,36 @@ export function SortableContentRow({
         <div className="w-44 p-2 border-r border-gray-200">
           <span className="text-sm text-gray-700">{item.servicos}</span>
         </div>
-        {customColumns.map((column) => (
-          <div key={column.id} className="w-44 p-2 border-r border-gray-200">
-            {column.type === 'status' ? (
-            <StatusButton
-              currentStatus={item[column.name] || statuses[0]?.name || 'Pendente'}
-              statuses={statuses}
-              onStatusChange={(statusName) => onUpdateItemStatus(item.id, column.name, statusName)}
-            />
-            ) : (
-              <span className="text-sm text-gray-700">{item[column.name] || ''}</span>
-            )}
-          </div>
-        ))}
+        {customColumns.map((column) => {
+          console.log('🎨 SortableContentRow: Processando coluna:', {
+            columnId: column.id,
+            columnName: column.name,
+            columnType: column.type,
+            currentValue: item[column.name],
+            availableStatuses: statuses.length
+          });
+
+          return (
+            <div key={column.id} className="w-44 p-2 border-r border-gray-200">
+              {column.type === 'status' ? (
+                <StatusButton
+                  currentStatus={item[column.name] || ''}
+                  statuses={statuses}
+                  onStatusChange={(statusId) => {
+                    console.log('🎨 SortableContentRow: Status selecionado:', {
+                      itemId: item.id,
+                      columnName: column.name,
+                      statusId: statusId
+                    });
+                    onUpdateItemStatus(item.id, column.name, statusId);
+                  }}
+                />
+              ) : (
+                <span className="text-sm text-gray-700">{item[column.name] || ''}</span>
+              )}
+            </div>
+          );
+        })}
         <div className="w-20 p-2 flex items-center space-x-1">
           <div className="flex items-center space-x-1">
             <Button

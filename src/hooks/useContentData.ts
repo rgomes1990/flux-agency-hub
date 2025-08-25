@@ -621,6 +621,8 @@ export function useContentData() {
 
   const updateClient = async (clientId: string, updates: any) => {
     try {
+      console.log('💾 CONTENT: Atualizando cliente:', clientId, updates);
+
       // Preparar dados para atualização
       const { hasAttachments, status, ...otherUpdates } = updates;
       
@@ -634,22 +636,38 @@ export function useContentData() {
       if (otherUpdates.observacoes !== undefined) updateData.observacoes = otherUpdates.observacoes;
       if (otherUpdates.attachments !== undefined) updateData.attachments = otherUpdates.attachments;
       
-      // Atualizar item_data com status e outros dados
-      if (status !== undefined || Object.keys(otherUpdates).length > 0) {
-        const currentItem = groups.flatMap(g => g.items).find(item => item.id === clientId);
-        const currentItemData = currentItem ? { 
-          status: currentItem.status || null, 
-          ...currentItem 
-        } : { status: null };
-        
-        updateData.item_data = { 
-          ...currentItemData,
-          status: status !== undefined ? status : currentItemData.status,
-          ...otherUpdates
-        };
+      // Buscar dados atuais do item para manter o item_data existente
+      const { data: currentData, error: fetchError } = await supabase
+        .from('content_data')
+        .select('item_data')
+        .eq('id', clientId)
+        .single();
+
+      if (fetchError) {
+        console.error('❌ CONTENT: Erro ao buscar dados atuais:', fetchError);
       }
 
-      // Primeiro atualizar no banco de dados
+      // Mesclar dados existentes com novos dados
+      let currentItemData = {};
+      try {
+        if (currentData?.item_data) {
+          currentItemData = typeof currentData.item_data === 'string' 
+            ? JSON.parse(currentData.item_data) 
+            : currentData.item_data;
+        }
+      } catch (error) {
+        console.warn('⚠️ CONTENT: Erro ao processar item_data atual:', error);
+      }
+
+      // Atualizar item_data com todos os updates
+      updateData.item_data = { 
+        ...currentItemData,
+        ...otherUpdates
+      };
+
+      console.log('📝 CONTENT: Dados para atualização:', updateData);
+
+      // Atualizar no banco de dados
       const { error: updateError } = await supabase
         .from('content_data')
         .update(updateData)
@@ -660,7 +678,7 @@ export function useContentData() {
         throw updateError;
       }
 
-      // Depois atualizar o estado local
+      // Atualizar o estado local
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => {
@@ -672,6 +690,7 @@ export function useContentData() {
       }));
 
       setGroups(updatedGroups);
+      console.log('✅ CONTENT: Cliente atualizado com sucesso');
       return updates;
     } catch (error) {
       console.error('❌ CONTENT: Erro ao atualizar cliente:', error);

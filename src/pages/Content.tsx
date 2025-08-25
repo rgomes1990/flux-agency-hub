@@ -324,11 +324,35 @@ export default function Content() {
     updateStatus(statusId, updates);
   };
 
-  const handleUpdateItemStatus = (itemId: string, field: string, statusName: string) => {
-    const status = statuses.find(s => s.name === statusName);
-    if (status) {
-      updateItemStatus(itemId, status);
+  const handleUpdateItemStatus = (itemId: string, field: string, statusId: string) => {
+    console.log('📊 Content: Atualizando status do item:', { itemId, field, statusId });
+    
+    // Encontrar o status pelo ID
+    const status = statuses.find(s => s.id === statusId);
+    if (!status) {
+      console.error('❌ Content: Status não encontrado:', statusId);
+      return;
     }
+
+    console.log('✅ Content: Status encontrado:', status);
+
+    // Atualizar o item com o novo status no campo específico
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      items: group.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = { ...item, [field]: statusId };
+          console.log('📝 Content: Item atualizado:', updatedItem);
+          return updatedItem;
+        }
+        return item;
+      })
+    }));
+
+    updateGroups(updatedGroups);
+
+    // Salvar no banco de dados
+    updateClient(itemId, { [field]: statusId });
   };
 
   return (
