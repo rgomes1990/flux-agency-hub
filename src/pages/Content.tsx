@@ -46,7 +46,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { FilePreview } from '@/components/FilePreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
-import { SortableClientRow } from '@/components/ClientManagement/SortableClientRow';
+import { SortableContentRow } from '@/components/ClientManagement/SortableContentRow';
 import { useUndo } from '@/contexts/UndoContext';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -55,7 +55,7 @@ export default function Content() {
   const { 
     groups, 
     columns,
-    customColumns, // Use customColumns for management interface
+    customColumns,
     statuses,
     updateGroups, 
     createMonth, 
@@ -160,7 +160,6 @@ export default function Content() {
       console.error('❌ Duplicate: Erro ao duplicar mês:', error);
     } finally {
       console.log('🔄 Duplicate: Limpando estados...');
-      // Sempre executar limpeza independente de sucesso ou erro
       setDuplicateMonthName('');
       setSelectedGroupToDuplicate('');
       setShowDuplicateDialog(false);
@@ -229,7 +228,6 @@ export default function Content() {
       const files = getClientFiles(clientId);
       setClientFile(files[0] || null);
       
-      // Parse existing observations from client notes
       try {
         const parsed = JSON.parse(client.observacoes || '[]');
         if (Array.isArray(parsed)) {
@@ -267,10 +265,8 @@ export default function Content() {
     const oldGroup = groups.find(g => g.items.some(item => item.id === clientId));
     
     if (client && oldGroup) {
-      // Remove from old group
       deleteClient(clientId);
       
-      // Add to new group
       addClient(newGroupId, {
         elemento: client.elemento,
         servicos: client.servicos || '',
@@ -296,7 +292,6 @@ export default function Content() {
       return;
     }
 
-    // Find which group the item belongs to
     const activeGroupId = active.data.current?.groupId;
     const group = groups.find(g => g.id === activeGroupId);
     
@@ -327,6 +322,13 @@ export default function Content() {
 
   const handleStatusUpdate = (statusId: string, updates: { name: string; color: string }) => {
     updateStatus(statusId, updates);
+  };
+
+  const handleUpdateItemStatus = (itemId: string, field: string, statusName: string) => {
+    const status = statuses.find(s => s.name === statusName);
+    if (status) {
+      updateItemStatus(itemId, status);
+    }
   };
 
   return (
@@ -398,7 +400,6 @@ export default function Content() {
                   onClick={() => {
                     console.log('🔄 Modal: Abrindo diálogo de duplicação para grupo:', group.id);
                     setSelectedGroupToDuplicate(group.id);
-                    // Pequeno delay para evitar conflitos de estado
                     setTimeout(() => {
                       console.log('🔄 Modal: Abrindo modal de duplicação');
                       setShowDuplicateDialog(true);
@@ -470,7 +471,7 @@ export default function Content() {
                 </div>
                 <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
                 <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-                {columns.map((column) => (
+                {customColumns.map((column) => (
                   <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                     {column.name}
                   </div>
@@ -526,19 +527,17 @@ export default function Content() {
                     strategy={verticalListSortingStrategy}
                   >
                     {group.items.map((item, index) => (
-                      <SortableClientRow 
+                      <SortableContentRow 
                         key={item.id}
                         item={item}
                         groupId={group.id}
                         index={index}
                         selectedItems={selectedItems}
-                        columns={columns}
+                        customColumns={customColumns}
                         onSelectItem={handleSelectItem}
                         onOpenClientDetails={openClientDetails}
-                        onUpdateItemStatus={updateItemStatus}
+                        onUpdateItemStatus={handleUpdateItemStatus}
                         onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                        getClientAttachments={getClientAttachments}
-                        openFilePreview={openFilePreview}
                         statuses={statuses}
                       />
                     ))}
@@ -555,7 +554,6 @@ export default function Content() {
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
         console.log('🔄 Modal: Estado do diálogo mudou para:', open);
         if (!open) {
-          // Ao fechar o modal, limpar os estados
           console.log('🔄 Modal: Fechando modal e limpando estados');
           setDuplicateMonthName('');
           setSelectedGroupToDuplicate('');
@@ -737,7 +735,6 @@ export default function Content() {
           observations={clientObservations}
           onUpdateObservations={(newObservations) => {
             setClientObservations(newObservations);
-            // Save observations to database
             const clientItem = groups.flatMap(g => g.items).find(item => item.id === showClientDetails);
             if (clientItem) {
               updateClient(showClientDetails!, { observacoes: JSON.stringify(newObservations) });
@@ -751,7 +748,6 @@ export default function Content() {
           onMoveClient={(newGroupId) => handleMoveClient(showClientDetails!, newGroupId)}
           clientAttachments={groups.flatMap(g => g.items).find(item => item.id === showClientDetails)?.attachments || []}
           onUpdateAttachments={(attachments) => {
-            // Save attachments automatically to database
             if (showClientDetails) {
               updateClient(showClientDetails, { attachments });
             }
