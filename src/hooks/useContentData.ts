@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDataProtection } from './useDataProtection';
@@ -638,7 +639,11 @@ export function useContentData() {
       // Atualizar item_data com status e outros dados
       if (status !== undefined || Object.keys(otherUpdates).length > 0) {
         const currentItem = groups.flatMap(g => g.items).find(item => item.id === clientId);
-        const currentItemData = currentItem ? { status: currentItem.status, ...currentItem } : {};
+        const currentItemData = currentItem ? { 
+          status: currentItem.status || null, 
+          ...currentItem 
+        } : { status: null };
+        
         updateData.item_data = { 
           ...currentItemData,
           status: status !== undefined ? status : currentItemData.status,
