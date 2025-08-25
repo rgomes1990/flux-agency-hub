@@ -238,7 +238,7 @@ export function useContentData() {
         throw error;
       }
 
-      console.log('📊 CONTENT: Dados carregados:', data?.length, 'registros');
+      console.log('📊 CONTENT: Dados carregados do banco:', data?.length, 'registros');
 
       if (!data || data.length === 0) {
         console.log('📝 CONTENT: Nenhum dado encontrado, criando dados padrão...');
@@ -313,6 +313,8 @@ export function useContentData() {
 
       const loadedGroups = Array.from(groupsMap.values());
       console.log('✅ CONTENT: Grupos carregados:', loadedGroups.length);
+      console.log('✅ CONTENT: Total de clientes:', loadedGroups.reduce((sum, group) => sum + group.items.length, 0));
+      
       updateGroups(loadedGroups);
 
     } catch (error) {
@@ -426,9 +428,21 @@ export function useContentData() {
   };
 
   const saveContentToDatabase = async (contentData: ContentGroup[]) => {
-    console.log('💾 CONTENT: Salvando dados no banco de dados...', contentData);
+    console.log('💾 CONTENT: Salvando dados no banco de dados...', contentData.length, 'grupos');
+    console.log('💾 CONTENT: Total de clientes a salvar:', contentData.reduce((sum, group) => sum + group.items.length, 0));
   
     try {
+      // Primeiro, limpar todos os dados existentes
+      const { error: deleteError } = await supabase
+        .from('content_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+  
+      if (deleteError) {
+        console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
+        throw deleteError;
+      }
+
       const formattedData = contentData.flatMap(group =>
         group.items.map(item => {
           const { id, elemento, servicos, observacoes, attachments, ...itemData } = item;
@@ -448,7 +462,7 @@ export function useContentData() {
             });
           }
           
-          return {
+          const record = {
             id: id,
             group_id: group.id,
             group_name: group.name,
@@ -461,19 +475,14 @@ export function useContentData() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
+          
+          console.log('📝 CONTENT: Preparando registro para salvar:', elemento, record);
+          return record;
         })
       );
   
-      const { error: deleteError } = await supabase
-        .from('content_data')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-  
-      if (deleteError) {
-        console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
-        throw deleteError;
-      }
-  
+      console.log('💾 CONTENT: Inserindo', formattedData.length, 'registros no banco...');
+
       if (formattedData.length > 0) {
         const { error: insertError } = await supabase
           .from('content_data')
@@ -483,6 +492,8 @@ export function useContentData() {
           console.error('❌ CONTENT: Erro ao inserir dados:', insertError);
           throw insertError;
         }
+        
+        console.log('✅ CONTENT: Todos os registros inseridos com sucesso!');
       }
   
       console.log('✅ CONTENT: Dados salvos com sucesso!');
@@ -521,7 +532,7 @@ export function useContentData() {
     setCustomColumns(defaultColumns);
     await saveColumnsToDatabase(defaultColumns);
 
-    // Criar o grupo padrão "AGOSTO - CONTEÚDO"
+    // Criar todos os clientes padrão
     const defaultGroupId = crypto.randomUUID();
     const defaultClients: ContentItem[] = [
       {
@@ -626,6 +637,8 @@ export function useContentData() {
       }
     ];
 
+    console.log('✅ CONTENT: Criando grupo com', defaultClients.length, 'clientes...');
+    
     const defaultGroups: ContentGroup[] = [
       {
         id: defaultGroupId,
