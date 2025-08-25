@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDataProtection } from './useDataProtection';
@@ -56,7 +55,6 @@ export function useContentData() {
     setGroups(updatedGroups);
   };
 
-  // Função otimizada para carregar dados sem duplicação
   const loadContentData = useCallback(async () => {
     console.log('🔄 CONTENT: Carregando dados...');
     setLoading(true);
@@ -731,10 +729,10 @@ export function useContentData() {
   const loadColumns = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('status_config')
+        .from('column_config')
         .select('*')
         .eq('module', 'content')
-        .order('created_at', { ascending: false });
+        .order('column_order', { ascending: true });
 
       if (error) {
         console.error('❌ CONTENT: Erro ao carregar colunas:', error);
@@ -743,10 +741,11 @@ export function useContentData() {
 
       if (data) {
         const typedColumns = data.map(col => ({
-          id: col.status_id,
-          name: col.status_name,
-          type: 'status' as const
+          id: col.column_id,
+          name: col.column_name,
+          type: col.column_type as 'status' | 'text'
         }));
+        console.log('✅ CONTENT: Colunas carregadas:', typedColumns.length);
         setColumns(typedColumns);
         setCustomColumns(typedColumns);
       }
@@ -786,8 +785,9 @@ export function useContentData() {
     console.log('💾 CONTENT: Salvando colunas no banco de dados...', columns);
 
     try {
+      // Delete existing columns for this module
       const { error: deleteError } = await supabase
-        .from('status_config')
+        .from('column_config')
         .delete()
         .eq('module', 'content');
 
@@ -796,16 +796,18 @@ export function useContentData() {
         throw deleteError;
       }
 
-      const formattedColumns = columns.map(column => ({
-        status_id: column.id,
-        status_name: column.name,
-        status_color: '#3b82f6',
+      // Insert new columns
+      const formattedColumns = columns.map((column, index) => ({
+        column_id: column.id,
+        column_name: column.name,
+        column_type: column.type,
+        column_order: index,
         module: 'content'
       }));
 
       if (formattedColumns.length > 0) {
         const { error: insertError } = await supabase
-          .from('status_config')
+          .from('column_config')
           .insert(formattedColumns);
 
         if (insertError) {
@@ -824,6 +826,7 @@ export function useContentData() {
     console.log('💾 CONTENT: Salvando status no banco de dados...', statuses);
 
     try {
+      // Delete existing statuses for this module
       const { error: deleteError } = await supabase
         .from('status_config')
         .delete()
@@ -834,6 +837,7 @@ export function useContentData() {
         throw deleteError;
       }
 
+      // Insert new statuses
       const formattedStatuses = statuses.map(status => ({
         status_id: status.id,
         status_name: status.name,
