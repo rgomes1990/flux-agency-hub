@@ -226,7 +226,7 @@ export default function Content() {
     if (client) {
       setClientNotes(client.observacoes || '');
       const files = getClientFiles(clientId);
-      setClientFile(files[0] || null);
+      // Don't set clientFile here since it expects a File object, not our attachment format
       
       try {
         const parsed = JSON.parse(client.observacoes || '[]');
@@ -321,7 +321,7 @@ export default function Content() {
   };
 
   const handleStatusUpdate = (statusId: string, updates: { name: string; color: string }) => {
-    updateStatus(statusId, updates);
+    updateStatus({ id: statusId, ...updates });
   };
 
   const handleUpdateItemStatus = (itemId: string, field: string, statusId: string) => {

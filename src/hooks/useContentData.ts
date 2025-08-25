@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -273,8 +274,8 @@ export function useContentData() {
           try {
             if (typeof item.attachments === 'string') {
               attachments = JSON.parse(item.attachments);
-            } else {
-              attachments = item.attachments;
+            } else if (Array.isArray(item.attachments)) {
+              attachments = item.attachments as Array<{ name: string; data: string; type: string; size?: number }>;
             }
           } catch (error) {
             console.warn('⚠️ CONTENT: Erro ao processar anexos:', error);
