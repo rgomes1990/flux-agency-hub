@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -437,14 +438,17 @@ export function useContentData() {
         .from('content_data')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
-  
+
       if (deleteError) {
         console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
         throw deleteError;
       }
 
-      const formattedData = contentData.flatMap(group =>
-        group.items.map(item => {
+      // Preparar dados para inserção
+      const allRecords: any[] = [];
+      
+      contentData.forEach(group => {
+        group.items.forEach(item => {
           const { id, elemento, servicos, observacoes, attachments, ...itemData } = item;
           
           let processedAttachments = null;
@@ -456,8 +460,6 @@ export function useContentData() {
                 data: att.data || '',
                 size: att.size || 0
               };
-              
-              console.log('📎 CONTENT: Salvando anexo:', processedAtt.name, processedAtt.type);
               return processedAtt;
             });
           }
@@ -468,8 +470,8 @@ export function useContentData() {
             group_name: group.name,
             group_color: group.color,
             elemento: elemento,
-            servicos: servicos,
-            observacoes: observacoes,
+            servicos: servicos || '',
+            observacoes: observacoes || '',
             attachments: processedAttachments,
             item_data: itemData,
             created_at: new Date().toISOString(),
@@ -477,28 +479,36 @@ export function useContentData() {
           };
           
           console.log('📝 CONTENT: Preparando registro para salvar:', elemento, record);
-          return record;
-        })
-      );
-  
-      console.log('💾 CONTENT: Inserindo', formattedData.length, 'registros no banco...');
+          allRecords.push(record);
+        });
+      });
 
-      if (formattedData.length > 0) {
-        const { error: insertError } = await supabase
-          .from('content_data')
-          .insert(formattedData);
-  
-        if (insertError) {
-          console.error('❌ CONTENT: Erro ao inserir dados:', insertError);
-          throw insertError;
+      console.log('💾 CONTENT: Inserindo', allRecords.length, 'registros no banco...');
+
+      if (allRecords.length > 0) {
+        // Inserir em lotes para evitar problemas de timeout
+        const batchSize = 10;
+        for (let i = 0; i < allRecords.length; i += batchSize) {
+          const batch = allRecords.slice(i, i + batchSize);
+          console.log(`💾 CONTENT: Inserindo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(allRecords.length/batchSize)}:`, batch.length, 'registros');
+          
+          const { error: insertError } = await supabase
+            .from('content_data')
+            .insert(batch);
+
+          if (insertError) {
+            console.error('❌ CONTENT: Erro ao inserir lote:', insertError);
+            throw insertError;
+          }
+          
+          console.log('✅ CONTENT: Lote inserido com sucesso!');
         }
-        
-        console.log('✅ CONTENT: Todos os registros inseridos com sucesso!');
       }
-  
-      console.log('✅ CONTENT: Dados salvos com sucesso!');
+
+      console.log('✅ CONTENT: Todos os dados salvos com sucesso!');
     } catch (error) {
       console.error('❌ CONTENT: Erro ao salvar dados no banco de dados:', error);
+      throw error;
     }
   };
 
@@ -532,7 +542,7 @@ export function useContentData() {
     setCustomColumns(defaultColumns);
     await saveColumnsToDatabase(defaultColumns);
 
-    // Criar todos os clientes padrão
+    // Criar todos os clientes padrão com IDs únicos
     const defaultGroupId = crypto.randomUUID();
     const defaultClients: ContentItem[] = [
       {
