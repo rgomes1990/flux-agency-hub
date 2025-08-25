@@ -264,11 +264,31 @@ export function useContentData() {
         items: []
       };
 
+      // Primeiro inserir no banco de dados
+      const { error: insertError } = await supabase
+        .from('content_data')
+        .insert({
+          id: crypto.randomUUID(),
+          group_id: newGroupId,
+          group_name: newGroup.name,
+          group_color: newGroup.color,
+          elemento: '',
+          servicos: '',
+          observacoes: '',
+          attachments: null,
+          item_data: { status: null },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error('❌ CONTENT: Erro ao inserir grupo no banco:', insertError);
+        throw insertError;
+      }
+
+      // Depois atualizar o estado local
       const updatedGroups = [...groups, newGroup];
       setGroups(updatedGroups);
-      
-      // Salvar no banco de dados
-      await saveContentToDatabase(updatedGroups);
       
       console.log('✅ CONTENT: Mês criado com sucesso:', monthName);
     } catch (error) {
@@ -281,12 +301,28 @@ export function useContentData() {
     console.log('🔄 CONTENT: Atualizando mês:', groupId, 'para:', newMonthName);
     
     try {
+      const newGroupName = `${newMonthName} - CONTEÚDO`;
+      
+      // Primeiro atualizar no banco de dados
+      const { error: updateError } = await supabase
+        .from('content_data')
+        .update({ 
+          group_name: newGroupName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('group_id', groupId);
+
+      if (updateError) {
+        console.error('❌ CONTENT: Erro ao atualizar grupo no banco:', updateError);
+        throw updateError;
+      }
+
+      // Depois atualizar o estado local
       const updatedGroups = groups.map(group =>
-        group.id === groupId ? { ...group, name: `${newMonthName} - CONTEÚDO` } : group
+        group.id === groupId ? { ...group, name: newGroupName } : group
       );
 
       setGroups(updatedGroups);
-      await saveContentToDatabase(updatedGroups);
       
       console.log('✅ CONTENT: Mês atualizado com sucesso');
     } catch (error) {
@@ -299,22 +335,20 @@ export function useContentData() {
     console.log('🔄 CONTENT: Deletando mês:', groupId);
     
     try {
-      const updatedGroups = groups.filter(group => group.id !== groupId);
-      setGroups(updatedGroups);
-      
-      // Primeiro deletar todos os itens do grupo no banco
-      const { error: deleteItemsError } = await supabase
+      // Deletar todos os itens do grupo no banco
+      const { error: deleteError } = await supabase
         .from('content_data')
         .delete()
         .eq('group_id', groupId);
 
-      if (deleteItemsError) {
-        console.error('❌ CONTENT: Erro ao deletar itens do grupo:', deleteItemsError);
-        throw deleteItemsError;
+      if (deleteError) {
+        console.error('❌ CONTENT: Erro ao deletar grupo no banco:', deleteError);
+        throw deleteError;
       }
 
-      // Depois salvar os grupos atualizados
-      await saveContentToDatabase(updatedGroups);
+      // Depois atualizar o estado local
+      const updatedGroups = groups.filter(group => group.id !== groupId);
+      setGroups(updatedGroups);
       
       console.log('✅ CONTENT: Mês deletado com sucesso');
     } catch (error) {
@@ -334,24 +368,61 @@ export function useContentData() {
       }
     
       const newGroupId = crypto.randomUUID();
+      const newGroupName = `${newMonthName} - CONTEÚDO`;
+      
+      // Preparar dados para inserção no banco
+      const itemsToInsert = groupToDuplicate.items.length > 0 
+        ? groupToDuplicate.items.map(item => ({
+            id: crypto.randomUUID(),
+            group_id: newGroupId,
+            group_name: newGroupName,
+            group_color: groupToDuplicate.color,
+            elemento: item.elemento || '',
+            servicos: item.servicos || '',
+            observacoes: item.observacoes || '',
+            attachments: item.attachments || null,
+            item_data: { status: item.status || null, ...item },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }))
+        : [{
+            id: crypto.randomUUID(),
+            group_id: newGroupId,
+            group_name: newGroupName,
+            group_color: groupToDuplicate.color,
+            elemento: '',
+            servicos: '',
+            observacoes: '',
+            attachments: null,
+            item_data: { status: null },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }];
+
+      // Inserir no banco de dados
+      const { error: insertError } = await supabase
+        .from('content_data')
+        .insert(itemsToInsert);
+
+      if (insertError) {
+        console.error('❌ CONTENT: Erro ao inserir grupo duplicado no banco:', insertError);
+        throw insertError;
+      }
+
+      // Depois atualizar o estado local
       const duplicatedGroup: ContentGroup = {
         id: newGroupId,
-        name: `${newMonthName} - CONTEÚDO`,
+        name: newGroupName,
         color: groupToDuplicate.color,
         isExpanded: true,
         items: groupToDuplicate.items.map(item => ({
           ...item,
-          id: crypto.randomUUID(),
-          elemento: item.elemento || '',
-          servicos: item.servicos || '',
-          observacoes: item.observacoes || '',
-          hasAttachments: item.hasAttachments || false
+          id: crypto.randomUUID()
         }))
       };
     
       const updatedGroups = [...groups, duplicatedGroup];
       setGroups(updatedGroups);
-      await saveContentToDatabase(updatedGroups);
       
       console.log('✅ CONTENT: Mês duplicado com sucesso');
     } catch (error) {
@@ -435,59 +506,158 @@ export function useContentData() {
   const updateItemStatus = async (itemId: string, status: any) => {
     console.log('🔄 CONTENT: Atualizando status do item:', itemId, status);
     
-    const updatedGroups = groups.map(group => ({
-      ...group,
-      items: group.items.map(item => {
-        if (item.id === itemId) {
-          const updatedItem = { ...item, status: status };
-          console.log('✅ CONTENT: Item atualizado com status:', updatedItem);
-          return updatedItem;
-        }
-        return item;
-      })
-    }));
+    try {
+      // Primeiro atualizar no banco de dados
+      const { error: updateError } = await supabase
+        .from('content_data')
+        .update({ 
+          item_data: { status: status },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', itemId);
 
-    setGroups(updatedGroups);
-    await saveContentToDatabase(updatedGroups);
+      if (updateError) {
+        console.error('❌ CONTENT: Erro ao atualizar status no banco:', updateError);
+        throw updateError;
+      }
+
+      // Depois atualizar o estado local
+      const updatedGroups = groups.map(group => ({
+        ...group,
+        items: group.items.map(item => {
+          if (item.id === itemId) {
+            const updatedItem = { ...item, status: status };
+            console.log('✅ CONTENT: Item atualizado com status:', updatedItem);
+            return updatedItem;
+          }
+          return item;
+        })
+      }));
+
+      setGroups(updatedGroups);
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao atualizar status:', error);
+      throw error;
+    }
   };
 
   const addClient = async (groupId: string, client: Omit<ContentItem, 'id'>) => {
-    const newClientId = crypto.randomUUID();
-    const newClient: ContentItem = {
-      id: newClientId,
-      elemento: client.elemento || '',
-      servicos: client.servicos || '',
-      observacoes: client.observacoes || '',
-      hasAttachments: false,
-      ...client
-    };
+    try {
+      const newClientId = crypto.randomUUID();
+      const group = groups.find(g => g.id === groupId);
+      if (!group) {
+        throw new Error('Grupo não encontrado');
+      }
 
-    return safeDataOperation('content_data', async () => {
+      const newClient: ContentItem = {
+        id: newClientId,
+        elemento: client.elemento || '',
+        servicos: client.servicos || '',
+        observacoes: client.observacoes || '',
+        hasAttachments: false,
+        ...client
+      };
+
+      // Primeiro inserir no banco de dados
+      const { error: insertError } = await supabase
+        .from('content_data')
+        .insert({
+          id: newClientId,
+          group_id: groupId,
+          group_name: group.name,
+          group_color: group.color,
+          elemento: newClient.elemento,
+          servicos: newClient.servicos,
+          observacoes: newClient.observacoes,
+          attachments: null,
+          item_data: { status: null },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error('❌ CONTENT: Erro ao inserir cliente no banco:', insertError);
+        throw insertError;
+      }
+
+      // Depois atualizar o estado local
       const updatedGroups = groups.map(group =>
         group.id === groupId ? { ...group, items: [...group.items, newClient] } : group
       );
 
       setGroups(updatedGroups);
-      await saveContentToDatabase(updatedGroups);
       return newClient;
-    }, groups);
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao adicionar cliente:', error);
+      throw error;
+    }
   };
 
   const deleteClient = async (clientId: string) => {
-    return safeDataOperation('content_data', async () => {
+    try {
+      // Primeiro deletar do banco de dados
+      const { error: deleteError } = await supabase
+        .from('content_data')
+        .delete()
+        .eq('id', clientId);
+
+      if (deleteError) {
+        console.error('❌ CONTENT: Erro ao deletar cliente no banco:', deleteError);
+        throw deleteError;
+      }
+
+      // Depois atualizar o estado local
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.filter(item => item.id !== clientId)
       }));
 
       setGroups(updatedGroups);
-      await saveContentToDatabase(updatedGroups);
       return clientId;
-    }, groups);
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao deletar cliente:', error);
+      throw error;
+    }
   };
 
   const updateClient = async (clientId: string, updates: any) => {
-    return safeDataOperation('content_data', async () => {
+    try {
+      // Preparar dados para atualização
+      const { hasAttachments, status, ...otherUpdates } = updates;
+      
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      // Atualizar campos específicos
+      if (otherUpdates.elemento !== undefined) updateData.elemento = otherUpdates.elemento;
+      if (otherUpdates.servicos !== undefined) updateData.servicos = otherUpdates.servicos;
+      if (otherUpdates.observacoes !== undefined) updateData.observacoes = otherUpdates.observacoes;
+      if (otherUpdates.attachments !== undefined) updateData.attachments = otherUpdates.attachments;
+      
+      // Atualizar item_data com status e outros dados
+      if (status !== undefined || Object.keys(otherUpdates).length > 0) {
+        const currentItem = groups.flatMap(g => g.items).find(item => item.id === clientId);
+        const currentItemData = currentItem ? { status: currentItem.status, ...currentItem } : {};
+        updateData.item_data = { 
+          ...currentItemData,
+          status: status !== undefined ? status : currentItemData.status,
+          ...otherUpdates
+        };
+      }
+
+      // Primeiro atualizar no banco de dados
+      const { error: updateError } = await supabase
+        .from('content_data')
+        .update(updateData)
+        .eq('id', clientId);
+
+      if (updateError) {
+        console.error('❌ CONTENT: Erro ao atualizar cliente no banco:', updateError);
+        throw updateError;
+      }
+
+      // Depois atualizar o estado local
       const updatedGroups = groups.map(group => ({
         ...group,
         items: group.items.map(item => {
@@ -499,141 +669,58 @@ export function useContentData() {
       }));
 
       setGroups(updatedGroups);
-      await saveContentToDatabase(updatedGroups);
       return updates;
-    }, groups);
-  };
-
-  // Função melhorada para salvar dados no banco
-  const saveContentToDatabase = async (contentData: ContentGroup[]) => {
-    console.log('💾 CONTENT: Salvando dados no banco de dados...', contentData.length, 'grupos');
-  
-    try {
-      // Mapear os dados para o formato correto antes de salvar
-      const formattedData = contentData.flatMap(group =>
-        group.items.map(item => {
-          const { id, elemento, servicos, observacoes, hasAttachments, status, attachments, ...itemData } = item;
-          
-          // Preparar item_data com status e outros dados
-          const itemDataToSave = { 
-            status: status || null, 
-            ...itemData 
-          };
-          
-          return {
-            id: id,
-            group_id: group.id,
-            group_name: group.name,
-            group_color: group.color,
-            elemento: elemento || '',
-            servicos: servicos || '',
-            observacoes: observacoes || '',
-            attachments: attachments || null,
-            item_data: itemDataToSave,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-        })
-      );
-
-      console.log('💾 CONTENT: Dados formatados para salvar:', formattedData.length, 'itens');
-
-      // Se não há itens, só precisamos garantir que grupos vazios existam
-      if (formattedData.length === 0 && contentData.length > 0) {
-        // Inserir um registro "dummy" para cada grupo vazio
-        const emptyGroupRecords = contentData.map(group => ({
-          id: crypto.randomUUID(),
-          group_id: group.id,
-          group_name: group.name,
-          group_color: group.color,
-          elemento: '',
-          servicos: '',
-          observacoes: '',
-          attachments: null,
-          item_data: { status: null },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-
-        // Deletar registros antigos
-        await supabase
-          .from('content_data')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-
-        // Inserir registros dos grupos vazios
-        const { error: insertError } = await supabase
-          .from('content_data')
-          .insert(emptyGroupRecords);
-
-        if (insertError) {
-          console.error('❌ CONTENT: Erro ao inserir grupos vazios:', insertError);
-          throw insertError;
-        }
-
-        console.log('✅ CONTENT: Grupos vazios salvos com sucesso!');
-        return;
-      }
-  
-      // Deletar todos os dados existentes
-      const { error: deleteError } = await supabase
-        .from('content_data')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-  
-      if (deleteError) {
-        console.error('❌ CONTENT: Erro ao limpar dados antigos:', deleteError);
-        throw deleteError;
-      }
-  
-      // Inserir os novos dados formatados
-      if (formattedData.length > 0) {
-        const { error: insertError } = await supabase
-          .from('content_data')
-          .insert(formattedData);
-  
-        if (insertError) {
-          console.error('❌ CONTENT: Erro ao inserir dados:', insertError);
-          throw insertError;
-        }
-      }
-  
-      console.log('✅ CONTENT: Dados salvos com sucesso!');
     } catch (error) {
-      console.error('❌ CONTENT: Erro ao salvar dados no banco de dados:', error);
+      console.error('❌ CONTENT: Erro ao atualizar cliente:', error);
       throw error;
     }
+  };
+
+  const saveContentToDatabase = async (contentData: ContentGroup[]) => {
+    console.log('💾 CONTENT: Função saveContentToDatabase chamada - usando operações individuais');
+    // Esta função agora é principalmente para compatibilidade
+    // As operações individuais já salvam diretamente no banco
   };
 
   const createDefaultData = async () => {
     console.log('📝 CONTENT: Criando dados padrão...');
     
-    const defaultGroups: ContentGroup[] = [
-      {
-        id: crypto.randomUUID(),
-        name: 'Janeiro - CONTEÚDO',
-        color: 'bg-blue-500',
-        isExpanded: true,
-        items: []
-      },
-      {
-        id: crypto.randomUUID(),
-        name: 'Fevereiro - CONTEÚDO',
-        color: 'bg-green-500',
-        isExpanded: true,
-        items: []
-      },
-      {
-        id: crypto.randomUUID(),
-        name: 'Março - CONTEÚDO',
-        color: 'bg-red-500',
-        isExpanded: true,
-        items: []
-      }
+    const defaultGroups = [
+      { name: 'Janeiro - CONTEÚDO', color: 'bg-blue-500' },
+      { name: 'Fevereiro - CONTEÚDO', color: 'bg-green-500' },
+      { name: 'Março - CONTEÚDO', color: 'bg-red-500' }
     ];
 
-    setGroups(defaultGroups);
-    await saveContentToDatabase(defaultGroups);
+    try {
+      const groupsToInsert = defaultGroups.map(group => ({
+        id: crypto.randomUUID(),
+        group_id: crypto.randomUUID(),
+        group_name: group.name,
+        group_color: group.color,
+        elemento: '',
+        servicos: '',
+        observacoes: '',
+        attachments: null,
+        item_data: { status: null },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error: insertError } = await supabase
+        .from('content_data')
+        .insert(groupsToInsert);
+
+      if (insertError) {
+        console.error('❌ CONTENT: Erro ao criar dados padrão:', insertError);
+        throw insertError;
+      }
+
+      // Recarregar dados
+      await loadContentData();
+    } catch (error) {
+      console.error('❌ CONTENT: Erro ao criar dados padrão:', error);
+      throw error;
+    }
   };
 
   const loadColumns = useCallback(async () => {
