@@ -104,6 +104,13 @@ export default function Content() {
   
   const { addUndoAction } = useUndo();
 
+  console.log('📊 Content: Estado atual:', {
+    grupos: groups.length,
+    colunas: columns.length,
+    status: statuses.length,
+    statusList: statuses
+  });
+
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
       group.id === groupId 

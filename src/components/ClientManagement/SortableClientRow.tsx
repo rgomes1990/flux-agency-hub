@@ -1,24 +1,57 @@
+
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Trash2,
+  Paperclip,
+  Eye,
+  GripVertical
+} from 'lucide-react';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
-import { Edit, Trash2, Paperclip, Eye, GripVertical } from 'lucide-react';
+
+interface ContentItem {
+  id: string;
+  elemento: string;
+  servicos: string;
+  observacoes: string;
+  hasAttachments?: boolean;
+  attachments?: any[];
+  status?: {
+    id?: string;
+    name?: string;
+    color?: string;
+  };
+  [key: string]: any;
+}
+
+interface ContentColumn {
+  id: string;
+  name: string;
+  type: 'status' | 'text';
+}
+
+interface ContentStatus {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface SortableClientRowProps {
-  item: any;
+  item: ContentItem;
   groupId: string;
   index: number;
   selectedItems: string[];
-  columns: any[];
+  columns: ContentColumn[];
   onSelectItem: (itemId: string, checked: boolean) => void;
   onOpenClientDetails: (clientId: string) => void;
-  onUpdateItemStatus: (itemId: string, field: string, statusId: string) => void;
+  onUpdateItemStatus: (itemId: string, status: any) => void;
   onDeleteClient: (clientId: string) => void;
-  getClientAttachments: (clientId: string) => File[];
+  getClientAttachments: (clientId: string) => any[];
   openFilePreview: (file: File) => void;
-  statuses: any[];
+  statuses: ContentStatus[];
 }
 
 export function SortableClientRow({
@@ -42,104 +75,120 @@ export function SortableClientRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ 
+  } = useSortable({
     id: item.id,
     data: {
-      groupId: groupId,
+      groupId,
+      index,
     },
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
+  console.log('📋 SortableClientRow: Renderizando item:', {
+    elemento: item.elemento,
+    status: item.status,
+    availableStatuses: statuses.length
+  });
+
+  const handleStatusChange = (statusId: string) => {
+    console.log('📋 SortableClientRow: Mudança de status solicitada:', { itemId: item.id, statusId });
+    
+    const selectedStatus = statuses.find(s => s.id === statusId);
+    if (selectedStatus) {
+      console.log('📋 SortableClientRow: Status encontrado:', selectedStatus);
+      onUpdateItemStatus(item.id, selectedStatus);
+    } else {
+      console.warn('📋 SortableClientRow: Status não encontrado:', statusId);
+    }
+  };
+
+  const attachments = getClientAttachments(item.id);
+
   return (
-    <div 
+    <div
       ref={setNodeRef}
       style={style}
-      className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-      } ${isDragging ? 'z-50' : ''}`}
+      className={`bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+        isDragging ? 'opacity-50 z-50' : ''
+      }`}
     >
       <div className="flex items-center min-w-max">
         <div className="w-8 flex items-center justify-center p-2">
-          <Checkbox
-            checked={selectedItems.includes(item.id)}
-            onCheckedChange={(checked) => onSelectItem(item.id, !!checked)}
-          />
-        </div>
-        <div className="w-56 p-2 border-r border-gray-200">
           <div className="flex items-center space-x-2">
-            <div 
-              {...attributes} 
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-200 rounded"
-            >
-              <GripVertical className="h-4 w-4 text-gray-400" />
-            </div>
+            <Checkbox
+              checked={selectedItems.includes(item.id)}
+              onCheckedChange={(checked) => onSelectItem(item.id, !!checked)}
+            />
             <button
-              onClick={() => onOpenClientDetails(item.id)}
-              className="text-sm text-blue-600 hover:underline font-medium text-left"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
             >
-              {item.elemento}
+              <GripVertical className="h-4 w-4" />
             </button>
-            {getClientAttachments(item.id).length > 0 && (
-              <Paperclip className="h-3 w-3 text-gray-400" />
-            )}
           </div>
         </div>
-        <div className="w-44 p-2 border-r border-gray-200">
-          <span className="text-sm text-gray-700">{item.servicos}</span>
+        
+        <div className="w-56 p-2 text-sm border-r border-gray-300">
+          <div className="font-medium text-gray-900 truncate">{item.elemento}</div>
         </div>
+        
+        <div className="w-44 p-2 text-sm text-gray-600 border-r border-gray-300">
+          <div className="truncate">{item.servicos}</div>
+        </div>
+
         {columns.map((column) => (
-          <div key={column.id} className="w-44 p-2 border-r border-gray-200">
+          <div key={column.id} className="w-44 p-2 border-r border-gray-300">
             {column.type === 'status' ? (
-            <StatusButton
-              currentStatus={item[column.id] || statuses[0]?.name || 'Pendente'}
-              statuses={statuses}
-              onStatusChange={(statusName) => onUpdateItemStatus(item.id, column.id, statusName)}
-            />
+              <StatusButton
+                currentStatus={item.status?.id || ''}
+                statuses={statuses}
+                onStatusChange={handleStatusChange}
+              />
             ) : (
-              <span className="text-sm text-gray-700">{item[column.id] || ''}</span>
+              <div className="text-sm text-gray-600">
+                {item[column.id] || '-'}
+              </div>
             )}
           </div>
         ))}
+
         <div className="w-20 p-2 flex items-center space-x-1">
-          <div className="flex items-center space-x-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onOpenClientDetails(item.id)}
+            className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+            title="Ver detalhes"
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+          
+          {attachments.length > 0 && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => onOpenClientDetails(item.id)}
-              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+              onClick={() => attachments[0] && openFilePreview(attachments[0])}
+              className="h-6 w-6 p-0 text-green-600 hover:text-green-800"
+              title="Ver anexo"
             >
-              <Edit className="h-3 w-3" />
+              <Paperclip className="h-3 w-3" />
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onDeleteClient(item.id)}
-              className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-            {getClientAttachments(item.id).length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  const files = getClientAttachments(item.id);
-                  if (files.length > 0) {
-                    openFilePreview(files[0]);
-                  }
-                }}
-                className="h-6 w-6 p-0 text-gray-600 hover:text-gray-800"
-              >
-                <Eye className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
+          )}
+          
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onDeleteClient(item.id)}
+            className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+            title="Excluir"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
         </div>
       </div>
     </div>
