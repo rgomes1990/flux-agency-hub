@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,10 +9,12 @@ import { supabase } from '@/integrations/supabase/client';
 interface DefaultObservation {
   id: string;
   module: string;
-  title: string;
-  description: string;
+  text: string;
   is_completed: boolean;
+  order_index: number;
+  user_id: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 interface DefaultObservationsModalProps {
@@ -27,11 +28,9 @@ export function DefaultObservationsModal({
   onOpenChange, 
   module 
 }: DefaultObservationsModalProps) {
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
+  const [newText, setNewText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editText, setEditText] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -42,7 +41,7 @@ export function DefaultObservationsModal({
         .from('default_observations')
         .select('*')
         .eq('module', module)
-        .order('created_at', { ascending: true });
+        .order('order_index', { ascending: true });
 
       if (error) throw error;
       return data as DefaultObservation[];
@@ -50,14 +49,15 @@ export function DefaultObservationsModal({
   });
 
   const addMutation = useMutation({
-    mutationFn: async (observation: { title: string; description: string }) => {
+    mutationFn: async (text: string) => {
       const { data, error } = await supabase
         .from('default_observations')
         .insert([{
           module,
-          title: observation.title,
-          description: observation.description,
-          is_completed: false
+          text: text,
+          is_completed: false,
+          order_index: observations.length,
+          user_id: null
         }])
         .select()
         .single();
@@ -67,16 +67,15 @@ export function DefaultObservationsModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['default-observations', module] });
-      setNewTitle('');
-      setNewDescription('');
+      setNewText('');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DefaultObservation> }) => {
+    mutationFn: async ({ id, text }: { id: string; text: string }) => {
       const { data, error } = await supabase
         .from('default_observations')
-        .update(updates)
+        .update({ text })
         .eq('id', id)
         .select()
         .single();
@@ -87,8 +86,7 @@ export function DefaultObservationsModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['default-observations', module] });
       setEditingId(null);
-      setEditTitle('');
-      setEditDescription('');
+      setEditText('');
     },
   });
 
@@ -107,28 +105,21 @@ export function DefaultObservationsModal({
   });
 
   const handleAdd = () => {
-    if (newTitle.trim()) {
-      addMutation.mutate({
-        title: newTitle.trim(),
-        description: newDescription.trim()
-      });
+    if (newText.trim()) {
+      addMutation.mutate(newText.trim());
     }
   };
 
   const handleEdit = (observation: DefaultObservation) => {
     setEditingId(observation.id);
-    setEditTitle(observation.title);
-    setEditDescription(observation.description);
+    setEditText(observation.text);
   };
 
   const handleUpdate = () => {
-    if (editingId && editTitle.trim()) {
+    if (editingId && editText.trim()) {
       updateMutation.mutate({
         id: editingId,
-        updates: {
-          title: editTitle.trim(),
-          description: editDescription.trim()
-        }
+        text: editText.trim()
       });
     }
   };
@@ -151,19 +142,13 @@ export function DefaultObservationsModal({
           <div className="bg-gray-50 p-4 rounded-lg space-y-4">
             <h4 className="font-medium text-gray-900">Adicionar Nova Observação</h4>
             <Input
-              placeholder="Título da observação"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-            />
-            <Textarea
-              placeholder="Descrição (opcional)"
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              rows={3}
+              placeholder="Texto da observação"
+              value={newText}
+              onChange={(e) => setNewText(e.target.value)}
             />
             <Button 
               onClick={handleAdd}
-              disabled={!newTitle.trim() || addMutation.isPending}
+              disabled={!newText.trim() || addMutation.isPending}
               className="w-full"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -190,21 +175,15 @@ export function DefaultObservationsModal({
                     {editingId === observation.id ? (
                       <div className="space-y-3">
                         <Input
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          placeholder="Título"
-                        />
-                        <Textarea
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          placeholder="Descrição"
-                          rows={3}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          placeholder="Texto da observação"
                         />
                         <div className="flex space-x-2">
                           <Button 
                             size="sm" 
                             onClick={handleUpdate}
-                            disabled={!editTitle.trim() || updateMutation.isPending}
+                            disabled={!editText.trim() || updateMutation.isPending}
                           >
                             Salvar
                           </Button>
@@ -220,10 +199,7 @@ export function DefaultObservationsModal({
                     ) : (
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{observation.title}</h5>
-                          {observation.description && (
-                            <p className="text-sm text-gray-600 mt-1">{observation.description}</p>
-                          )}
+                          <p className="text-sm text-gray-800">{observation.text}</p>
                         </div>
                         <div className="flex space-x-1 ml-4">
                           <Button
