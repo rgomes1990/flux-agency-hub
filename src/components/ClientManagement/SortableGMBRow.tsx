@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -90,9 +91,6 @@ export function SortableGMBRow({
               <Paperclip className="h-3 w-3 text-gray-400" />
             )}
           </div>
-        </div>
-        <div className="w-52 p-2 text-sm text-gray-600 border-r border-gray-200">
-          {item.servicos}
         </div>
         {columns.map((column) => (
           <div key={column.id} className="w-48 p-2 border-r border-gray-200">

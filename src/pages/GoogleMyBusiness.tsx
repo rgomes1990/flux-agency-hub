@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useGoogleMyBusinessData } from '@/hooks/useGoogleMyBusinessData';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,8 @@ import {
   Menu,
   ChevronUp,
   ChevronDown as ChevronDownIcon,
-  Move
+  Move,
+  FileText
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -24,6 +26,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ClientDetails } from '@/components/ClientManagement/ClientDetails';
 import { SortableGMBRow } from '@/components/ClientManagement/SortableGMBRow';
+import { DefaultObservationsModal } from '@/components/ServiceManagement/DefaultObservationsModal';
 import { 
   DndContext, 
   closestCenter, 
@@ -76,9 +79,8 @@ export default function GoogleMyBusiness() {
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState<string | null>(null);
   const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [showDefaultObservationsModal, setShowDefaultObservationsModal] = useState(false);
   const [newClientName, setNewClientName] = useState('');
-  const [newClientServices, setNewClientServices] = useState('');
-  const [newClientInfo, setNewClientInfo] = useState('');
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
   const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
@@ -137,13 +139,11 @@ export default function GoogleMyBusiness() {
     
     addClient(selectedGroupForClient, {
       elemento: newClientName,
-      servicos: newClientServices,
-      informacoes: newClientInfo
+      servicos: '',
+      informacoes: ''
     });
     
     setNewClientName('');
-    setNewClientServices('');
-    setNewClientInfo('');
     setSelectedGroupForClient('');
     setShowClientDialog(false);
   };
@@ -387,6 +387,16 @@ export default function GoogleMyBusiness() {
             <Settings className="h-4 w-4 mr-1" />
             Gerenciar Status
           </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowDefaultObservationsModal(true)}
+            className={isMobile ? 'w-full' : ''}
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            Observações Padrões
+          </Button>
         </div>
       </div>
 
@@ -415,11 +425,9 @@ export default function GoogleMyBusiness() {
                   onCheckedChange={handleSelectAll}
                 />
               </div>
-                <div className="w-56 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-                <div className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Serviços</div>
-                <div className="w-64 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Informações</div>
+                <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
               {columns.map((column) => (
-                <div key={column.id} className="w-44 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                <div key={column.id} className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
                   {column.name}
                 </div>
               ))}
@@ -525,7 +533,7 @@ export default function GoogleMyBusiness() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Client Dialog */}
+      {/* Add Client Dialog - Simplified */}
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
@@ -548,19 +556,9 @@ export default function GoogleMyBusiness() {
               </select>
             </div>
             <Input
-              placeholder="Elemento"
+              placeholder="Nome do cliente"
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
-            />
-            <Input
-              placeholder="Serviços (ex: Gestão de Redes Sociais)"
-              value={newClientServices}
-              onChange={(e) => setNewClientServices(e.target.value)}
-            />
-            <Input
-              placeholder="Informações (ex: Telefone, Endereço)"
-              value={newClientInfo}
-              onChange={(e) => setNewClientInfo(e.target.value)}
             />
             <div className="flex space-x-2">
               <Button onClick={handleCreateClient} className="bg-blue-600 hover:bg-blue-700 flex-1">
@@ -679,6 +677,13 @@ export default function GoogleMyBusiness() {
         onUpdateStatus={(statusId, updates) => updateStatus(statusId, updates)}
         onDeleteStatus={deleteStatus}
         existingStatuses={statuses}
+      />
+
+      {/* Default Observations Modal */}
+      <DefaultObservationsModal
+        open={showDefaultObservationsModal}
+        onOpenChange={setShowDefaultObservationsModal}
+        module="google_my_business"
       />
 
       {/* Client Details Modal - Modified to exclude attachments */}

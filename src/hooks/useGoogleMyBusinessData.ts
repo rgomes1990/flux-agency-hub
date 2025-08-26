@@ -45,6 +45,34 @@ export function useGoogleMyBusinessData() {
     loadStatuses();
   }, []);
 
+  const loadDefaultObservations = async (): Promise<Array<{id: string, text: string, completed: boolean}>> => {
+    try {
+      const { data, error } = await supabase
+        .from('default_observations')
+        .select('*')
+        .eq('module', 'google_my_business')
+        .order('order_index', { ascending: true });
+
+      if (error) {
+        console.error('❌ Erro ao carregar observações padrões:', error);
+        return [];
+      }
+
+      if (data) {
+        return data.map(obs => ({
+          id: crypto.randomUUID(),
+          text: obs.text,
+          completed: false
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('❌ Erro ao carregar observações padrões:', error);
+      return [];
+    }
+  };
+
   const saveGoogleMyBusinessToDatabase = async (googleMyBusinessData: GoogleMyBusinessGroup[]) => {
     console.log('💾 GMB: Salvando dados no banco de dados...', googleMyBusinessData);
   
@@ -357,12 +385,16 @@ export function useGoogleMyBusinessData() {
 
   const addClient = async (groupId: string, client: Omit<GoogleMyBusinessItem, 'id'>) => {
     const newClientId = crypto.randomUUID();
+    
+    // Carregar observações padrões
+    const defaultObservations = await loadDefaultObservations();
+    
     const newClient: GoogleMyBusinessItem = {
       id: newClientId,
       elemento: client.elemento || '',
       servicos: client.servicos || '',
       informacoes: client.informacoes || '',
-      observacoes: client.observacoes || '',
+      observacoes: JSON.stringify(defaultObservations),
       status: client.status || { id: 'pending', name: 'Pendente', color: '#gray-500' },
       attachments: client.attachments || [],
       ...client
