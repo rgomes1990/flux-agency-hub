@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useGoogleMyBusinessData } from '@/hooks/useGoogleMyBusinessData';
 import { Button } from '@/components/ui/button';
@@ -82,7 +81,6 @@ export default function GoogleMyBusiness() {
   const [showDefaultObservationsModal, setShowDefaultObservationsModal] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [selectedGroupForClient, setSelectedGroupForClient] = useState('');
-  const [clientFile, setClientFile] = useState<File | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'status' | 'text'>('status');
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'client' | 'column' | 'month', id: string } | null>(null);
@@ -90,7 +88,6 @@ export default function GoogleMyBusiness() {
   const [showEditMonthDialog, setShowEditMonthDialog] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [clientObservations, setClientObservations] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  const [clientAttachments, setClientAttachments] = useState<Array<{ name: string; data: string; type: string; size?: number }>>([]);
 
   const toggleGroup = (groupId: string) => {
     updateGroups(groups.map(group => 
@@ -134,13 +131,11 @@ export default function GoogleMyBusiness() {
     setShowDuplicateDialog(false);
   };
 
-  const handleCreateClient = () => {
+  const handleCreateClient = async () => {
     if (!newClientName.trim() || !selectedGroupForClient) return;
     
-    addClient(selectedGroupForClient, {
-      elemento: newClientName,
-      servicos: '',
-      informacoes: ''
+    await addClient(selectedGroupForClient, {
+      elemento: newClientName
     });
     
     setNewClientName('');
@@ -170,7 +165,7 @@ export default function GoogleMyBusiness() {
   const handleEditMonth = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      const nameWithoutSuffix = group.name.replace(' - Google My Business', '');
+      const nameWithoutSuffix = group.name.replace(' - GMB', '');
       setEditingMonth({ id: groupId, name: nameWithoutSuffix });
       setShowEditMonthDialog(true);
     }
@@ -236,7 +231,6 @@ export default function GoogleMyBusiness() {
         setClientObservations([]);
       }
 
-      setClientAttachments([]);
       setShowClientDetails(clientId);
     }
   };
@@ -247,8 +241,6 @@ export default function GoogleMyBusiness() {
         const updates: any = { 
           observacoes: JSON.stringify(clientObservations)
         };
-
-        
         
         await updateClient(showClientDetails, updates);
       } catch (error) {
@@ -257,8 +249,6 @@ export default function GoogleMyBusiness() {
 
       setShowClientDetails(null);
       setClientObservations([]);
-      setClientAttachments([]);
-      setClientFile(null);
     }
   };
 
@@ -269,12 +259,7 @@ export default function GoogleMyBusiness() {
       deleteClient(clientId);
       
       addClient(newGroupId, {
-        elemento: client.elemento,
-        servicos: client.servicos || '',
-        informacoes: client.informacoes || '',
-        observacoes: client.observacoes,
-        status: client.status,
-        ...client
+        elemento: client.elemento
       });
       
       setShowClientDetails(null);
@@ -416,94 +401,92 @@ export default function GoogleMyBusiness() {
             }}
           >
             <div className="min-w-max" style={{ minWidth: '1200px' }}>
-          {/* Table Header */}
-          <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-            <div className="flex items-center min-w-max">
-              <div className="w-8 flex items-center justify-center p-2">
-                <Checkbox
-                  checked={selectedItems.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </div>
-                <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
-              {columns.map((column) => (
-                <div key={column.id} className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
-                  {column.name}
-                </div>
-              ))}
-              <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
-            </div>
-          </div>
-
-          {/* Group Items */}
-          {groups.map((group) => (
-            <div key={group.id}>
-              {/* Group Header */}
-              <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
+              {/* Table Header */}
+              <div className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
                 <div className="flex items-center min-w-max">
                   <div className="w-8 flex items-center justify-center p-2">
-                    <button onClick={() => toggleGroup(group.id)}>
-                      {group.isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600" />
-                      )}
-                    </button>
+                    <Checkbox
+                      checked={selectedItems.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
                   </div>
-                  <div className="flex items-center space-x-2 p-2 flex-1">
-                    <div className={`w-3 h-3 rounded ${group.color}`}></div>
-                    <span className="font-medium text-gray-900">{group.name}</span>
-                  </div>
-                  <div className="flex items-center space-x-1 p-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditMonth(group.id)}
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <div className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">Cliente</div>
+                  {columns.map((column) => (
+                    <div key={column.id} className="w-48 p-2 text-xs font-medium text-gray-600 border-r border-gray-300">
+                      {column.name}
+                    </div>
+                  ))}
+                  <div className="w-20 p-2 text-xs font-medium text-gray-600">Ações</div>
                 </div>
               </div>
 
               {/* Group Items */}
-              {group.isExpanded && (
-                <SortableContext 
-                  items={group.items.map(item => item.id)} 
-                  strategy={verticalListSortingStrategy}
-                >
-                  {group.items.map((item, index) => (
-                    <SortableGMBRow 
-                      key={item.id}
-                      item={item}
-                      groupId={group.id}
-                      index={index}
-                      selectedItems={selectedItems}
-                      columns={columns}
-                      onSelectItem={handleSelectItem}
-                      onOpenClientDetails={openClientDetails}
-                      onUpdateItemStatus={(itemId: string, field: string, statusId: string) => {
-                        updateItemStatus(itemId, { id: statusId, name: '', color: '' });
-                      }}
-                      onUpdateClientField={updateClient}
-                      onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
-                      getClientFiles={getClientFiles}
-                      statuses={statuses}
-                    />
-                  ))}
-                </SortableContext>
-              )}
-            </div>
-          ))}
+              {groups.map((group) => (
+                <div key={group.id}>
+                  {/* Group Header */}
+                  <div className="bg-blue-50 border-b border-gray-200 hover:bg-blue-100 transition-colors">
+                    <div className="flex items-center min-w-max">
+                      <div className="w-8 flex items-center justify-center p-2">
+                        <button onClick={() => toggleGroup(group.id)}>
+                          {group.isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-gray-600" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-2 p-2 flex-1">
+                        <div className={`w-3 h-3 rounded ${group.color}`}></div>
+                        <span className="font-medium text-gray-900">{group.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-1 p-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditMonth(group.id)}
+                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmDelete({ type: 'month', id: group.id })}
+                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Items */}
+                  {group.isExpanded && (
+                    <SortableContext 
+                      items={group.items.map(item => item.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {group.items.map((item, index) => (
+                        <SortableGMBRow 
+                          key={item.id}
+                          item={item}
+                          groupId={group.id}
+                          index={index}
+                          selectedItems={selectedItems}
+                          columns={columns}
+                          onSelectItem={handleSelectItem}
+                          onOpenClientDetails={openClientDetails}
+                          onUpdateItemStatus={updateItemStatus}
+                          onUpdateClientField={updateClient}
+                          onDeleteClient={(clientId) => setConfirmDelete({ type: 'client', id: clientId })}
+                          getClientFiles={getClientFiles}
+                          statuses={statuses}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </DndContext>
@@ -533,7 +516,7 @@ export default function GoogleMyBusiness() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Client Dialog - Simplified */}
+      {/* Add Client Dialog */}
       <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
         <DialogContent className={isMobile ? 'w-[95vw] max-w-none' : ''}>
           <DialogHeader>
@@ -686,7 +669,7 @@ export default function GoogleMyBusiness() {
         module="google_my_business"
       />
 
-      {/* Client Details Modal - Modified to exclude attachments */}
+      {/* Client Details Modal */}
       {showClientDetails && (
         <Dialog open={!!showClientDetails} onOpenChange={handleClientDetailsClose}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
@@ -737,7 +720,17 @@ export default function GoogleMyBusiness() {
                       className="flex-1"
                     />
                     <Button 
-                      onClick={() => {}} 
+                      onClick={() => {
+                        const newObs = {
+                          id: crypto.randomUUID(),
+                          text: (document.querySelector('input[placeholder="Nova observação..."]') as HTMLInputElement)?.value || '',
+                          completed: false
+                        };
+                        if (newObs.text.trim()) {
+                          setClientObservations([...clientObservations, newObs]);
+                          (document.querySelector('input[placeholder="Nova observação..."]') as HTMLInputElement).value = '';
+                        }
+                      }} 
                       size="sm"
                       className="bg-blue-600 hover:bg-blue-700"
                     >

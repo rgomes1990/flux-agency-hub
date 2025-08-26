@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { StatusButton } from '@/components/ServiceManagement/StatusButton';
 import { Input } from '@/components/ui/input';
-import { Edit, Trash2, Paperclip, Eye, GripVertical } from 'lucide-react';
+import { Edit, Trash2, Paperclip, GripVertical } from 'lucide-react';
 
 interface SortableGMBRowProps {
   item: any;
@@ -96,7 +96,7 @@ export function SortableGMBRow({
           <div key={column.id} className="w-48 p-2 border-r border-gray-200">
             {column.type === 'status' ? (
               <StatusButton
-                currentStatus={(item as any)[column.id] || ''}
+                currentStatus={item[column.id]?.id || item.status?.id || ''}
                 statuses={statuses}
                 onStatusChange={(statusId) => onUpdateItemStatus(item.id, column.id, statusId)}
               />
