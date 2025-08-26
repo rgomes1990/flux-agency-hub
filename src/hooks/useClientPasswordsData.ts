@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,18 +60,10 @@ export const useClientPasswordsData = () => {
     try {
       console.log('🔄 Adicionando senha:', passwordData);
       
-      // Primeiro criar backup dos dados atuais
-      if (user && logAudit) {
-        await logAudit('client_passwords', 'backup', 'BACKUP', null, { 
-          total_passwords: passwords.length,
-          action: 'before_insert' 
-        });
-      }
-      
       const { data, error } = await supabase
         .from('client_passwords')
         .insert({
-          user_id: user?.id || null,
+          user_id: null, // Definindo como null para usar as políticas globais
           cliente: passwordData.cliente,
           plataforma: passwordData.plataforma,
           observacoes: passwordData.observacoes || null,
@@ -99,7 +92,7 @@ export const useClientPasswordsData = () => {
 
       setPasswords(prev => [newPassword, ...prev]);
 
-      // Registrar na auditoria
+      // Registrar na auditoria apenas se conseguirmos inserir
       if (user && logAudit) {
         await logAudit('client_passwords', data.id, 'INSERT', null, {
           cliente: passwordData.cliente,
