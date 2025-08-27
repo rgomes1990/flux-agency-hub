@@ -155,12 +155,13 @@ export function ClientDetails({
               <div className="p-4 space-y-4">
                 {/* Adicionar Nova Observação */}
                 <div className="flex space-x-2">
-                  <Input
+                  <Textarea
                     placeholder="Nova observação..."
                     value={newObservation}
                     onChange={(e) => setNewObservation(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addObservation()}
-                    className="flex-1"
+                    onKeyPress={(e) => e.key === 'Enter' && e.ctrlKey && addObservation()}
+                    className="flex-1 resize-none"
+                    rows={2}
                   />
                   <Button 
                     onClick={addObservation} 
