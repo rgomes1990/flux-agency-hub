@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -92,13 +93,16 @@ export function SortablePadariasRow({
         {customColumns.map((column) => (
           <div key={column.id} className="w-44 p-2 border-r border-gray-200">
             {column.type === 'status' ? (
-            <StatusButton
-              currentStatus={item[column.name] || statuses[0]?.name || 'Pendente'}
-              statuses={statuses}
-              onStatusChange={(statusName) => onUpdateItemStatus(item.id, column.name, statusName)}
-            />
+              <StatusButton
+                currentStatus={item[column.id]?.id || ''}
+                statuses={statuses}
+                onStatusChange={(statusId) => {
+                  console.log('🎨 Padarias: Selecionando status para coluna:', column.id, 'status:', statusId);
+                  onUpdateItemStatus(item.id, column.id, statusId);
+                }}
+              />
             ) : (
-              <span className="text-sm text-gray-700">{item[column.name] || ''}</span>
+              <span className="text-sm text-gray-700">{item[column.id] || ''}</span>
             )}
           </div>
         ))}

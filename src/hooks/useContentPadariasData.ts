@@ -37,7 +37,6 @@ export interface ContentPadariasStatus {
 
 export function useContentPadariasData() {
   const [groups, setGroups] = useState<ContentPadariasGroup[]>([]);
-  const [columns, setColumns] = useState<ContentPadariasColumn[]>([]);
   const [customColumns, setCustomColumns] = useState<ContentPadariasColumn[]>([]);
   const [statuses, setStatuses] = useState<ContentPadariasStatus[]>([]);
 
@@ -105,11 +104,13 @@ export function useContentPadariasData() {
   };
 
   const addStatus = async (status: ContentPadariasStatus) => {
+    console.log('➕ Adicionando status:', status);
     setStatuses([...statuses, status]);
     await saveStatusesToDatabase([...statuses, status]);
   };
 
   const updateStatus = async (updatedStatus: ContentPadariasStatus) => {
+    console.log('✏️ Atualizando status:', updatedStatus);
     const updatedStatuses = statuses.map(status =>
       status.id === updatedStatus.id ? updatedStatus : status
     );
@@ -119,12 +120,14 @@ export function useContentPadariasData() {
   };
 
   const deleteStatus = async (statusId: string) => {
+    console.log('🗑️ Deletando status:', statusId);
     const updatedStatuses = statuses.filter(status => status.id !== statusId);
     setStatuses(updatedStatuses);
     await saveStatusesToDatabase(updatedStatuses);
   };
 
   const addColumn = async (columnName: string, columnType: 'status' | 'text') => {
+    console.log('➕ Adicionando coluna:', { columnName, columnType });
     const newColumn = {
       id: crypto.randomUUID(),
       name: columnName,
@@ -136,6 +139,7 @@ export function useContentPadariasData() {
   };
 
   const updateColumn = async (updatedColumn: ContentPadariasColumn) => {
+    console.log('✏️ Atualizando coluna:', updatedColumn);
     const updatedColumns = customColumns.map(column =>
       column.id === updatedColumn.id ? updatedColumn : column
     );
@@ -145,6 +149,7 @@ export function useContentPadariasData() {
   };
 
   const deleteColumn = async (columnId: string) => {
+    console.log('🗑️ Deletando coluna:', columnId);
     const updatedColumns = customColumns.filter(column => column.id !== columnId);
     setCustomColumns(updatedColumns);
     await saveColumnsToDatabase(updatedColumns);
@@ -176,12 +181,25 @@ export function useContentPadariasData() {
     await saveColumnsToDatabase(newColumns);
   };
 
-  const updateItemStatus = async (itemId: string, status: any) => {
+  const updateItemStatus = async (itemId: string, field: string, statusId: string) => {
+    console.log('🎨 Atualizando status do item:', { itemId, field, statusId });
+    
+    // Encontrar o status pelo ID
+    const selectedStatus = statuses.find(s => s.id === statusId);
+    if (!selectedStatus) {
+      console.warn('⚠️ Status não encontrado:', statusId);
+      return;
+    }
+
     const updatedGroups = groups.map(group => ({
       ...group,
       items: group.items.map(item => {
         if (item.id === itemId) {
-          return { ...item, status: status };
+          console.log('📝 Atualizando campo:', field, 'com status:', selectedStatus);
+          return { 
+            ...item, 
+            [field]: selectedStatus  // Armazena o objeto status completo no campo específico
+          };
         }
         return item;
       })
@@ -628,13 +646,13 @@ export function useContentPadariasData() {
   };
 
   const loadColumns = useCallback(async () => {
+    console.log('🔄 Carregando colunas...');
     try {
-      // Use status_config table with proper filtering
       const { data, error } = await supabase
-        .from('status_config')
+        .from('column_config')
         .select('*')
         .eq('module', 'content_padarias')
-        .order('created_at', { ascending: false });
+        .order('column_order', { ascending: true });
 
       if (error) {
         console.error('❌ Erro ao carregar colunas:', error);
@@ -643,11 +661,11 @@ export function useContentPadariasData() {
 
       if (data) {
         const typedColumns = data.map(col => ({
-          id: col.status_id,
-          name: col.status_name,
-          type: 'status' as const
+          id: col.column_id,
+          name: col.column_name,
+          type: col.column_type as 'status' | 'text'
         }));
-        setColumns(typedColumns);
+        console.log('✅ Colunas carregadas:', typedColumns);
         setCustomColumns(typedColumns);
       }
     } catch (error) {
@@ -656,8 +674,8 @@ export function useContentPadariasData() {
   }, []);
 
   const loadStatuses = useCallback(async () => {
+    console.log('🔄 Carregando status...');
     try {
-      // Use status_config table with proper filtering
       const { data, error } = await supabase
         .from('status_config')
         .select('*')
@@ -675,6 +693,7 @@ export function useContentPadariasData() {
           name: status.status_name,
           color: status.status_color
         }));
+        console.log('✅ Status carregados:', typedStatuses);
         setStatuses(typedStatuses);
       }
     } catch (error) {
@@ -688,7 +707,7 @@ export function useContentPadariasData() {
     try {
       // Delete existing columns for this module
       const { error: deleteError } = await supabase
-        .from('status_config')
+        .from('column_config')
         .delete()
         .eq('module', 'content_padarias');
 
@@ -698,16 +717,17 @@ export function useContentPadariasData() {
       }
 
       // Insert new columns
-      const formattedColumns = columns.map(column => ({
-        status_id: column.id,
-        status_name: column.name,
-        status_color: '#3b82f6',
+      const formattedColumns = columns.map((column, index) => ({
+        column_id: column.id,
+        column_name: column.name,
+        column_type: column.type,
+        column_order: index,
         module: 'content_padarias'
       }));
 
       if (formattedColumns.length > 0) {
         const { error: insertError } = await supabase
-          .from('status_config')
+          .from('column_config')
           .insert(formattedColumns);
 
         if (insertError) {
@@ -764,7 +784,6 @@ export function useContentPadariasData() {
 
   return {
     groups,
-    columns,
     customColumns,
     statuses,
     updateGroups,
