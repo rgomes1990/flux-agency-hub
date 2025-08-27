@@ -48,7 +48,6 @@ export default function ContentPadarias() {
   const isMobile = useIsMobile();
   const { 
     groups, 
-    columns,
     customColumns, // Use customColumns for management interface
     statuses,
     updateGroups, 
@@ -343,7 +342,7 @@ export default function ContentPadarias() {
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900">Conteúdo Padarias</h1>
             <div className="text-xs text-gray-500">
-              Grupos: {groups.length} | Colunas: {columns.length} | Status: {statuses.length}
+              Grupos: {groups.length} | Colunas: {customColumns.length} | Status: {statuses.length}
             </div>
           </div>
           {isMobile && (
