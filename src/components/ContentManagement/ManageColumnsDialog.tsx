@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { ContentColumn } from '@/hooks/useContentData';
 
 interface ManageColumnsDialogProps {
-  customColumns?: any[];
+  customColumns: ContentColumn[];
+  onUpdateColumns: (columns: ContentColumn[]) => void;
   onAddColumn?: (name: string, type: 'status' | 'text') => void;
   onMoveColumnUp?: (columnId: string) => void;
   onMoveColumnDown?: (columnId: string) => void;
@@ -16,6 +18,7 @@ interface ManageColumnsDialogProps {
 
 export function ManageColumnsDialog({ 
   customColumns = [],
+  onUpdateColumns,
   onAddColumn,
   onMoveColumnUp,
   onMoveColumnDown,
@@ -26,9 +29,21 @@ export function ManageColumnsDialog({
   const [columnType, setColumnType] = useState<'status' | 'text'>('status');
 
   const handleAddColumn = () => {
-    if (!columnName.trim() || !onAddColumn) return;
+    if (!columnName.trim()) return;
     
-    onAddColumn(columnName, columnType);
+    if (onAddColumn) {
+      onAddColumn(columnName, columnType);
+    } else {
+      // Fallback: create new column and update the columns list
+      const newColumn: ContentColumn = {
+        id: Date.now().toString(),
+        name: columnName,
+        type: columnType,
+        order: customColumns.length
+      };
+      onUpdateColumns([...customColumns, newColumn]);
+    }
+    
     setColumnName('');
     setColumnType('status');
   };

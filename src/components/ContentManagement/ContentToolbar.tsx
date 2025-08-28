@@ -2,8 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Grid, List, Settings, Download, Upload, Plus, Copy, UserPlus } from 'lucide-react';
+import { Search, Grid, List, Download } from 'lucide-react';
 import { CreateMonthDialog } from './CreateMonthDialog';
 import { DuplicateMonthDialog } from './DuplicateMonthDialog';
 import { CreateClientDialog } from './CreateClientDialog';
@@ -29,7 +28,7 @@ export function ContentToolbar({
   onSearchChange,
   viewMode,
   onViewModeChange,
-  selectedItems,
+  selectedItems = [], // Default to empty array to prevent undefined errors
   groups,
   customColumns,
   onCreateMonth,
@@ -37,6 +36,20 @@ export function ContentToolbar({
   onAddClient,
   onUpdateColumns
 }: ContentToolbarProps) {
+  const handleCreateMonth = (monthName: string) => {
+    // Generate a random color for the month
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 'bg-indigo-500'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    onCreateMonth(monthName, randomColor);
+  };
+
+  const handleDuplicateMonth = (groupId: string, newMonthName: string) => {
+    // Generate a random color for the duplicated month
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 'bg-indigo-500'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    onDuplicateMonth(groupId, newMonthName, randomColor);
+  };
+
   return (
     <div className="bg-white border-b border-gray-200 p-4">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -74,12 +87,12 @@ export function ContentToolbar({
         <div className="flex items-center space-x-2">
           <CreateClientDialog groups={groups} onAddClient={onAddClient} />
           
-          <CreateMonthDialog onCreateMonth={onCreateMonth} />
+          <CreateMonthDialog onCreateMonth={handleCreateMonth} />
           
-          <DuplicateMonthDialog groups={groups} onDuplicateMonth={onDuplicateMonth} />
+          <DuplicateMonthDialog groups={groups} onDuplicateMonth={handleDuplicateMonth} />
           
           <ManageColumnsDialog
-            columns={customColumns}
+            customColumns={customColumns}
             onUpdateColumns={onUpdateColumns}
           />
 

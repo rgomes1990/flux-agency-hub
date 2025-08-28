@@ -230,6 +230,19 @@ export default function Content() {
     updateClient(itemId, { [field]: statusId });
   };
 
+  const handleCreateMonth = (name: string, color: string) => {
+    createMonth(name);
+  };
+
+  const handleDuplicateMonth = (sourceGroupId: string, newName: string, newColor: string) => {
+    duplicateMonth(sourceGroupId, newName);
+  };
+
+  const handleUpdateColumns = (columns: any[]) => {
+    // Implementation for updating columns
+    console.log('Updating columns:', columns);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DndContext
@@ -252,8 +265,13 @@ export default function Content() {
           onSearchChange={setSearchTerm}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          selectedItems={selectedItems}
           groups={groups}
-          onManageStatuses={() => setShowStatusModal(true)}
+          customColumns={customColumns}
+          onCreateMonth={handleCreateMonth}
+          onDuplicateMonth={handleDuplicateMonth}
+          onAddClient={addClient}
+          onUpdateColumns={handleUpdateColumns}
         />
 
         {/* Main Content */}
@@ -288,7 +306,7 @@ export default function Content() {
               </p>
               {!searchTerm && (
                 <CreateMonthDialog 
-                  onCreateMonth={createMonth}
+                  onCreateMonth={handleCreateMonth}
                   trigger={
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
@@ -303,11 +321,12 @@ export default function Content() {
       </DndContext>
 
       {/* Dialogs */}
-      <CreateMonthDialog onCreateMonth={createMonth} />
-      <DuplicateMonthDialog groups={groups} onDuplicateMonth={duplicateMonth} />
+      <CreateMonthDialog onCreateMonth={handleCreateMonth} />
+      <DuplicateMonthDialog groups={groups} onDuplicateMonth={handleDuplicateMonth} />
       <CreateClientDialog groups={groups} onAddClient={addClient} />
       <ManageColumnsDialog 
         customColumns={customColumns}
+        onUpdateColumns={handleUpdateColumns}
         onAddColumn={addColumn}
         onMoveColumnUp={moveColumnUp}
         onMoveColumnDown={moveColumnDown}
