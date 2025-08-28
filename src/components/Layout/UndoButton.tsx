@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo2 } from 'lucide-react';
@@ -9,31 +10,27 @@ export function UndoButton() {
   const { toast } = useToast();
 
   const handleUndo = () => {
-    const description = undoLastAction();
-    if (description) {
+    const undoDescription = undoLastAction();
+    if (undoDescription) {
       toast({
         title: "Ação desfeita",
-        description: `Desfez: ${description}`,
+        description: undoDescription,
+        duration: 3000,
       });
     }
   };
 
-  // Debug logging
-  console.log('UndoButton render:', { hasUndo, undoCount: hasUndo });
-
-  // Always show for debugging - remove the hasUndo check temporarily
-  // if (!hasUndo) return null;
+  if (!hasUndo) return null;
 
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={handleUndo}
-      disabled={!hasUndo}
-      className="flex items-center gap-2"
+      className="flex items-center space-x-2 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
     >
       <Undo2 className="h-4 w-4" />
-      Desfazer
+      <span className="hidden sm:inline">Desfazer</span>
     </Button>
   );
 }
