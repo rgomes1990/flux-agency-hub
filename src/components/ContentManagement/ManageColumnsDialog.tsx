@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,8 +37,7 @@ export function ManageColumnsDialog({
       const newColumn: ContentColumn = {
         id: Date.now().toString(),
         name: columnName,
-        type: columnType,
-        order: customColumns.length
+        type: columnType
       };
       onUpdateColumns([...customColumns, newColumn]);
     }

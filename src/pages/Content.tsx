@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -230,11 +229,11 @@ export default function Content() {
     updateClient(itemId, { [field]: statusId });
   };
 
-  const handleCreateMonth = (name: string, color: string) => {
+  const handleCreateMonth = (name: string) => {
     createMonth(name);
   };
 
-  const handleDuplicateMonth = (sourceGroupId: string, newName: string, newColor: string) => {
+  const handleDuplicateMonth = (sourceGroupId: string, newName: string) => {
     duplicateMonth(sourceGroupId, newName);
   };
 

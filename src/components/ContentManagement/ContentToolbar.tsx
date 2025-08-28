@@ -17,8 +17,8 @@ interface ContentToolbarProps {
   selectedItems: string[];
   groups: ContentGroup[];
   customColumns: ContentColumn[];
-  onCreateMonth: (name: string, color: string) => void;
-  onDuplicateMonth: (sourceGroupId: string, newName: string, newColor: string) => void;
+  onCreateMonth: (name: string) => void;
+  onDuplicateMonth: (sourceGroupId: string, newName: string) => void;
   onAddClient: (groupId: string, client: { elemento: string; servicos: string }) => void;
   onUpdateColumns: (columns: ContentColumn[]) => void;
 }
@@ -28,7 +28,7 @@ export function ContentToolbar({
   onSearchChange,
   viewMode,
   onViewModeChange,
-  selectedItems = [], // Default to empty array to prevent undefined errors
+  selectedItems = [],
   groups,
   customColumns,
   onCreateMonth,
@@ -36,20 +36,6 @@ export function ContentToolbar({
   onAddClient,
   onUpdateColumns
 }: ContentToolbarProps) {
-  const handleCreateMonth = (monthName: string) => {
-    // Generate a random color for the month
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 'bg-indigo-500'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    onCreateMonth(monthName, randomColor);
-  };
-
-  const handleDuplicateMonth = (groupId: string, newMonthName: string) => {
-    // Generate a random color for the duplicated month
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 'bg-indigo-500'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    onDuplicateMonth(groupId, newMonthName, randomColor);
-  };
-
   return (
     <div className="bg-white border-b border-gray-200 p-4">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -87,9 +73,9 @@ export function ContentToolbar({
         <div className="flex items-center space-x-2">
           <CreateClientDialog groups={groups} onAddClient={onAddClient} />
           
-          <CreateMonthDialog onCreateMonth={handleCreateMonth} />
+          <CreateMonthDialog onCreateMonth={onCreateMonth} />
           
-          <DuplicateMonthDialog groups={groups} onDuplicateMonth={handleDuplicateMonth} />
+          <DuplicateMonthDialog groups={groups} onDuplicateMonth={onDuplicateMonth} />
           
           <ManageColumnsDialog
             customColumns={customColumns}
