@@ -1,6 +1,6 @@
 
 import { createContext, useContext } from 'react';
-import { useAuth as useAuthHook } from '@/hooks/useAuth';
+import { useAuth as useAuthHook, AuthProvider as AuthProviderHook } from '@/hooks/useAuth';
 
 interface AppUser {
   id: string;
@@ -20,19 +20,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const auth = useAuthHook();
-
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthProviderHook>
       {children}
-    </AuthContext.Provider>
+    </AuthProviderHook>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useAuthHook();
 }
