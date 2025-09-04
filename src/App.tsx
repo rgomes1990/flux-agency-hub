@@ -1,172 +1,139 @@
 
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
-import MainLayout from '@/components/Layout/MainLayout';
-import Dashboard from '@/pages/Dashboard';
-import Tasks from '@/pages/Tasks';
-import { UndoProvider } from '@/contexts/UndoContext';
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { AuthProvider } from './contexts/AuthContext';
-import Login from './pages/Login';
-import { RequireAuth } from './components/RequireAuth';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+import { UndoProvider } from './contexts/UndoContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import MainLayout from './components/Layout/MainLayout';
+import Auth from './pages/Auth';
+import Index from './pages/Index';
+import Dashboard from './pages/Dashboard';
 import Content from './pages/Content';
-import UsersPage from './pages/Users';
-import ClientPasswords from './pages/ClientPasswords';
-import Audit from './pages/Audit';
-import Traffic from './pages/Traffic';
+import ContentPadarias from './pages/ContentPadarias';
 import Sites from './pages/Sites';
+import Tasks from './pages/Tasks';
+import Traffic from './pages/Traffic';
 import GoogleMyBusiness from './pages/GoogleMyBusiness';
 import RSGAvaliacoes from './pages/RSGAvaliacoes';
 import Videos from './pages/Videos';
-import ContentPadarias from './pages/ContentPadarias';
-import { ThemeProvider } from '@/hooks/useTheme';
+import Users from './pages/Users';
+import ClientPasswords from './pages/ClientPasswords';
+import Audit from './pages/Audit';
+import NotFound from './pages/NotFound';
+
+function RoutePreserver() {
+  const location = useLocation();
+  
+  useEffect(() => {
+    sessionStorage.setItem('lastRoute', location.pathname);
+  }, [location.pathname]);
+
+  return null;
+}
 
 function App() {
+  useEffect(() => {
+    // Simplesmente não fazer nenhum redirecionamento automático
+    console.log('App initialized - staying on current page:', window.location.pathname);
+  }, []);
+
   return (
-    <ThemeProvider>
+    <AuthProvider>
       <UndoProvider>
-        <TooltipProvider>
-          <AuthProvider>
-            <Toaster />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route
-                  path="/"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Dashboard />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Dashboard />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/tasks"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Tasks />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/content"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Content />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/content-padarias"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <ContentPadarias />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/users"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <UsersPage />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/client-passwords"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <ClientPasswords />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/audit"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Audit />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/traffic"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Traffic />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/sites"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Sites />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/google-my-business"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <GoogleMyBusiness />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/rsg-avaliacoes"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <RSGAvaliacoes />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/videos"
-                  element={
-                    <RequireAuth>
-                      <MainLayout>
-                        <Videos />
-                      </MainLayout>
-                    </RequireAuth>
-                  }
-                />
-              </Routes>
-            </BrowserRouter>
-          </AuthProvider>
-        </TooltipProvider>
+        <Router>
+          <RoutePreserver />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/content" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Content />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/content-padarias" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ContentPadarias />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/sites" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Sites />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Tasks />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/traffic" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Traffic />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+            <Route path="/google-my-business" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <GoogleMyBusiness />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/rsg-avaliacoes" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <RSGAvaliacoes />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/videos" element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Videos />
+                </MainLayout>
+              </ProtectedRoute>
+            } />
+          <Route path="/users" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Users />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/client-passwords" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ClientPasswords />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/audit" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Audit />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Router>
       </UndoProvider>
-    </ThemeProvider>
+    </AuthProvider>
   );
 }
 

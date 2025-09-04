@@ -106,7 +106,7 @@ export default function Sidebar() {
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden fixed top-4 left-4 z-50 bg-background shadow-md"
+        className="lg:hidden fixed top-4 left-4 z-50 bg-white shadow-md"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
         <Menu className="h-5 w-5" />
@@ -122,19 +122,19 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border shadow-xl transition-all duration-300 z-40",
+        "fixed left-0 top-0 h-screen bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-40",
         isCollapsed ? "w-16" : "w-64",
         "lg:translate-x-0",
         isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         {/* Header */}
-        <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           {!isCollapsed && (
             <div>
-              <h1 className="text-xl font-bold gradient-text">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 RSG Tarefas
               </h1>
-              <p className="text-sm text-sidebar-foreground/70 mt-1">Agência de Marketing</p>
+              <p className="text-sm text-gray-500 mt-1">Agência de Marketing</p>
             </div>
           )}
           
@@ -142,7 +142,7 @@ export default function Sidebar() {
             variant="ghost"
             size="icon"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex h-8 w-8 hover:bg-sidebar-accent"
+            className="hidden lg:flex h-8 w-8 hover:bg-gray-100"
           >
             {isCollapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -167,29 +167,29 @@ export default function Sidebar() {
                     className={cn(
                       "flex items-center space-x-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative",
                       isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                        ? "bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 shadow-sm"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     )}
                   >
                     <div className={cn(
                       "p-2 rounded-lg transition-colors",
-                      isActive ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "group-hover:bg-sidebar-primary/10"
+                      isActive ? "bg-white shadow-sm" : "group-hover:bg-white group-hover:shadow-sm"
                     )}>
-                      <Icon className={cn("h-4 w-4", isActive ? "text-sidebar-primary-foreground" : item.color)} />
+                      <Icon className={cn("h-4 w-4", isActive ? item.color : "text-gray-500 group-hover:text-gray-700")} />
                     </div>
                     
                     {!isCollapsed && (
                       <>
                         <span className="flex-1">{item.name}</span>
                         {isActive && (
-                          <div className="w-2 h-2 bg-sidebar-primary rounded-full" />
+                          <div className="w-2 h-2 bg-blue-600 rounded-full" />
                         )}
                       </>
                     )}
                     
                     {/* Tooltip for collapsed state */}
                     {isCollapsed && (
-                      <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border shadow-md">
+                      <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                         {item.name}
                       </div>
                     )}
@@ -202,9 +202,9 @@ export default function Sidebar() {
 
         {/* Footer */}
         {!isCollapsed && (
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="bg-sidebar-accent p-3 rounded-lg">
-              <p className="text-xs text-sidebar-foreground/70 text-center">
+          <div className="p-4 border-t border-gray-100">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-600 text-center">
                 © 2024 RSG Tarefas
               </p>
             </div>
