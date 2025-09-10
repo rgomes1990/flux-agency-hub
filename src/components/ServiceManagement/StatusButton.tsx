@@ -46,7 +46,7 @@ export function StatusButton({ currentStatus, statuses, onStatusChange }: Status
             backgroundColor: currentStatusObj?.color?.includes('bg-') ? undefined : currentStatusObj?.color
           }}
         >
-          {currentStatusObj?.name || 'Selecionar Status'}
+          {currentStatusObj?.name || 'Status'}
           <ChevronDown className="h-3 w-3 ml-1" />
         </Button>
       </DropdownMenuTrigger>

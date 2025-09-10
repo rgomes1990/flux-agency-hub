@@ -370,7 +370,7 @@ export default function GoogleMyBusiness() {
             className={isMobile ? 'w-full' : ''}
           >
             <Settings className="h-4 w-4 mr-1" />
-            Gerenciar Status
+            Status
           </Button>
 
           <Button 

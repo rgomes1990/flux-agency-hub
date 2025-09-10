@@ -67,7 +67,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium">{user?.username || 'Usuário'}</p>
-              <p className="text-xs text-gray-500">{user?.email || 'admin@rsg.com'}</p>
+              <p className="text-xs text-gray-500">admin@rsg.com</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
